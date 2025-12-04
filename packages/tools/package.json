@@ -1,0 +1,6 @@
+{
+  "name": "@demo/tools",
+  "type": "module",
+  "module": "src/index.ts",
+  "private": true
+}

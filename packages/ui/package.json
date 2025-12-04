@@ -1,0 +1,10 @@
+{
+  "name": "@demo/ui",
+  "type": "module",
+  "module": "src/index.ts",
+  "private": true,
+  "dependencies": {
+    "@demo/core": "workspace:*",
+    "@demo/tools": "workspace:*"
+  }
+}

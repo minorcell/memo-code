@@ -1,0 +1,6 @@
+{
+  "name": "@demo/core",
+  "type": "module",
+  "module": "src/index.ts",
+  "private": true
+}

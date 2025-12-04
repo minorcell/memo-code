@@ -1,11 +1,17 @@
 {
   "name": "react-demo",
-  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --target bun --outdir dist"
+    "start": "bun run packages/ui/src/index.ts",
+    "build": "bun build packages/ui/src/index.ts --target bun --outdir dist"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "imports": {
+    "@demo/core": "./packages/core/src/index.ts",
+    "@demo/tools": "./packages/tools/src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

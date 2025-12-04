@@ -29,6 +29,6 @@
 
 ## 自定义
 
-- 修改 `src/prompt.tmpl` 调整行为
-- 在 `src/tools/` 添加新工具
-- 调试可调整 `src/index.ts` 中的参数
+- 修改 `packages/core/prompt.tmpl` 调整行为
+- 在 `packages/tools/src/` 添加新工具或调整现有工具
+- Core 主循环在 `packages/core/src/index.ts`，UI 入口在 `packages/ui/src/index.ts`

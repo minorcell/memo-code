@@ -24,6 +24,15 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+
+    // Workspace path aliases
+    "baseUrl": ".",
+    "paths": {
+      "@demo/core": ["packages/core/src/index.ts"],
+      "@demo/core/*": ["packages/core/src/*"],
+      "@demo/tools": ["packages/tools/src/index.ts"],
+      "@demo/tools/*": ["packages/tools/src/*"]
+    }
   }
 }

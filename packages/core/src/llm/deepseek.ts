@@ -1,4 +1,4 @@
-import type { ChatMessage } from "../utils"
+import type { ChatMessage } from "../types"
 import { requestJson } from "../utils/request"
 
 type DeepSeekMessage = { content?: string }
