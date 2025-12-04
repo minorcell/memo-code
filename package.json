@@ -1,8 +1,12 @@
 {
   "name": "react-demo",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --target bun --outdir dist"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

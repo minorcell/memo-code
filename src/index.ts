@@ -1,7 +1,15 @@
-// 入口：运行 ReAct Agent，调用 DeepSeek 与工具集，落盘对话到 history.xml
 import { TOOLKIT } from "./tools"
-import type { ToolName, AgentResult, ChatMessage } from "./types"
-import { loadSystemPrompt, parseAssistant, writeHistory, wrapMessage, callDeepSeek, HISTORY_FILE } from "./utils"
+import type { ToolName } from "./tools/types"
+import {
+    loadSystemPrompt,
+    parseAssistant,
+    writeHistory,
+    wrapMessage,
+    HISTORY_FILE,
+    type AgentResult,
+    type ChatMessage,
+} from "./utils"
+import { callDeepSeek } from "./apis/deepseek"
 export const MAX_STEPS = 100
 
 async function runAgent(question: string): Promise<AgentResult> {
