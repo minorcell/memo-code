@@ -5,6 +5,10 @@ type DeepSeekMessage = { content?: string }
 type DeepSeekChoice = { message?: DeepSeekMessage }
 type DeepSeekResponse = { choices?: DeepSeekChoice[] }
 
+/**
+ * 调用 DeepSeek Chat API，返回模型回复文本。
+ * @throws 当缺失密钥或返回体异常时抛出错误。
+ */
 export async function callDeepSeek(messages: ChatMessage[]): Promise<string> {
     const apiKey = process.env.DEEPSEEK_API_KEY
     if (!apiKey) {

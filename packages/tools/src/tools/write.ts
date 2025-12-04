@@ -6,6 +6,7 @@ type WriteInput =
     | { file_path?: string; content?: string }
     | { error: string }
 
+/** 解析 write 入参，确保路径和内容存在。 */
 function parseWriteInput(input: string): WriteInput {
     try {
         const parsed = JSON.parse(input)
@@ -24,6 +25,9 @@ function parseWriteInput(input: string): WriteInput {
     }
 }
 
+/**
+ * 覆盖写入文件内容，必要时递归创建父目录。
+ */
 export const write: ToolFn = async (rawInput: string) => {
     const parsed = parseWriteInput(rawInput.trim())
     if ("error" in parsed) return parsed.error
@@ -31,6 +35,7 @@ export const write: ToolFn = async (rawInput: string) => {
     const path = normalizePath(parsed.file_path!)
     const content = String(parsed.content ?? "")
     try {
+        // 如有需要递归创建父目录
         await ensureParentDir(path)
         await writeFile(path, content, { encoding: "utf8" })
         return `已写入 ${path} (overwrite, length=${content.length})`

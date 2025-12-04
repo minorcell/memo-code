@@ -10,6 +10,11 @@ import {
     type AgentDeps,
 } from "@memo/core"
 
+/**
+ * 包装一套默认依赖，供 CLI 调用 Agent。
+ * - 使用 DeepSeek 作为默认 LLM。
+ * - 将工具注册表与日志回调传入。
+ */
 async function run(question: string): Promise<AgentResult> {
     const deps: AgentDeps = {
         tools: TOOLKIT,
@@ -23,6 +28,9 @@ async function run(question: string): Promise<AgentResult> {
     return runAgent(question, deps)
 }
 
+/**
+ * CLI 入口：读取命令行问题，运行 Agent 并输出回答与历史。
+ */
 async function main() {
     const userQuestion = process.argv.slice(2).join(" ") || "给我做一个自我介绍"
     console.log(`用户问题: ${userQuestion}`)
