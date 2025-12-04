@@ -11,6 +11,9 @@ type EditInput =
       }
     | { error: string }
 
+/**
+ * 解析并校验 edit 入参，确保路径与替换文本有效。
+ */
 function parseEditInput(input: string): EditInput {
     try {
         const parsed = JSON.parse(input)
@@ -38,11 +41,15 @@ function parseEditInput(input: string): EditInput {
     }
 }
 
+/**
+ * 根据入参在目标文件中替换文本，支持单次或全局替换。
+ * 返回替换数量及文件路径，若未找到或未变更会返回提示语。
+ */
 export const edit: ToolFn = async (rawInput: string) => {
     const parsed = parseEditInput(rawInput.trim())
     if ("error" in parsed) return parsed.error
 
-    const path = normalizePath(parsed.file_path!)
+    const path = normalizePath(parsed.file_path!) // 统一为绝对路径，避免相对路径混淆
     const replaceAll = parsed.replace_all ?? false
 
     try {
@@ -59,10 +66,12 @@ export const edit: ToolFn = async (rawInput: string) => {
         let replaced: string
         let count = 0
         if (replaceAll) {
+            // 全局替换：拆分再拼接统计替换次数
             const parts = original.split(parsed.old_string!)
             count = parts.length - 1
             replaced = parts.join(parsed.new_string!)
         } else {
+            // 单次替换：只替换首个匹配
             replaced = original.replace(parsed.old_string!, parsed.new_string!)
             count = 1
         }
@@ -71,6 +80,7 @@ export const edit: ToolFn = async (rawInput: string) => {
             return "未检测到内容变化"
         }
 
+        // 持久化写回文件
         await ensureParentDir(path)
         await writeFile(path, replaced, { encoding: "utf8" })
         return `替换完成: file=${path} count=${count}`

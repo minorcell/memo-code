@@ -5,6 +5,7 @@ type GlobInput =
     | { pattern?: string; path?: string }
     | { error: string }
 
+/** 解析 glob 入参，限定 pattern 与 path 的类型。 */
 function parseGlobInput(input: string): GlobInput {
     try {
         const parsed = JSON.parse(input)
@@ -20,11 +21,16 @@ function parseGlobInput(input: string): GlobInput {
     }
 }
 
+/**
+ * 扫描目录下符合 pattern 的文件，返回绝对路径列表。
+ * 默认在当前工作目录执行，可通过 path 覆盖。
+ */
 export const glob: ToolFn = async (rawInput: string) => {
     const parsed = parseGlobInput(rawInput.trim())
     if ("error" in parsed) return parsed.error
 
     const cwd = parsed.path ? normalizePath(parsed.path) : process.cwd()
+    // Bun.Glob 按模式扫描匹配
     const globber = new Bun.Glob(parsed.pattern!)
     const matches: string[] = []
 

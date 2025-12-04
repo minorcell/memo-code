@@ -15,6 +15,7 @@ type GrepInput =
       }
     | { error: string }
 
+/** 解析 grep 入参，兼容常见 ripgrep 选项与输出模式。 */
 function parseGrepInput(input: string): GrepInput {
     try {
         const parsed = JSON.parse(input)
@@ -54,12 +55,16 @@ function parseGrepInput(input: string): GrepInput {
     }
 }
 
+/**
+ * 基于 ripgrep 查找文本，支持内容/文件列表/计数三种输出。
+ * 入参为 JSON 字符串，内部负责调用 rg 并处理错误码。
+ */
 export const grep: ToolFn = async (rawInput: string) => {
     const parsed = parseGrepInput(rawInput.trim())
     if ("error" in parsed) return parsed.error
 
     const basePath = parsed.path ? normalizePath(parsed.path) : process.cwd()
-    const args = ["rg", "--color", "never"]
+    const args = ["rg", "--color", "never"] // 使用 ripgrep，禁用颜色方便解析
     const mode = parsed.output_mode ?? "content"
 
     if (mode === "files_with_matches") {
@@ -70,6 +75,7 @@ export const grep: ToolFn = async (rawInput: string) => {
         args.push("--line-number", "--no-heading")
     }
 
+    // 追加大小写、glob 及上下文参数
     if (parsed["-i"]) args.push("-i")
     if (parsed.glob) args.push("--glob", parsed.glob)
     if (parsed["-A"] !== undefined) args.push("-A", String(parsed["-A"]))
@@ -83,12 +89,14 @@ export const grep: ToolFn = async (rawInput: string) => {
             stdout: "pipe",
             stderr: "pipe",
         })
+        // 并行收集输出，避免阻塞
         const [stdout, stderr] = await Promise.all([
             new Response(proc.stdout).text(),
             new Response(proc.stderr).text(),
         ])
         const exitCode = await proc.exited
 
+        // ripgrep 约定：2 表示错误；1 且无输出表示未匹配
         if (exitCode === 2) {
             return `grep 失败(exit=2): ${stderr || stdout}`
         }
