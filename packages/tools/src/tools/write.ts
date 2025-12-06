@@ -1,6 +1,5 @@
-import { writeFile } from "node:fs/promises"
 import type { ToolFn } from "@memo/tools/tools/types"
-import { ensureParentDir, normalizePath } from "@memo/tools/tools/helpers"
+import { normalizePath } from "@memo/tools/tools/helpers"
 
 type WriteInput =
     | { file_path?: string; content?: string }
@@ -35,9 +34,8 @@ export const write: ToolFn = async (rawInput: string) => {
     const path = normalizePath(parsed.file_path!)
     const content = String(parsed.content ?? "")
     try {
-        // 如有需要递归创建父目录
-        await ensureParentDir(path)
-        await writeFile(path, content, { encoding: "utf8" })
+        // Bun.write 会自动创建缺失的父目录
+        await Bun.write(path, content)
         return `已写入 ${path} (overwrite, length=${content.length})`
     } catch (err) {
         return `写入失败: ${(err as Error).message}`
