@@ -70,38 +70,52 @@
 - 渲染策略：沿用 `onAssistantStep` 打印每次模型输出；工具调用与 observation 也同步打印，便于可视化。
 - 命令行参数：`--once`、`--session-id`（可选复用外部 ID）、`--log-format=xml|jsonl|both`、`--log-dir`。
 
+## Token 计数与预算策略
+
+选择方案：**主力使用本地 tokenizer（@dqbd/tiktoken）做预估与限流，辅以 LLM 返回的 usage 作为对账**。理由：
+- 预估可在发请求前完成，便于拒绝/截断过长输入；LLM usage 只能事后拿到，且不同厂商字段不一致。
+- @dqbd/tiktoken 可在 Bun/Node 侧运行，稳定、开销小；流式/离线场景也能计算。
+- 仍保留对 `response.usage` 的记录，用于校验/审计，但不依赖它做硬限制。
+
+落地点：
+- Core Session 层维护 `tokenUsage`：`promptTokens`、`completionTokens`、`totalTokens`，分级累计（step/turn/session）。
+- 在每次 `callLLM` 前，用 tiktoken 对当前 `chatHistory` + 最新 user 输入做预估；若超过 `maxPromptTokens`，可选策略：a) 拒绝并要求用户缩短；b) 做窗口截断/摘要（后续扩展）。
+- 在得到 LLM 响应后，记录 `response.usage`（若存在），并用本地 tokenizer 对 assistant 内容做补记，兼容无 usage 的模型。
+- JSONL 事件中写入 `meta.tokens`，方便后续统计/成本分析。
+- CLI 增加配置：`--max-prompt-tokens`、`--warn-prompt-tokens`、`--tokenizer-model`（传给 tiktoken 的 encoding 名称）。
+
 ## JSONL 事件格式设计
 
 每行一条事件，字段固定，便于后续落 ES/ClickHouse 等：
 
-- 公共字段：`ts`（ISO）、`session_id`、`turn`（数字，从 1 开始）、`step`（数字，从 0 开始，限于 turn 内）、`type`（见下）、`content`（字符串）、`role`（system|user|assistant，可选）、`meta`（对象，放工具名、耗时、错误等）。
+- 公共字段：`ts`（ISO）、`session_id`、`turn`（数字，从 1 开始）、`step`（数字，从 0 开始，限于 turn 内）、`type`（见下）、`content`（字符串）、`role`（system|user|assistant，可选）、`meta`（对象，放工具名、耗时、token 等）。
 - 事件类型示例：
-  - `session_start` / `session_end`：`meta` 包含 `mode`、`config`（模型、温度、工作目录、工具开关）。
-  - `turn_start`：`content` 为原始用户输入。
-  - `assistant`：模型原文输出。
+  - `session_start` / `session_end`：`meta` 包含 `mode`、`config`（模型、温度、工作目录、工具开关、tokenizer）。
+  - `turn_start`：`content` 为原始用户输入；`meta.tokens.prompt` 为 user 输入的预估 tokens。
+  - `assistant`：模型原文输出；`meta.tokens` 记录本地/usage 的 completion/prompt/total。
   - `action`：`meta.tool`、`meta.input`（raw）；`content` 可为空或简述。
   - `observation`：`meta.tool`、`content` 为工具返回。
-  - `final`：`content` 为 `<final>` 文本。
-  - `turn_end`：`meta` 包含 `status`、`stepCount`、`durationMs`、`errorMessage?`。
+  - `final`：`content` 为 `<final>` 文本；`meta.tokens` 可包含本轮累计。
+  - `turn_end`：`meta` 包含 `status`、`stepCount`、`durationMs`、`errorMessage?`、`tokens`（该 turn 累计）。
 
 示例（简化）：
 
-```
-{"ts":"2024-05-10T12:00:00Z","session_id":"sess_x","type":"session_start","meta":{"mode":"interactive","model":"deepseek-chat"}}
-{"ts":"2024-05-10T12:00:05Z","session_id":"sess_x","turn":1,"type":"turn_start","content":"帮我读 README"}
-{"ts":"2024-05-10T12:00:06Z","session_id":"sess_x","turn":1,"step":0,"type":"assistant","content":"<thought>需要 read...</thought><action tool=\"read\">..."}
+```jsonl
+{"ts":"2024-05-10T12:00:00Z","session_id":"sess_x","type":"session_start","meta":{"mode":"interactive","model":"deepseek-chat","tokenizer":"cl100k_base"}}
+{"ts":"2024-05-10T12:00:05Z","session_id":"sess_x","turn":1,"type":"turn_start","content":"帮我读 README","meta":{"tokens":{"prompt":12}}}
+{"ts":"2024-05-10T12:00:06Z","session_id":"sess_x","turn":1,"step":0,"type":"assistant","content":"<thought>需要 read...</thought><action tool=\"read\">...","meta":{"tokens":{"prompt":120,"completion":35,"total":155}}}
 {"ts":"2024-05-10T12:00:06Z","session_id":"sess_x","turn":1,"step":0,"type":"action","meta":{"tool":"read","input":"/repo/README.md"}}
 {"ts":"2024-05-10T12:00:06Z","session_id":"sess_x","turn":1,"step":0,"type":"observation","meta":{"tool":"read"},"content":"(文件片段)"}
-{"ts":"2024-05-10T12:00:08Z","session_id":"sess_x","turn":1,"step":1,"type":"final","content":"README 摘要..."}
-{"ts":"2024-05-10T12:00:08Z","session_id":"sess_x","turn":1,"type":"turn_end","meta":{"status":"ok","stepCount":2,"durationMs":3000}}
+{"ts":"2024-05-10T12:00:08Z","session_id":"sess_x","turn":1,"step":1,"type":"final","content":"README 摘要...","meta":{"tokens":{"completion":28}}}
+{"ts":"2024-05-10T12:00:08Z","session_id":"sess_x","turn":1,"type":"turn_end","meta":{"status":"ok","stepCount":2,"durationMs":3000,"tokens":{"prompt":132,"completion":63,"total":195}}}
 {"ts":"2024-05-10T12:05:00Z","session_id":"sess_x","type":"session_end"}
 ```
 
 ## 历史文件与兼容性
 
 - 默认写入 `history/<sessionId>.jsonl`，便于一 Session 一文件；`--log-dir` 可定制路径。
-- XML 历史继续支持，用于快速肉眼复盘；可由 Session 结束时统一生成，也可按 `--log-format` 关闭。
-- 旧接口（返回 `logEntries`）保持不变，UI 按需选择写入 XML 或忽略。
+- XML 仅保留为核心的兼容写入工具，但默认 CLI 不再落盘 XML，专注 JSONL 结构化日志。
+- 旧接口（返回 `logEntries`）保持不变，便于需要 XML 的场景自行调用。
 
 ## 开放问题与后续
 
