@@ -38,10 +38,10 @@
 ## 项目结构
 
 - `packages/core`
-  - `config/`：常量等配置。
-  - `runtime/`：Session/Turn 运行时（日志、提示词加载、历史事件）。
-  - `llm/`：模型适配与 tokenizer（OpenAI 兼容 DeepSeek、tiktoken）。
-  - `utils/`：解析与请求工具。
+    - `config/`：常量等配置。
+    - `runtime/`：Session/Turn 运行时（日志、提示词加载、历史事件）。
+    - `llm/`：模型适配与 tokenizer（OpenAI 兼容 DeepSeek、tiktoken）。
+    - `utils/`：解析与请求工具。
 - `packages/tools`：内置工具集合，统一导出 `TOOLKIT`。
 - `packages/ui`：CLI 入口，组装 Core + Tools 并处理交互。
 - `docs/`：架构与设计文档。

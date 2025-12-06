@@ -12,19 +12,22 @@
 
 ## 近期优先事项
 
-1) Core
+1. Core
+
 - 完善 Session/Turn API：hook（onTurnStart/onAction/onObservation/onFinal）、可选上下文截断策略。
 - 提供摘要/截断策略接口，控制长上下文。
 - 优化 token 计数：集中封装 tiktoken + usage 对账，暴露预算超限的策略钩子。
 - 抽象历史 sink：文件 JSONL、stdout、可选远端（后续）。
 
-2) Tools
+2. Tools
+
 - 补全输入校验与错误信息一致性。
 - 增加常用工具（时间、env、文件大小、hash 等），保持最小泄漏。
 - 约定工具输出格式（简短、确定性），便于 UI 渲染。
 - 加强隔离：路径白名单/只读模式、网络超时等。
 
-3) 测试与 CI
+3. 测试与 CI
+
 - 继续用 `bun test` 覆盖解析、工具和 session 流程；mock LLM 以做单元测试。
 - CI 运行全套测试，安装所需依赖（如 ripgrep）。
 

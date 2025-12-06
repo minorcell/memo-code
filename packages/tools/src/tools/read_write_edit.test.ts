@@ -61,7 +61,7 @@ describe("edit tool", () => {
                 old_string: "foo",
                 new_string: "baz",
                 replace_all: false,
-            })
+            }),
         )
         assert.ok(res.includes("count=1"))
         const content = await readFile(target, "utf8")
@@ -77,7 +77,7 @@ describe("edit tool", () => {
                 old_string: "y",
                 new_string: "z",
                 replace_all: true,
-            })
+            }),
         )
         assert.ok(res.includes("count=2"))
         const content = await readFile(target, "utf8")

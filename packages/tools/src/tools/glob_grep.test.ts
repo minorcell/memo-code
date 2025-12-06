@@ -46,7 +46,7 @@ describe("grep tool", () => {
 
     test("supports count output mode", async () => {
         const res = await grep(
-            JSON.stringify({ pattern: "hello", path: tempDir, output_mode: "count" })
+            JSON.stringify({ pattern: "hello", path: tempDir, output_mode: "count" }),
         )
         if (!rgAvailable) {
             assert.strictEqual(res, "rg 未安装或不在 PATH")
