@@ -25,7 +25,10 @@ describe("glob tool", () => {
 
     test("matches pattern under provided path", async () => {
         const res = await glob(JSON.stringify({ pattern: "**/*.ts", path: tempDir }))
-        const files = res.split("\n").filter(Boolean).map((p) => basename(p))
+        const files = res
+            .split("\n")
+            .filter(Boolean)
+            .map((p) => basename(p))
         assert.deepStrictEqual(files.sort(), ["a.ts"])
     })
 })
