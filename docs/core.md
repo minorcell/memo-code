@@ -61,12 +61,12 @@ return { answer: "未能生成最终回答，请重试或调整问题。", logEn
 
 要点：
 
-- **注入式依赖**：`tools`（工具注册表）、`callLLM`（模型客户端）、`loadPrompt`、`writeHistory`、`historyFilePath`、`onAssistantStep` 均从 `AgentDeps` 传入，Core 不直接依赖外部环境变量或 IO。
+- **注入式依赖**：`tools`（工具注册表）、`callLLM`（模型客户端）、`loadPrompt`、`onAssistantStep`、`historySinks` 等均从依赖注入传入，Core 不直接依赖外部环境变量或 IO。
 - **循环与防护**：`MAX_STEPS` 默认 100，避免模型进入死循环；若既无 `<action>` 也无 `<final>`，立即跳出。
 - **Observation 回写**：工具输出被包装为 `<observation>...` 重新写入对话，诱导模型继续推理或收敛到 `<final>`。
 - **未知工具提示**：当模型要求的工具未注册时，直接写入 `"未知工具: xxx"`，保持协议完整。
 
-## 提示词加载（packages/core/src/prompt.ts & prompt.xml）
+## 提示词加载（packages/core/src/runtime/prompt.ts & prompt.xml）
 
 - `loadSystemPrompt()` 读取内置的 XML 模板 `prompt.xml`，可被依赖注入覆盖。
 - 模板中定义：
@@ -80,10 +80,10 @@ return { answer: "未能生成最终回答，请重试或调整问题。", logEn
 - `escapeCData` 与 `wrapMessage` 将任意消息包装成 `<message role="..."><![CDATA[...]]></message>`，确保日志中的特殊符号不会破坏 XML。
 - 解析策略是「宽松正则」而非严格 XML 解析器，优点是简单鲁棒，缺点是无法校验嵌套/属性正确性；因此提示词中需清晰告知模型格式要求。
 
-## 历史与日志（packages/core/src/history.ts）
+## 历史与日志（packages/core/src/runtime/history.ts）
 
-- `writeHistory(logEntries, filePath)` 将累积的 `<message>` 片段写成 XML 文件，默认路径 `history.xml`，包含 `startedAt` 时间戳，方便离线复盘。
-- `runAgent` 自身不直接写盘，而是返回 `logEntries` 供上层决定是否调用 `writeHistory`，避免核心逻辑与 IO 绑定。
+- 提供 JSONL 历史 sink（`JsonlHistorySink`）和事件构造器 `createHistoryEvent`，用于结构化落盘。
+- `runAgent` 返回的 `logEntries` 仅用于兼容旧 XML 复盘需求，默认 CLI 不再写 XML。
 
 ## LLM 适配（packages/core/src/llm/openai.ts）
 
@@ -108,7 +108,6 @@ const deps = {
     tools: TOOLKIT,
     callLLM: callOpenAICompatible,
     loadPrompt: loadSystemPrompt,
-    writeHistory: (logs) => writeHistory(logs, HISTORY_FILE),
     onAssistantStep: (text, step) => console.log(`[LLM 第 ${step + 1} 轮输出]\\n${text}`),
 }
 const result = await runAgent(userQuestion, deps)
