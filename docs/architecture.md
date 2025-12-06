@@ -5,7 +5,7 @@
 ## 分层概览
 
 - **UI 包**（例如 `packages/ui`）：基于 React + Ink 的 CLI 交互层。负责用户输入、对话渲染、工具调用进度/结果展示、配置选择（模型、温度、启用工具集等）。不包含业务逻辑，仅消费 Core 暴露的接口。
-- **Core 包**（例如 `packages/core`）：Agent 业务核心。职责：会话状态机（ReAct 循环、MAX_STEPS）、系统提示词加载、历史记录、日志包装、模型客户端接口（LLMClient 抽象）、工具调用协议（Tool 接口与注册表契约）、错误/超时处理。对工具实现无感，仅依赖工具接口。
+- **Core 包**（例如 `packages/core`）：Agent 业务核心。职责：会话状态机（ReAct 循环、MAX_STEPS）、系统提示词加载、历史事件写入（JSONL）、日志包装、模型客户端接口（LLMClient 抽象）、工具调用协议（Tool 接口与注册表契约）、错误/超时处理。对工具实现无感，仅依赖工具接口。
 - **Tools 包**（例如 `packages/tools`）：提供具体工具集合和适配层。职责：内置本地工具（read/write/edit/glob/grep/bash/fetch/time 等）、MCP server 适配（将 MCP 的 resource/template 暴露为工具）、安全与约束（路径规范化、文件大小/超时限制）。对 UI/Core 无耦合，仅通过 Tool 接口对外。
 
 ## 核心接口与数据流
@@ -13,7 +13,7 @@
 - `ToolFn`: `(input: string) => Promise<string>`；`ToolName` 受控枚举。Tools 包提供 `getToolkit(): Record<ToolName, ToolFn>`。
 - `LLMClient`: `chat(messages: ChatMessage[], options?): Promise<string>`；Core 注入具体实现（如 OpenAI 兼容接口，默认指向 DeepSeek，后续其他模型）。
 - `runAgent(question, deps)`：Core 暴露的主调度函数，依赖注入 `{ tools, llmClient, logger, historyWriter, promptLoader, maxSteps }`；可扩展为 async generator 以便 UI 流式渲染。
-- 历史记录与提示词：Core 内部通过接口 `loadPrompt()`、`writeHistory(logs)`，由 UI/上层提供路径或实现，避免硬编码。
+- 历史记录与提示词：Core 内部通过接口 `loadPrompt()`、历史事件 sink（如 JSONL），由 UI/上层提供路径或实现，避免硬编码。
 - 错误与日志：Core 提供结构化 log 回调（如 `onStep`, `onTool`, `onFinal`），UI 可订阅绘制。
 
 ## 包职责切分
