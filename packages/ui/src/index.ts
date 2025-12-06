@@ -1,19 +1,8 @@
 // CLI 入口：提供交互式/一次性两种模式，负责 Session 管理与日志输出。
 import { randomUUID } from "node:crypto"
-import { join } from "node:path"
 import { createInterface } from "node:readline/promises"
 import { stdin as input, stdout as output } from "node:process"
-import { TOOLKIT } from "@memo/tools"
-import {
-    callLLM,
-    createAgentSession,
-    HISTORY_DIR,
-    JsonlHistorySink,
-    loadSystemPrompt,
-    type AgentSessionDeps,
-    type AgentSessionOptions,
-    type HistorySink,
-} from "@memo/core"
+import { createAgentSession, type AgentSessionDeps, type AgentSessionOptions } from "@memo/core"
 
 type CliOptions = {
     once: boolean
@@ -46,28 +35,19 @@ function parseArgs(argv: string[]): ParsedArgs {
     return { question: questionParts.join(" "), options }
 }
 
-function buildHistorySinks(sessionId: string): { sinks: HistorySink[] } {
-    const sinks: HistorySink[] = []
-    const jsonlPath = join(HISTORY_DIR, `${sessionId}.jsonl`)
-    sinks.push(new JsonlHistorySink(jsonlPath))
-    return { sinks }
-}
-
 async function runInteractive(parsed: ParsedArgs) {
     const sessionId = randomUUID()
-    const { sinks } = buildHistorySinks(sessionId)
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: parsed.options.once ? "once" : "interactive",
     }
 
     const deps: AgentSessionDeps = {
-        tools: TOOLKIT,
-        callLLM,
-        loadPrompt: loadSystemPrompt,
-        historySinks: sinks,
         onAssistantStep: (text: string, step: number) => {
             console.log(`\n[LLM 第 ${step + 1} 轮输出]\n${text}\n`)
+        },
+        onObservation: (tool: string, observation: string, step: number) => {
+            console.log(`\n[Observation 第 ${step + 1} 步 工具=${tool}]\n${observation}\n`)
         },
     }
 

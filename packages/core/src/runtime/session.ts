@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto"
 import { FALLBACK_FINAL, MAX_STEPS } from "@memo/core/config/constants"
 import { createHistoryEvent } from "@memo/core/runtime/history"
-import { createTokenCounter } from "@memo/core/llm/tokenizer"
+import { withDefaultDeps } from "@memo/core/runtime/defaults"
 import { parseAssistant, wrapMessage } from "@memo/core/utils"
 import type {
     AgentSession,
@@ -19,10 +19,10 @@ import type {
     SessionMode,
     TokenCounter,
     TokenUsage,
+    ToolRegistry,
     TurnResult,
     TurnStatus,
 } from "@memo/core/types"
-import { loadSystemPrompt as defaultLoadPrompt } from "@memo/core/runtime/prompt"
 
 const DEFAULT_SESSION_MODE: SessionMode = "interactive"
 
@@ -71,7 +71,10 @@ class AgentSessionImpl implements AgentSession {
     private startedAt = Date.now()
 
     constructor(
-        private deps: AgentSessionDeps,
+        private deps: AgentSessionDeps & {
+            tools: ToolRegistry
+            callLLM: NonNullable<AgentSessionDeps["callLLM"]>
+        },
         private options: AgentSessionOptions,
         systemPrompt: string,
         tokenCounter: TokenCounter
@@ -247,6 +250,7 @@ class AgentSessionImpl implements AgentSession {
                 if (lastStep) {
                     lastStep.observation = observation
                 }
+                this.deps.onObservation?.(parsed.action.tool, observation, step)
 
                 await this.emitEvent("observation", {
                     turn,
@@ -350,9 +354,15 @@ export async function createAgentSession(
     deps: AgentSessionDeps,
     options: AgentSessionOptions = {}
 ): Promise<AgentSession> {
-    const systemPrompt = await (deps.loadPrompt ?? defaultLoadPrompt)()
-    const tokenCounter = deps.tokenCounter ?? createTokenCounter(options.tokenizerModel)
-    const session = new AgentSessionImpl(deps, options, systemPrompt, tokenCounter)
+    const sessionId = options.sessionId || randomUUID()
+    const resolved = withDefaultDeps(deps, { ...options, sessionId }, sessionId)
+    const systemPrompt = await resolved.loadPrompt()
+    const session = new AgentSessionImpl(
+        { ...(deps as AgentSessionDeps), ...resolved },
+        { ...options, sessionId, mode: options.mode ?? DEFAULT_SESSION_MODE },
+        systemPrompt,
+        resolved.tokenCounter
+    )
     await session.init()
     return session
 }
