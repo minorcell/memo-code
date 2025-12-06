@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "bun run packages/ui/src/index.ts",
-    "build": "bun build packages/ui/src/index.ts --target bun --outdir dist"
+    "build": "bun build packages/ui/src/index.ts --target bun --outdir dist --minify"
   },
   "workspaces": [
     "packages/*"
