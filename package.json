@@ -21,5 +21,8 @@
     },
     "peerDependencies": {
         "typescript": "^5"
+    },
+    "dependencies": {
+        "@dqbd/tiktoken": "^1.0.22"
     }
 }
