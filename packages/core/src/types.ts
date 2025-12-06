@@ -4,39 +4,55 @@
  */
 export type Role = "system" | "user" | "assistant"
 
-/** 模型侧的单条聊天消息。 */
+/** 模型侧的单条聊天消息（OpenAI 兼容）。 */
 export type ChatMessage = {
+    /** 消息角色：system/user/assistant。 */
     role: Role
+    /** 消息正文。 */
     content: string
 }
 
 /** Agent 运行得到的结果，包括最终答案与全量日志。 */
 export type AgentResult = {
+    /** 模型最终输出的文本。 */
     answer: string
+    /** 兼容旧 XML 记录的日志片段。 */
     logEntries: string[]
 }
 
-/** 单步调试记录。 */
+/** 单步调试记录，便于回放与可观测。 */
 export type AgentStepTrace = {
+    /** 步骤索引，从 0 开始。 */
     index: number
+    /** 本步 assistant 的原始输出。 */
     assistantText: string
+    /** 解析后的 action/final 结构。 */
     parsed: ParsedAssistant
+    /** 本步对应的工具 observation（若有）。 */
     observation?: string
+    /** 本步的 token 统计。 */
     tokenUsage: TokenUsage
 }
 
 /** token 统计数据，提示词/生成/总计。 */
 export type TokenUsage = {
+    /** 输入提示词占用的 tokens。 */
     prompt: number
+    /** 模型生成部分的 tokens。 */
     completion: number
+    /** 总 tokens（若模型未返回，则为 prompt+completion）。 */
     total: number
 }
 
-/** 统一的 tokenizer 计数器接口。 */
+/** 统一的 tokenizer 计数器接口，兼容不同模型的 encoding。 */
 export type TokenCounter = {
+    /** 实际使用的 tokenizer/encoding 名称。 */
     model: string
+    /** 计算纯文本的 tokens。 */
     countText: (text: string) => number
+    /** 计算消息数组的 tokens。 */
     countMessages: (messages: ChatMessage[]) => number
+    /** 释放底层资源。 */
     dispose: () => void
 }
 
@@ -44,13 +60,17 @@ export type TokenCounter = {
 export type LLMResponse =
     | string
     | {
+          /** 模型输出文本。 */
           content: string
+          /** 模型返回的 token usage（可选）。 */
           usage?: Partial<TokenUsage>
       }
 
 /** 将 LLM 输出解析成 action/final 结构后的表示。 */
 export type ParsedAssistant = {
+    /** 待调用的工具及其入参。 */
     action?: { tool: string; input: string }
+    /** 最终回答。 */
     final?: string
 }
 
@@ -59,7 +79,7 @@ export type ToolFn = (input: string) => Promise<string>
 /** 工具注册表，键为工具名称，值为执行函数。 */
 export type ToolRegistry = Record<string, ToolFn>
 
-/** LLM 调用接口：输入历史消息，返回模型回复文本。 */
+/** LLM 调用接口：输入历史消息，返回模型回复文本或携带 usage。 */
 export type CallLLM = (messages: ChatMessage[]) => Promise<LLMResponse>
 
 /**
@@ -70,10 +90,16 @@ export type CallLLM = (messages: ChatMessage[]) => Promise<LLMResponse>
  * - onAssistantStep: 每轮模型输出的回调（便于流式打印）。
  */
 export type AgentDeps = {
-    tools: ToolRegistry
-    callLLM: CallLLM
+    /** 工具名称到实现的映射（未提供则使用默认工具集）。 */
+    tools?: ToolRegistry
+    /** 模型调用实现。 */
+    callLLM?: CallLLM
+    /** 系统提示词加载（不提供则用默认内置）。 */
     loadPrompt?: () => Promise<string>
+    /** 每次 assistant 输出时的回调。 */
     onAssistantStep?: (content: string, step: number) => void
+    /** 每次工具 observation 返回时的回调。 */
+    onObservation?: (tool: string, observation: string, step: number) => void
 }
 
 /** Session 模式：一次性或交互式。 */
@@ -81,35 +107,58 @@ export type SessionMode = "interactive" | "once"
 
 /** Session 级别的配置项。 */
 export type AgentSessionOptions = {
+    /** 自定义 Session ID（默认随机）。 */
     sessionId?: string
+    /** 运行模式：交互式/单次。 */
     mode?: SessionMode
+    /** 历史 JSONL 输出目录（默认 history/）。 */
+    historyDir?: string
+    /** tokenizer encoding 名称，默认 cl100k_base。 */
     tokenizerModel?: string
+    /** 提示词预警阈值。 */
     warnPromptTokens?: number
+    /** 提示词硬上限，超出直接拒绝。 */
     maxPromptTokens?: number
 }
 
 /** Session 运行需要的依赖（含扩展项）。 */
 export type AgentSessionDeps = AgentDeps & {
+    /** 历史事件 sink 列表（JSONL 等）。 */
     historySinks?: HistorySink[]
+    /** 自定义 tokenizer。 */
     tokenCounter?: TokenCounter
 }
 
+/** 单轮对话的状态码。 */
 export type TurnStatus = "ok" | "error" | "max_steps" | "prompt_limit"
 
+/** 单轮对话的运行结果（含步骤与 token）。 */
 export type TurnResult = {
+    /** 最终输出文本。 */
     finalText: string
+    /** 步骤轨迹。 */
     steps: AgentStepTrace[]
+    /** 运行状态。 */
     status: TurnStatus
+    /** 错误信息（若有）。 */
     errorMessage?: string
+    /** 本轮 token 统计。 */
     tokenUsage: TokenUsage
+    /** 兼容 XML 的日志片段。 */
     logEntries: string[]
 }
 
+/** Session 对象，持有历史并可执行多轮对话。 */
 export type AgentSession = {
+    /** Session 唯一标识。 */
     id: string
+    /** 运行模式。 */
     mode: SessionMode
+    /** 当前对话历史。 */
     history: ChatMessage[]
+    /** 执行一轮对话。 */
     runTurn: (input: string) => Promise<TurnResult>
+    /** 结束 Session，释放资源。 */
     close: () => Promise<void>
 }
 
@@ -131,13 +180,18 @@ export type HistoryEvent = {
     turn?: number
     step?: number
     type: HistoryEventType
+    /** 事件内容（如 assistant 文本、observation）。 */
     content?: string
+    /** 角色（若适用）。 */
     role?: Role
+    /** 额外元数据（工具名、token 等）。 */
     meta?: Record<string, unknown>
 }
 
 /** 历史落盘抽象，可输出到文件/外部系统。 */
 export type HistorySink = {
+    /** 写入单条事件。 */
     append: (event: HistoryEvent) => Promise<void> | void
+    /** 可选：flush 持久化。 */
     flush?: () => Promise<void> | void
 }

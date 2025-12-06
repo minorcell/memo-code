@@ -1,6 +1,6 @@
 /**
  * Agent 核心：基于 ReAct 模式的循环与依赖注入。
- * 尽量保持纯逻辑，依赖通过 AgentDeps 传入，方便在 CLI/UI 层复用或替换。
+ * 尽量保持纯逻辑，依赖通过 AgentDeps 传入（提供默认实现），方便在 CLI/UI 层复用或替换。
  */
 import { createAgentSession } from "@memo/core/runtime/session"
 import type { AgentResult, AgentSessionDeps, AgentSessionOptions } from "@memo/core/types"
@@ -23,6 +23,7 @@ export async function runAgent(
 export * from "@memo/core/types"
 export * from "@memo/core/runtime/prompt"
 export * from "@memo/core/runtime/history"
+export * from "@memo/core/runtime/defaults"
 export * from "@memo/core/utils"
 export * from "@memo/core/llm/tokenizer"
 export * from "@memo/core/runtime/session"
