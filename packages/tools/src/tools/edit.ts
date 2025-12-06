@@ -1,6 +1,5 @@
-import { writeFile } from "node:fs/promises"
 import type { ToolFn } from "@memo/tools/tools/types"
-import { ensureParentDir, normalizePath } from "@memo/tools/tools/helpers"
+import { normalizePath } from "@memo/tools/tools/helpers"
 
 type EditInput =
     | {
@@ -80,9 +79,8 @@ export const edit: ToolFn = async (rawInput: string) => {
             return "未检测到内容变化"
         }
 
-        // 持久化写回文件
-        await ensureParentDir(path)
-        await writeFile(path, replaced, { encoding: "utf8" })
+        // 持久化写回文件，Bun.write 会自动创建父目录
+        await Bun.write(path, replaced)
         return `替换完成: file=${path} count=${count}`
     } catch (err) {
         return `edit 失败: ${(err as Error).message}`
