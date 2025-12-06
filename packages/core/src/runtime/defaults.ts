@@ -20,7 +20,7 @@ import type {
 export function withDefaultDeps(
     deps: AgentSessionDeps,
     options: AgentSessionOptions,
-    sessionId: string
+    sessionId: string,
 ): {
     tools: ToolRegistry
     callLLM: CallLLM
@@ -32,9 +32,9 @@ export function withDefaultDeps(
     const callLLM = deps.callLLM ?? defaultCallLLM
     const loadPrompt = deps.loadPrompt ?? defaultLoadPrompt
 
-    const historySinks =
-        deps.historySinks ??
-        [new JsonlHistorySink(join(options.historyDir ?? HISTORY_DIR, `${sessionId}.jsonl`))]
+    const historySinks = deps.historySinks ?? [
+        new JsonlHistorySink(join(options.historyDir ?? HISTORY_DIR, `${sessionId}.jsonl`)),
+    ]
 
     const tokenCounter = deps.tokenCounter ?? createTokenCounter(options.tokenizerModel)
 

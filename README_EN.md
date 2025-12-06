@@ -38,10 +38,10 @@ A Bun + TypeScript ReAct agent for the terminal. Supports multi-turn sessions, J
 ## Project Structure (monorepo)
 
 - `packages/core`
-  - `config/`: constants.
-  - `runtime/`: session/turn runtime, prompt loader, history events.
-  - `llm/`: model adapter (DeepSeek via OpenAI) and tokenizer helper.
-  - `utils/`: parsing and request helpers.
+    - `config/`: constants.
+    - `runtime/`: session/turn runtime, prompt loader, history events.
+    - `llm/`: model adapter (DeepSeek via OpenAI) and tokenizer helper.
+    - `utils/`: parsing and request helpers.
 - `packages/tools`: Built-in toolset, exported as `TOOLKIT`.
 - `packages/ui`: CLI entry wiring Core + Tools, handles interaction.
 - `docs/`: architecture and design notes.

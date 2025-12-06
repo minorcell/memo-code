@@ -77,7 +77,7 @@ class AgentSessionImpl implements AgentSession {
         },
         private options: AgentSessionOptions,
         systemPrompt: string,
-        tokenCounter: TokenCounter
+        tokenCounter: TokenCounter,
     ) {
         this.id = options.sessionId || randomUUID()
         this.mode = options.mode || DEFAULT_SESSION_MODE
@@ -331,7 +331,7 @@ class AgentSessionImpl implements AgentSession {
     /** 将结构化事件发送到所有历史 sink，独立于主流程错误。 */
     private async emitEvent(
         type: HistoryEvent["type"],
-        payload: Omit<HistoryEvent, "ts" | "sessionId" | "type">
+        payload: Omit<HistoryEvent, "ts" | "sessionId" | "type">,
     ) {
         if (!this.sinks.length) return
         const event = createHistoryEvent({
@@ -352,7 +352,7 @@ class AgentSessionImpl implements AgentSession {
  */
 export async function createAgentSession(
     deps: AgentSessionDeps,
-    options: AgentSessionOptions = {}
+    options: AgentSessionOptions = {},
 ): Promise<AgentSession> {
     const sessionId = options.sessionId || randomUUID()
     const resolved = withDefaultDeps(deps, { ...options, sessionId }, sessionId)
@@ -361,7 +361,7 @@ export async function createAgentSession(
         { ...(deps as AgentSessionDeps), ...resolved },
         { ...options, sessionId, mode: options.mode ?? DEFAULT_SESSION_MODE },
         systemPrompt,
-        resolved.tokenCounter
+        resolved.tokenCounter,
     )
     await session.init()
     return session
