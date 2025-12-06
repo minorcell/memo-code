@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "memo-cli",
+      "dependencies": {
+        "@dqbd/tiktoken": "^1.0.22",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "prettier": "^3.3.3",
@@ -27,6 +30,8 @@
     },
   },
   "packages": {
+    "@dqbd/tiktoken": ["@dqbd/tiktoken@1.0.22", "https://registry.npmmirror.com/@dqbd/tiktoken/-/tiktoken-1.0.22.tgz", {}, "sha512-RYhO8xeHkMNX5Ixqf4M1Ve3siCYJY/dI0yLnlX4M4oIEDOvjMIQ+E+3OUpAaZcWTaMtQJzGcDAghYfllpx3i/w=="],
+
     "@memo/core": ["@memo/core@workspace:packages/core"],
 
     "@memo/tools": ["@memo/tools@workspace:packages/tools"],
