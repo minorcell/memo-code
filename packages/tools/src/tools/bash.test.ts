@@ -10,7 +10,7 @@ describe("bash tool", () => {
 
     test("executes simple command and captures output", async () => {
         const res = await bash("echo hello")
-        assert.ok(res.includes('exit=0'), "exit code should be captured")
-        assert.ok(res.includes('hello'), "stdout should include command output")
+        assert.ok(res.includes("exit=0"), "exit code should be captured")
+        assert.ok(res.includes("hello"), "stdout should include command output")
     })
 })

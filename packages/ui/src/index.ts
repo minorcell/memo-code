@@ -77,7 +77,7 @@ async function runInteractive(parsed: ParsedArgs) {
             console.log("\n=== 最终回答 ===")
             console.log(turnResult.finalText)
             console.log(
-                `\n[tokens] prompt=${turnResult.tokenUsage.prompt} completion=${turnResult.tokenUsage.completion} total=${turnResult.tokenUsage.total}`
+                `\n[tokens] prompt=${turnResult.tokenUsage.prompt} completion=${turnResult.tokenUsage.completion} total=${turnResult.tokenUsage.total}`,
             )
 
             if (parsed.options.once) {

@@ -11,21 +11,21 @@
 ### 包结构
 
 - **`packages/core`**: Agent 核心逻辑，实现 ReAct 循环
-  - `src/index.ts`: 主函数 `runAgent()`，包含 MAX_STEPS 安全限制
-  - `src/prompt.xml`: 系统提示词模板（以文本形式导入）
-  - `src/prompt.ts`: 加载系统提示词模板
-  - `src/history.ts`: 将对话日志写入根目录的 `history.xml`（XML 格式）
-  - `src/llm/openai.ts`: OpenAI 兼容 API 客户端（默认使用 DeepSeek）
-  - `src/utils.ts`: 消息包装和 assistant 响应解析工具函数
-  - `src/types.ts`: 共享 TypeScript 接口（AgentDeps、ChatMessage 等）
+    - `src/index.ts`: 主函数 `runAgent()`，包含 MAX_STEPS 安全限制
+    - `src/prompt.xml`: 系统提示词模板（以文本形式导入）
+    - `src/prompt.ts`: 加载系统提示词模板
+    - `src/history.ts`: 将对话日志写入根目录的 `history.xml`（XML 格式）
+    - `src/llm/openai.ts`: OpenAI 兼容 API 客户端（默认使用 DeepSeek）
+    - `src/utils.ts`: 消息包装和 assistant 响应解析工具函数
+    - `src/types.ts`: 共享 TypeScript 接口（AgentDeps、ChatMessage 等）
 
 - **`packages/tools`**: 内置工具实现
-  - `src/tools/`: 各工具实现文件（bash、read、write、edit、glob、grep、fetch）
-  - `src/index.ts`: 导出 TOOLKIT 对象，将工具名称映射到函数
-  - 通过在 `src/tools/` 创建文件并在 `src/index.ts` 注册来添加新工具
+    - `src/tools/`: 各工具实现文件（bash、read、write、edit、glob、grep、fetch）
+    - `src/index.ts`: 导出 TOOLKIT 对象，将工具名称映射到函数
+    - 通过在 `src/tools/` 创建文件并在 `src/index.ts` 注册来添加新工具
 
 - **`packages/ui`**: CLI 入口点
-  - `src/index.ts`: 整合 core 和 tools，处理控制台输出，运行 agent
+    - `src/index.ts`: 整合 core 和 tools，处理控制台输出，运行 agent
 
 ### 关键设计模式
 
@@ -57,8 +57,8 @@ bun run packages/ui/src/index.ts "问题"
 
 - **必需**: `DEEPSEEK_API_KEY`（或使用 `OPENAI_API_KEY` 作为后备）
 - **可选**:
-  - `OPENAI_BASE_URL`（默认: `https://api.deepseek.com`）
-  - `OPENAI_MODEL`（默认: `deepseek-chat`）
+    - `OPENAI_BASE_URL`（默认: `https://api.deepseek.com`）
+    - `OPENAI_MODEL`（默认: `deepseek-chat`）
 - 生成的 `history.xml` 文件包含完整对话日志，如涉及敏感信息不应提交。
 
 ## 代码风格

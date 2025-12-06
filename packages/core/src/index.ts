@@ -12,7 +12,7 @@ export { MAX_STEPS } from "@memo/core/config/constants"
 export async function runAgent(
     question: string,
     deps: AgentSessionDeps,
-    options: AgentSessionOptions = {}
+    options: AgentSessionOptions = {},
 ): Promise<AgentResult> {
     const session = await createAgentSession(deps, { ...options, mode: options.mode ?? "once" })
     const turnResult = await session.runTurn(question)
