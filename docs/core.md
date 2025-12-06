@@ -56,7 +56,7 @@
 - `callOpenAICompatible(messages)` 使用 OpenAI Chat Completions 协议，默认 Base URL 指向 DeepSeek（`https://api.deepseek.com`），默认模型 `deepseek-chat`。
 - API Key 读取顺序：`OPENAI_API_KEY` → `DEEPSEEK_API_KEY`（便于兼容 OpenAI/DeepSeek）。
 - 可用环境变量：`OPENAI_BASE_URL`（默认 DeepSeek）、`OPENAI_MODEL`（默认 deepseek-chat）。
-- 请求发送与错误处理由 `utils/request.ts` 的 `requestJson` 封装：自动序列化 body、填充 Content-Type、非 2xx 抛错。
+- 模型请求由 OpenAI SDK 发送（默认 BaseURL 深度寻址 https://api.deepseek.com），调用方可通过 `OPENAI_BASE_URL/OPENAI_MODEL` 覆盖。
 
 ## 工具协议与注册表
 

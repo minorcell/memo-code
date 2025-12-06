@@ -1,10 +1,5 @@
+import OpenAI from "openai"
 import type { ChatMessage, LLMResponse } from "@memo/core/types"
-import { requestJson } from "@memo/core/utils/request"
-
-type LLMMessage = { content?: string }
-type LLMChoice = { message?: LLMMessage }
-type Usage = { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
-type LLMBody = { choices?: LLMChoice[]; usage?: Usage }
 
 const DEFAULT_BASE_URL = process.env.OPENAI_BASE_URL ?? "https://api.deepseek.com"
 const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? "deepseek-chat"
@@ -20,17 +15,15 @@ export async function callLLM(messages: ChatMessage[]): Promise<LLMResponse> {
         throw new Error("缺少环境变量 OPENAI_API_KEY（或 DEEPSEEK_API_KEY）")
     }
 
-    const data = await requestJson<LLMBody>({
-        url: `${DEFAULT_BASE_URL}/v1/chat/completions`,
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${apiKey}`,
-        },
-        body: {
-            model: DEFAULT_MODEL,
-            messages,
-            temperature: 0.35,
-        },
+    const client = new OpenAI({
+        apiKey,
+        baseURL: DEFAULT_BASE_URL,
+    })
+
+    const data = await client.chat.completions.create({
+        model: DEFAULT_MODEL,
+        messages,
+        temperature: 0.35,
     })
 
     const content = data.choices?.[0]?.message?.content
@@ -40,9 +33,9 @@ export async function callLLM(messages: ChatMessage[]): Promise<LLMResponse> {
     return {
         content,
         usage: {
-            prompt: data.usage?.prompt_tokens,
-            completion: data.usage?.completion_tokens,
-            total: data.usage?.total_tokens,
+            prompt: data.usage?.prompt_tokens ?? undefined,
+            completion: data.usage?.completion_tokens ?? undefined,
+            total: data.usage?.total_tokens ?? undefined,
         },
     }
 }
