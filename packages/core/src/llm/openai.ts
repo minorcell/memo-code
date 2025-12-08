@@ -1,48 +1,56 @@
+import OpenAI from "openai"
+import type { ProviderConfig } from "@memo/core/config/config"
 import type { ChatMessage, LLMResponse } from "@memo/core/types"
-import { requestJson } from "@memo/core/utils/request"
-
-type LLMMessage = { content?: string }
-type LLMChoice = { message?: LLMMessage }
-type Usage = { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
-type LLMBody = { choices?: LLMChoice[]; usage?: Usage }
 
 const DEFAULT_BASE_URL = process.env.OPENAI_BASE_URL ?? "https://api.deepseek.com"
 const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? "deepseek-chat"
 
-/**
- * OpenAI 兼容的聊天调用，默认指向 DeepSeek（模型 `deepseek-chat`，Base URL `https://api.deepseek.com`）。
- * 约定优先读取 `OPENAI_API_KEY`，缺失时回退 `DEEPSEEK_API_KEY`。
- * @throws 缺少密钥或响应体异常时抛错。
- */
-export async function callLLM(messages: ChatMessage[]): Promise<LLMResponse> {
-    const apiKey = process.env.OPENAI_API_KEY ?? process.env.DEEPSEEK_API_KEY
-    if (!apiKey) {
-        throw new Error("缺少环境变量 OPENAI_API_KEY（或 DEEPSEEK_API_KEY）")
-    }
+function resolveApiKey(envKey?: string) {
+    if (!envKey) return process.env.OPENAI_API_KEY ?? process.env.DEEPSEEK_API_KEY
+    return process.env[envKey] ?? process.env.OPENAI_API_KEY ?? process.env.DEEPSEEK_API_KEY
+}
 
-    const data = await requestJson<LLMBody>({
-        url: `${DEFAULT_BASE_URL}/v1/chat/completions`,
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${apiKey}`,
-        },
-        body: {
-            model: DEFAULT_MODEL,
-            messages,
-            temperature: 0.35,
-        },
+/** 根据 provider 配置创建一个 LLM 调用函数。 */
+export function createOpenAIClient(provider: Pick<ProviderConfig, "env_api_key" | "model" | "base_url">) {
+    const apiKey = resolveApiKey(provider.env_api_key)
+    if (!apiKey) {
+        throw new Error(`缺少环境变量 ${provider.env_api_key}（或 OPENAI_API_KEY/DEEPSEEK_API_KEY）`)
+    }
+    const client = new OpenAI({
+        apiKey,
+        baseURL: provider.base_url || DEFAULT_BASE_URL,
     })
 
-    const content = data.choices?.[0]?.message?.content
-    if (typeof content !== "string") {
-        throw new Error("OpenAI 兼容接口返回内容为空")
+    return async (messages: ChatMessage[]): Promise<LLMResponse> => {
+        const data = await client.chat.completions.create({
+            model: provider.model || DEFAULT_MODEL,
+            messages,
+            temperature: 0.35,
+        })
+
+        const content = data.choices?.[0]?.message?.content
+        if (typeof content !== "string") {
+            throw new Error("OpenAI 兼容接口返回内容为空")
+        }
+        return {
+            content,
+            usage: {
+                prompt: data.usage?.prompt_tokens ?? undefined,
+                completion: data.usage?.completion_tokens ?? undefined,
+                total: data.usage?.total_tokens ?? undefined,
+            },
+        }
     }
-    return {
-        content,
-        usage: {
-            prompt: data.usage?.prompt_tokens,
-            completion: data.usage?.completion_tokens,
-            total: data.usage?.total_tokens,
-        },
-    }
+}
+
+/**
+ * 兼容旧调用方式：使用环境变量提供 baseURL/model。
+ */
+export async function callLLM(messages: ChatMessage[]): Promise<LLMResponse> {
+    const client = createOpenAIClient({
+        env_api_key: process.env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY",
+        model: DEFAULT_MODEL,
+        base_url: DEFAULT_BASE_URL,
+    })
+    return client(messages)
 }
