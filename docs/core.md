@@ -48,10 +48,10 @@
 简例：
 
 ```ts
-import { createAgentSession } from "@memo/core"
+import { createAgentSession } from '@memo/core'
 
-const session = await createAgentSession({ onAssistantStep: console.log }, { mode: "once" })
-const turn = await session.runTurn("你好")
+const session = await createAgentSession({ onAssistantStep: console.log }, { mode: 'once' })
+const turn = await session.runTurn('你好')
 await session.close()
 ```
 

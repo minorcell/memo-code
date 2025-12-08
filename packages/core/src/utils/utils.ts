@@ -1,4 +1,4 @@
-import type { ParsedAssistant } from "@memo/core/types"
+import type { ParsedAssistant } from '@memo/core/types'
 
 /**
  * 将模型输出解析为 action/final 结构，依赖简单的 XML 片段正则。
@@ -12,8 +12,8 @@ export function parseAssistant(content: string): ParsedAssistant {
     const parsed: ParsedAssistant = {}
     if (actionMatch) {
         parsed.action = {
-            tool: actionMatch[1] ?? "",
-            input: actionMatch[2]?.trim() ?? "",
+            tool: actionMatch[1] ?? '',
+            input: actionMatch[2]?.trim() ?? '',
         }
     }
     if (finalMatch) {
@@ -27,7 +27,7 @@ export function parseAssistant(content: string): ParsedAssistant {
  * 在写入 CDATA 时转义结束标记，避免破坏 XML。
  */
 export function escapeCData(content: string) {
-    return content.replaceAll("]]>", "]]]]><![CDATA[>")
+    return content.replaceAll(']]>', ']]]]><![CDATA[>')
 }
 
 /**

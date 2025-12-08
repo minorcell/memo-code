@@ -1,4 +1,4 @@
-import promptXml from "./prompt.xml" with { type: "text" }
+import promptXml from './prompt.xml' with { type: 'text' }
 
 /**
  * 读取内置的系统提示词模板。

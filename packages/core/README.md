@@ -28,10 +28,10 @@ Core 提供 Memo Agent 的核心能力：ReAct 循环、会话状态管理、默
 ## 使用方式（示意）
 
 ```ts
-import { createAgentSession } from "@memo/core"
+import { createAgentSession } from '@memo/core'
 
-const session = await createAgentSession({ onAssistantStep: console.log }, { mode: "once" })
-const turn = await session.runTurn("你好")
+const session = await createAgentSession({ onAssistantStep: console.log }, { mode: 'once' })
+const turn = await session.runTurn('你好')
 await session.close()
 ```
 

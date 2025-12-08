@@ -1,7 +1,7 @@
-import { encoding_for_model, get_encoding, type Tiktoken } from "@dqbd/tiktoken"
-import type { ChatMessage, TokenCounter } from "@memo/core/types"
+import { encoding_for_model, get_encoding, type Tiktoken } from '@dqbd/tiktoken'
+import type { ChatMessage, TokenCounter } from '@memo/core/types'
 
-const DEFAULT_TOKENIZER_MODEL = "cl100k_base"
+const DEFAULT_TOKENIZER_MODEL = 'cl100k_base'
 
 type EncodingFactory = () => Tiktoken
 
@@ -34,7 +34,7 @@ export function createTokenCounter(model?: string): TokenCounter {
     const countMessages = (messages: ChatMessage[]) => {
         if (!messages.length) return 0
         // 粗略策略：将 role 与内容串联，便于统一计数
-        const joined = messages.map((m) => `${m.role}: ${m.content}`).join("\n")
+        const joined = messages.map((m) => `${m.role}: ${m.content}`).join('\n')
         return countText(joined)
     }
 

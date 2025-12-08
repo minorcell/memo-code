@@ -1,6 +1,6 @@
-import { appendFile, mkdir } from "node:fs/promises"
-import { dirname } from "node:path"
-import type { HistoryEvent, HistorySink, Role } from "@memo/core/types"
+import { appendFile, mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
+import type { HistoryEvent, HistorySink, Role } from '@memo/core/types'
 
 /** JSONL 历史写入器：一行一个事件。 */
 export class JsonlHistorySink implements HistorySink {
@@ -13,7 +13,7 @@ export class JsonlHistorySink implements HistorySink {
             await mkdir(dirname(this.filePath), { recursive: true })
             this.ready = true
         }
-        await appendFile(this.filePath, `${JSON.stringify(event)}\n`, "utf8")
+        await appendFile(this.filePath, `${JSON.stringify(event)}\n`, 'utf8')
     }
 
     async flush() {
@@ -25,7 +25,7 @@ export class JsonlHistorySink implements HistorySink {
 /** 辅助生成结构化历史事件。 */
 export function createHistoryEvent(params: {
     sessionId: string
-    type: HistoryEvent["type"]
+    type: HistoryEvent['type']
     turn?: number
     step?: number
     content?: string

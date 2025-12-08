@@ -71,7 +71,7 @@ bun run packages/ui/src/index.ts "问题"
 
 - 尽可能的使用`bun`的api，而不是`node`
 - TypeScript + ESM 模块
-- 4 空格缩进，无分号，禁用单引号（见 `prettier.config.mjs`）
+- 4 空格缩进，无分号，启用单引号（见 `.prettierrc`）
 - 变量/函数使用 camelCase，类型/类使用 PascalCase，共享常量使用 CONSTANT_CASE
 - 保持 `packages/core` 中的函数小巧纯粹；副作用应放在 UI/tools 层
 - 从包入口点使用显式命名导出

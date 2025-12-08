@@ -1,7 +1,7 @@
 // CLI 入口：提供交互式/一次性两种模式，负责 Session 管理与日志输出。
-import { randomUUID } from "node:crypto"
-import { createInterface } from "node:readline/promises"
-import { stdin as input, stdout as output } from "node:process"
+import { randomUUID } from 'node:crypto'
+import { createInterface } from 'node:readline/promises'
+import { stdin as input, stdout as output } from 'node:process'
 import {
     createAgentSession,
     loadMemoConfig,
@@ -9,7 +9,7 @@ import {
     type AgentSessionDeps,
     type AgentSessionOptions,
     type MemoConfig,
-} from "@memo/core"
+} from '@memo/core'
 
 type CliOptions = {
     once: boolean
@@ -32,14 +32,14 @@ function parseArgs(argv: string[]): ParsedArgs {
         if (arg === undefined) {
             continue
         }
-        if (arg === "--once") {
+        if (arg === '--once') {
             options.once = true
             continue
         }
         questionParts.push(arg)
     }
 
-    return { question: questionParts.join(" "), options }
+    return { question: questionParts.join(' '), options }
 }
 
 async function ensureProviderConfig() {
@@ -53,13 +53,13 @@ async function ensureProviderConfig() {
     }
 
     try {
-        console.log("未检测到可用的 provider 配置，请按提示输入：")
-        const name = await ask("Provider 名称 [deepseek]: ", "deepseek")
-        const envKey = await ask("API Key 环境变量名 [DEEPSEEK_API_KEY]: ", "DEEPSEEK_API_KEY")
-        const model = await ask("模型名称 [deepseek-chat]: ", "deepseek-chat")
+        console.log('未检测到可用的 provider 配置，请按提示输入：')
+        const name = await ask('Provider 名称 [deepseek]: ', 'deepseek')
+        const envKey = await ask('API Key 环境变量名 [DEEPSEEK_API_KEY]: ', 'DEEPSEEK_API_KEY')
+        const model = await ask('模型名称 [deepseek-chat]: ', 'deepseek-chat')
         const baseUrl = await ask(
-            "Base URL [https://api.deepseek.com]: ",
-            "https://api.deepseek.com",
+            'Base URL [https://api.deepseek.com]: ',
+            'https://api.deepseek.com',
         )
 
         const config: MemoConfig = {
@@ -87,7 +87,7 @@ async function runInteractive(parsed: ParsedArgs) {
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
         sessionId,
-        mode: parsed.options.once ? "once" : "interactive",
+        mode: parsed.options.once ? 'once' : 'interactive',
     }
 
     const deps: AgentSessionDeps = {
@@ -105,24 +105,24 @@ async function runInteractive(parsed: ParsedArgs) {
     const rl = createInterface({ input, output })
     let nextQuestion = parsed.question
     if (parsed.options.once && !nextQuestion) {
-        nextQuestion = "给我做一个自我介绍"
+        nextQuestion = '给我做一个自我介绍'
     }
 
     try {
         while (true) {
-            const userInput = nextQuestion || (await rl.question("> "))
-            nextQuestion = ""
+            const userInput = nextQuestion || (await rl.question('> '))
+            nextQuestion = ''
             const trimmed = userInput.trim()
             if (!trimmed) {
                 continue
             }
-            if (trimmed === "/exit") {
+            if (trimmed === '/exit') {
                 break
             }
 
             console.log(`\n用户: ${trimmed}`)
             const turnResult = await session.runTurn(trimmed)
-            console.log("\n=== 最终回答 ===")
+            console.log('\n=== 最终回答 ===')
             console.log(turnResult.finalText)
             console.log(
                 `\n[tokens] prompt=${turnResult.tokenUsage.prompt} completion=${turnResult.tokenUsage.completion} total=${turnResult.tokenUsage.total}`,

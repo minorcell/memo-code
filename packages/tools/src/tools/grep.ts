@@ -1,17 +1,17 @@
-import type { ToolFn } from "@memo/tools/tools/types"
-import { normalizePath } from "@memo/tools/tools/helpers"
+import type { ToolFn } from '@memo/tools/tools/types'
+import { normalizePath } from '@memo/tools/tools/helpers'
 
-type OutputMode = "content" | "files_with_matches" | "count"
+type OutputMode = 'content' | 'files_with_matches' | 'count'
 type GrepInput =
     | {
           pattern?: string
           path?: string
           output_mode?: OutputMode
           glob?: string
-          "-i"?: boolean
-          "-A"?: number
-          "-B"?: number
-          "-C"?: number
+          '-i'?: boolean
+          '-A'?: number
+          '-B'?: number
+          '-C'?: number
       }
     | { error: string }
 
@@ -19,32 +19,32 @@ type GrepInput =
 function parseGrepInput(input: string): GrepInput {
     try {
         const parsed = JSON.parse(input)
-        if (!parsed?.pattern || typeof parsed.pattern !== "string") {
-            return { error: "grep 需要 pattern 字符串" }
+        if (!parsed?.pattern || typeof parsed.pattern !== 'string') {
+            return { error: 'grep 需要 pattern 字符串' }
         }
-        if (parsed.path !== undefined && typeof parsed.path !== "string") {
-            return { error: "path 需为字符串" }
+        if (parsed.path !== undefined && typeof parsed.path !== 'string') {
+            return { error: 'path 需为字符串' }
         }
         if (
             parsed.output_mode !== undefined &&
-            parsed.output_mode !== "content" &&
-            parsed.output_mode !== "files_with_matches" &&
-            parsed.output_mode !== "count"
+            parsed.output_mode !== 'content' &&
+            parsed.output_mode !== 'files_with_matches' &&
+            parsed.output_mode !== 'count'
         ) {
             return { error: 'output_mode 仅支持 "content"|"files_with_matches"|"count"' }
         }
-        const ctxKeys: Array<"-A" | "-B" | "-C"> = ["-A", "-B", "-C"]
+        const ctxKeys: Array<'-A' | '-B' | '-C'> = ['-A', '-B', '-C']
         for (const key of ctxKeys) {
             const val = parsed[key]
             if (val !== undefined && (!Number.isInteger(val) || val < 0)) {
                 return { error: `${key} 需为非负整数` }
             }
         }
-        if (parsed["-i"] !== undefined && typeof parsed["-i"] !== "boolean") {
-            return { error: "-i 需为布尔值" }
+        if (parsed['-i'] !== undefined && typeof parsed['-i'] !== 'boolean') {
+            return { error: '-i 需为布尔值' }
         }
-        if (parsed.glob !== undefined && typeof parsed.glob !== "string") {
-            return { error: "glob 需为字符串" }
+        if (parsed.glob !== undefined && typeof parsed.glob !== 'string') {
+            return { error: 'glob 需为字符串' }
         }
         return parsed as GrepInput
     } catch {
@@ -60,39 +60,39 @@ function parseGrepInput(input: string): GrepInput {
  */
 export const grep: ToolFn = async (rawInput: string) => {
     const parsed = parseGrepInput(rawInput.trim())
-    if ("error" in parsed) return parsed.error
+    if ('error' in parsed) return parsed.error
 
     // 环境前置校验：缺少 rg 直接返回提示。
-    const rgPath = Bun.which("rg")
+    const rgPath = Bun.which('rg')
     if (!rgPath) {
-        return "rg 未安装或不在 PATH"
+        return 'rg 未安装或不在 PATH'
     }
 
     const basePath = parsed.path ? normalizePath(parsed.path) : process.cwd()
-    const args = ["rg", "--color", "never"] // 使用 ripgrep，禁用颜色方便解析
-    const mode = parsed.output_mode ?? "content"
+    const args = ['rg', '--color', 'never'] // 使用 ripgrep，禁用颜色方便解析
+    const mode = parsed.output_mode ?? 'content'
 
-    if (mode === "files_with_matches") {
-        args.push("-l")
-    } else if (mode === "count") {
-        args.push("-c")
+    if (mode === 'files_with_matches') {
+        args.push('-l')
+    } else if (mode === 'count') {
+        args.push('-c')
     } else {
-        args.push("--line-number", "--no-heading")
+        args.push('--line-number', '--no-heading')
     }
 
     // 追加大小写、glob 及上下文参数
-    if (parsed["-i"]) args.push("-i")
-    if (parsed.glob) args.push("--glob", parsed.glob)
-    if (parsed["-A"] !== undefined) args.push("-A", String(parsed["-A"]))
-    if (parsed["-B"] !== undefined) args.push("-B", String(parsed["-B"]))
-    if (parsed["-C"] !== undefined) args.push("-C", String(parsed["-C"]))
+    if (parsed['-i']) args.push('-i')
+    if (parsed.glob) args.push('--glob', parsed.glob)
+    if (parsed['-A'] !== undefined) args.push('-A', String(parsed['-A']))
+    if (parsed['-B'] !== undefined) args.push('-B', String(parsed['-B']))
+    if (parsed['-C'] !== undefined) args.push('-C', String(parsed['-C']))
 
     args.push(parsed.pattern!, basePath)
 
     try {
         const proc = Bun.spawn(args, {
-            stdout: "pipe",
-            stderr: "pipe",
+            stdout: 'pipe',
+            stderr: 'pipe',
         })
         // 并行收集输出，避免阻塞
         const [stdout, stderr] = await Promise.all([
@@ -107,7 +107,7 @@ export const grep: ToolFn = async (rawInput: string) => {
         }
 
         if (exitCode === 1 && !stdout.trim()) {
-            return "未找到匹配"
+            return '未找到匹配'
         }
 
         return stdout || stderr || `命令完成 exit=${exitCode}`
