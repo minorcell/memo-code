@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto"
 import { createHistoryEvent } from "@memo/core/runtime/history"
 import { withDefaultDeps } from "@memo/core/runtime/defaults"
-import { parseAssistant, wrapMessage } from "@memo/core/utils/utils"
+import { parseAssistant } from "@memo/core/utils/utils"
 import type {
     AgentSession,
     AgentSessionDeps,
@@ -62,7 +62,6 @@ class AgentSessionImpl implements AgentSession {
     public mode: SessionMode
     public history: ChatMessage[]
 
-    private logEntries: string[] = []
     private turnIndex = 0
     private tokenCounter: TokenCounter
     private sinks: HistorySink[]
@@ -83,7 +82,6 @@ class AgentSessionImpl implements AgentSession {
         this.id = options.sessionId || randomUUID()
         this.mode = options.mode || DEFAULT_SESSION_MODE
         this.history = [{ role: "system", content: systemPrompt }]
-        this.logEntries.push(wrapMessage("system", systemPrompt))
         this.tokenCounter = tokenCounter
         this.sinks = deps.historySinks ?? []
         this.maxSteps = maxSteps
@@ -111,7 +109,6 @@ class AgentSessionImpl implements AgentSession {
 
         // 写入用户消息
         this.history.push({ role: "user", content: input })
-        this.logEntries.push(wrapMessage("user", input))
 
         const promptTokens = this.tokenCounter.countMessages(this.history)
         await this.emitEvent("turn_start", {
@@ -125,7 +122,6 @@ class AgentSessionImpl implements AgentSession {
             const limitMessage = `上下文 tokens (${promptTokens}) 超出限制，请缩短输入或重启对话。`
             const finalPayload = `<final>${limitMessage}</final>`
             this.history.push({ role: "assistant", content: finalPayload })
-            this.logEntries.push(wrapMessage("assistant", finalPayload))
             await this.emitEvent("final", {
                 turn,
                 content: limitMessage,
@@ -146,7 +142,6 @@ class AgentSessionImpl implements AgentSession {
                 status: "prompt_limit",
                 errorMessage: limitMessage,
                 tokenUsage: turnUsage,
-                logEntries: [...this.logEntries],
             }
         }
 
@@ -171,7 +166,6 @@ class AgentSessionImpl implements AgentSession {
                 const msg = `LLM 调用失败: ${(err as Error).message}`
                 const finalPayload = `<final>${msg}</final>`
                 this.history.push({ role: "assistant", content: finalPayload })
-                this.logEntries.push(wrapMessage("assistant", finalPayload))
                 status = "error"
                 finalText = msg
                 await this.emitEvent("final", { turn, content: msg, role: "assistant" })
@@ -180,7 +174,6 @@ class AgentSessionImpl implements AgentSession {
 
             this.deps.onAssistantStep?.(assistantText, step)
             this.history.push({ role: "assistant", content: assistantText })
-            this.logEntries.push(wrapMessage("assistant", assistantText))
 
             // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。
             const completionTokens = this.tokenCounter.countText(assistantText)
@@ -243,7 +236,6 @@ class AgentSessionImpl implements AgentSession {
                     status = "error"
                 }
 
-                this.logEntries.push(wrapMessage("observation", observation))
                 this.history.push({
                     role: "user",
                     content: `<observation>${observation}</observation>`,
@@ -284,7 +276,6 @@ class AgentSessionImpl implements AgentSession {
             finalText = "未能生成最终回答，请重试或调整问题。"
             const payload = `<final>${finalText}</final>`
             this.history.push({ role: "assistant", content: payload })
-            this.logEntries.push(wrapMessage("assistant", payload))
             await this.emitEvent("final", {
                 turn,
                 content: finalText,
@@ -307,7 +298,6 @@ class AgentSessionImpl implements AgentSession {
             steps,
             status,
             tokenUsage: turnUsage,
-            logEntries: [...this.logEntries],
         }
     }
 
