@@ -69,6 +69,7 @@ bun run packages/ui/src/index.ts "问题"
 
 ## 代码风格
 
+- 尽可能的使用`bun`的api，而不是`node`
 - TypeScript + ESM 模块
 - 4 空格缩进，无分号，禁用单引号（见 `prettier.config.mjs`）
 - 变量/函数使用 camelCase，类型/类使用 PascalCase，共享常量使用 CONSTANT_CASE

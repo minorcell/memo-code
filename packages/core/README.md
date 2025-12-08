@@ -5,18 +5,17 @@ Core 提供 Memo Agent 的核心能力：ReAct 循环、会话状态管理、默
 ## 目录结构
 
 - `config/`
-  - `config.ts`：读取 `~/.memo/config.toml`（providers、max_steps、sessions 路径），提供 provider 选择、会话路径构建、配置写入。
-  - `constants.ts`：兜底常量（如 MAX_STEPS 默认值）。
-- `llm/`
-  - `openai.ts`：OpenAI SDK 适配，支持基于 provider 配置的客户端工厂。
-  - `tokenizer.ts`：基于 tiktoken 的 tokenizer 工具。
+    - `config.ts`：读取 `~/.memo/config.toml`（providers、max_steps、sessions 路径），提供 provider 选择、会话路径构建、配置写入。
+    - `constants.ts`：兜底常量（如 MAX_STEPS 默认值）。
 - `runtime/`
-  - `prompt.ts/xml`：系统提示词加载。
-  - `history.ts`：JSONL 历史 sink 与事件构造。
-  - `defaults.ts`：默认依赖补全（工具集、LLM、prompt、history sink、tokenizer、maxSteps）。
-  - `session.ts`：Session/Turn 运行时，执行 ReAct 循环、事件写入、token 统计。
+    - `prompt.ts/xml`：系统提示词加载。
+    - `history.ts`：JSONL 历史 sink 与事件构造。
+    - `defaults.ts`：默认依赖补全（工具集、LLM、prompt、history sink、tokenizer、maxSteps）。
+    - `session.ts`：Session/Turn 运行时，执行 ReAct 循环、事件写入、token 统计。
 - `types.ts`：公共类型定义（AgentDeps、Session/Turn、TokenUsage、HistoryEvent 等）。
-- `utils/`：工具函数（解析 assistant 输出、消息包装）。
+- `utils/`：
+    - 工具函数（解析 assistant 输出、消息包装）。
+    - `tokenizer.ts`：基于 tiktoken 的 tokenizer 工具。
 - `index.ts`：包入口，导出核心模块与类型。
 
 ## 关键流程
@@ -31,12 +30,9 @@ Core 提供 Memo Agent 的核心能力：ReAct 循环、会话状态管理、默
 ```ts
 import { createAgentSession } from "@memo/core"
 
-const session = await createAgentSession(
-  { onAssistantStep: console.log },
-  { mode: "once" }
-)
+const session = await createAgentSession({ onAssistantStep: console.log }, { mode: "once" })
 const turn = await session.runTurn("你好")
 await session.close()
 ```
 
-如果提供自定义工具/LLM/prompt/sink，可在 deps/options 中覆盖对应字段。默认配置会选择当前 provider 并写入用户目录的 sessions。 
+如果提供自定义工具/LLM/prompt/sink，可在 deps/options 中覆盖对应字段。默认配置会选择当前 provider 并写入用户目录的 sessions。

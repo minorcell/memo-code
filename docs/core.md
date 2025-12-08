@@ -5,16 +5,16 @@
 ## 目录/模块
 
 - `config/`：配置与路径
-  - `config.ts`：读取/写入 `~/.memo/config.toml`，provider 选择（name/env_api_key/model/base_url）、会话路径 `sessions/YY/MM/DD/<uuid>.jsonl`、sessionId 生成。
-  - `constants.ts`：兜底默认（如 MAX_STEPS）。
+    - `config.ts`：读取/写入 `~/.memo/config.toml`，provider 选择（name/env_api_key/model/base_url）、会话路径 `sessions/YY/MM/DD/<uuid>.jsonl`、sessionId 生成。
+    - `constants.ts`：兜底默认（如 MAX_STEPS）。
 - `runtime/`：运行时与日志
-  - `prompt.xml/prompt.ts`：系统提示词加载。
-  - `history.ts`：JSONL sink 与事件构造。
-  - `defaults.ts`：补全工具集、LLM、prompt、history sink、tokenizer、maxSteps（基于配置）。
-  - `session.ts`：Session/Turn 状态机，执行 ReAct 循环、写事件、统计 token、触发回调。
+    - `prompt.xml/prompt.ts`：系统提示词加载。
+    - `history.ts`：JSONL sink 与事件构造。
+    - `defaults.ts`：补全工具集、LLM、prompt、history sink、tokenizer、maxSteps（基于配置）。
+    - `session.ts`：Session/Turn 状态机，执行 ReAct 循环、写事件、统计 token、触发回调。
 - `llm/`：模型与 tokenizer
-  - `openai.ts`：OpenAI SDK 适配，`createOpenAIClient(provider)` 基于配置生成客户端，兼容 DeepSeek/OpenAI。
-  - `tokenizer.ts`：tiktoken 封装。
+    - `openai.ts`：OpenAI SDK 适配，`createOpenAIClient(provider)` 基于配置生成客户端，兼容 DeepSeek/OpenAI。
+    - `tokenizer.ts`：tiktoken 封装。
 - `utils/`：解析工具（assistant 输出解析、消息包装）。
 - `types.ts`：公共类型。
 - `index.ts`：包入口，导出上述模块。
@@ -24,13 +24,14 @@
 1. 系统提示词要求模型使用 `<thought>`、`<action tool="...">`、`<final>`。
 2. `parseAssistant` 抽取 `<action>` / `<final>`。
 3. 状态流转：
-   - `<final>`：结束，返回答案。
-   - `<action tool="X">payload</action>`：执行工具，得到 observation。
-   - 无 action/final：跳出，走兜底。
+    - `<final>`：结束，返回答案。
+    - `<action tool="X">payload</action>`：执行工具，得到 observation。
+    - 无 action/final：跳出，走兜底。
 4. Observation 回写：`<observation>...</observation>` 作为 user 消息写回，引导模型继续。
 5. 循环防护：`max_steps` 来自配置（默认 100），限制单个 turn 内 step 数；未知工具写 `"未知工具: X"` 继续纠偏。
 
 标签职责：
+
 - `<thought>`：思考，程序不消费。
 - `<action tool="name">input</action>`：要调用的工具和入参。
 - `<observation>...</observation>`：程序生成，告诉模型工具产物。
@@ -45,6 +46,7 @@
 - 回调：`onAssistantStep`、`onObservation` 供 UI 实时渲染。
 
 简例：
+
 ```ts
 import { createAgentSession } from "@memo/core"
 
@@ -78,4 +80,4 @@ await session.close()
 
 ## 小结
 
-Core 提供“一站式默认装配 + 可插拔依赖”，UI 只关心交互。配置/日志放在用户目录，避免污染仓库，支持多 provider 与 token 预算控制。 
+Core 提供“一站式默认装配 + 可插拔依赖”，UI 只关心交互。配置/日志放在用户目录，避免污染仓库，支持多 provider 与 token 预算控制。
