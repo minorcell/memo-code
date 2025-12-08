@@ -1,5 +1,5 @@
-import type { ToolFn } from "@memo/tools/tools/types"
-import { normalizePath } from "@memo/tools/tools/helpers"
+import type { ToolFn } from '@memo/tools/tools/types'
+import { normalizePath } from '@memo/tools/tools/helpers'
 
 type EditInput =
     | {
@@ -16,17 +16,17 @@ type EditInput =
 function parseEditInput(input: string): EditInput {
     try {
         const parsed = JSON.parse(input)
-        if (!parsed?.file_path || typeof parsed.file_path !== "string") {
-            return { error: "edit 需要 file_path 字符串" }
+        if (!parsed?.file_path || typeof parsed.file_path !== 'string') {
+            return { error: 'edit 需要 file_path 字符串' }
         }
-        if (typeof parsed.old_string !== "string") {
-            return { error: "edit 需要 old_string 字符串" }
+        if (typeof parsed.old_string !== 'string') {
+            return { error: 'edit 需要 old_string 字符串' }
         }
-        if (typeof parsed.new_string !== "string") {
-            return { error: "edit 需要 new_string 字符串" }
+        if (typeof parsed.new_string !== 'string') {
+            return { error: 'edit 需要 new_string 字符串' }
         }
-        if (parsed.replace_all !== undefined && typeof parsed.replace_all !== "boolean") {
-            return { error: "replace_all 需为布尔值" }
+        if (parsed.replace_all !== undefined && typeof parsed.replace_all !== 'boolean') {
+            return { error: 'replace_all 需为布尔值' }
         }
         return parsed as EditInput
     } catch {
@@ -42,7 +42,7 @@ function parseEditInput(input: string): EditInput {
  */
 export const edit: ToolFn = async (rawInput: string) => {
     const parsed = parseEditInput(rawInput.trim())
-    if ("error" in parsed) return parsed.error
+    if ('error' in parsed) return parsed.error
 
     const path = normalizePath(parsed.file_path!) // 统一为绝对路径，避免相对路径混淆
     const replaceAll = parsed.replace_all ?? false
@@ -55,7 +55,7 @@ export const edit: ToolFn = async (rawInput: string) => {
         const original = await file.text()
 
         if (!original.includes(parsed.old_string!)) {
-            return "未找到待替换文本"
+            return '未找到待替换文本'
         }
 
         let replaced: string
@@ -72,7 +72,7 @@ export const edit: ToolFn = async (rawInput: string) => {
         }
 
         if (replaced === original) {
-            return "未检测到内容变化"
+            return '未检测到内容变化'
         }
 
         // 持久化写回文件，Bun.write 会自动创建父目录

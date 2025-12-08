@@ -1,9 +1,9 @@
-import { mkdir } from "node:fs/promises"
-import { homedir } from "node:os"
-import { dirname, join } from "node:path"
-import { randomUUID } from "node:crypto"
-import { parse } from "toml"
-import type { AgentSessionOptions } from "@memo/core/types"
+import { mkdir } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { parse } from 'toml'
+import type { AgentSessionOptions } from '@memo/core/types'
 
 export type ProviderConfig = {
     name: string
@@ -18,24 +18,24 @@ export type MemoConfig = {
     providers: ProviderConfig[]
 }
 
-const DEFAULT_MEMO_HOME = join(homedir(), ".memo")
-const DEFAULT_SESSIONS_DIR = "sessions"
+const DEFAULT_MEMO_HOME = join(homedir(), '.memo')
+const DEFAULT_SESSIONS_DIR = 'sessions'
 
 const DEFAULT_CONFIG: MemoConfig = {
-    current_provider: "deepseek",
+    current_provider: 'deepseek',
     max_steps: 100,
     providers: [
         {
-            name: "deepseek",
-            env_api_key: "DEEPSEEK_API_KEY",
-            model: "deepseek-chat",
-            base_url: "https://api.deepseek.com",
+            name: 'deepseek',
+            env_api_key: 'DEEPSEEK_API_KEY',
+            model: 'deepseek-chat',
+            base_url: 'https://api.deepseek.com',
         },
     ],
 }
 
 function expandHome(path: string) {
-    if (path.startsWith("~")) {
+    if (path.startsWith('~')) {
         return join(homedir(), path.slice(1))
     }
     return path
@@ -49,9 +49,9 @@ function serializeConfig(config: MemoConfig) {
 name = "${p.name}"
 env_api_key = "${p.env_api_key}"
 model = "${p.model}"
-${p.base_url ? `base_url = "${p.base_url}"\n` : ""}`,
+${p.base_url ? `base_url = "${p.base_url}"\n` : ''}`,
         )
-        .join("\n\n")
+        .join('\n\n')
     return `# Memo config. Edit to change provider/model/base_url.
 current_provider = "${config.current_provider}"
 max_steps = ${config.max_steps ?? 100}
@@ -73,7 +73,7 @@ export type LoadedConfig = {
 
 export async function loadMemoConfig(): Promise<LoadedConfig> {
     const home = process.env.MEMO_HOME ? expandHome(process.env.MEMO_HOME) : DEFAULT_MEMO_HOME
-    const configPath = join(home, "config.toml")
+    const configPath = join(home, 'config.toml')
     try {
         const file = Bun.file(configPath)
         if (!(await file.exists())) {
@@ -108,8 +108,8 @@ export function getSessionsDir(loaded: LoadedConfig, options: AgentSessionOption
 export function buildSessionPath(baseDir: string, sessionId: string) {
     const now = new Date()
     const yy = String(now.getFullYear()).slice(2)
-    const mm = String(now.getMonth() + 1).padStart(2, "0")
-    const dd = String(now.getDate()).padStart(2, "0")
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(now.getDate()).padStart(2, '0')
     return join(baseDir, yy, mm, dd, `${sessionId}.jsonl`)
 }
 

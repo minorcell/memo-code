@@ -2,7 +2,7 @@
  * Agent 层的基础类型声明，涵盖对话消息、解析结果与依赖注入接口。
  * 每个类型尽量保持精简，方便在 UI/工具等层复用。
  */
-export type Role = "system" | "user" | "assistant"
+export type Role = 'system' | 'user' | 'assistant'
 
 /** 模型侧的单条聊天消息（OpenAI 兼容）。 */
 export type ChatMessage = {
@@ -95,7 +95,7 @@ export type AgentDeps = {
 }
 
 /** Session 模式：一次性或交互式。 */
-export type SessionMode = "interactive" | "once"
+export type SessionMode = 'interactive' | 'once'
 
 /** Session 级别的配置项。 */
 export type AgentSessionOptions = {
@@ -126,7 +126,7 @@ export type AgentSessionDeps = AgentDeps & {
 }
 
 /** 单轮对话的状态码。 */
-export type TurnStatus = "ok" | "error" | "max_steps" | "prompt_limit"
+export type TurnStatus = 'ok' | 'error' | 'max_steps' | 'prompt_limit'
 
 /** 单轮对话的运行结果（含步骤与 token）。 */
 export type TurnResult = {
@@ -158,14 +158,14 @@ export type AgentSession = {
 
 /** 日志事件类型，用于 JSONL。 */
 export type HistoryEventType =
-    | "session_start"
-    | "session_end"
-    | "turn_start"
-    | "assistant"
-    | "action"
-    | "observation"
-    | "final"
-    | "turn_end"
+    | 'session_start'
+    | 'session_end'
+    | 'turn_start'
+    | 'assistant'
+    | 'action'
+    | 'observation'
+    | 'final'
+    | 'turn_end'
 
 /** 结构化历史事件，便于 JSONL 序列化。 */
 export type HistoryEvent = {

@@ -1,14 +1,14 @@
-import { TOOLKIT } from "@memo/tools"
-import OpenAI from "openai"
-import { createTokenCounter } from "@memo/core/utils/tokenizer"
+import { TOOLKIT } from '@memo/tools'
+import OpenAI from 'openai'
+import { createTokenCounter } from '@memo/core/utils/tokenizer'
 import {
     buildSessionPath,
     getSessionsDir,
     loadMemoConfig,
     selectProvider,
-} from "@memo/core/config/config"
-import { JsonlHistorySink } from "@memo/core/runtime/history"
-import { loadSystemPrompt as defaultLoadPrompt } from "@memo/core/runtime/prompt"
+} from '@memo/core/config/config'
+import { JsonlHistorySink } from '@memo/core/runtime/history'
+import { loadSystemPrompt as defaultLoadPrompt } from '@memo/core/runtime/prompt'
 import type {
     AgentSessionDeps,
     AgentSessionOptions,
@@ -16,7 +16,7 @@ import type {
     HistorySink,
     TokenCounter,
     ToolRegistry,
-} from "@memo/core/types"
+} from '@memo/core/types'
 
 /**
  * 根据缺省策略补全依赖项（工具、callLLM、prompt、history sinks、tokenizer）。
@@ -63,8 +63,8 @@ export async function withDefaultDeps(
                     temperature: 0.35,
                 })
                 const content = data.choices?.[0]?.message?.content
-                if (typeof content !== "string") {
-                    throw new Error("OpenAI 兼容接口返回内容为空")
+                if (typeof content !== 'string') {
+                    throw new Error('OpenAI 兼容接口返回内容为空')
                 }
                 return {
                     content,
