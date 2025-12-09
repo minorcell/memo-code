@@ -15,6 +15,7 @@ export type ProviderConfig = {
 export type MemoConfig = {
     current_provider: string
     max_steps?: number
+    stream_output?: boolean
     providers: ProviderConfig[]
 }
 
@@ -24,6 +25,7 @@ const DEFAULT_SESSIONS_DIR = 'sessions'
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
     max_steps: 100,
+    stream_output: true,
     providers: [
         {
             name: 'deepseek',
@@ -55,6 +57,7 @@ ${p.base_url ? `base_url = "${p.base_url}"\n` : ''}`,
     return `# Memo config. Edit to change provider/model/base_url.
 current_provider = "${config.current_provider}"
 max_steps = ${config.max_steps ?? 100}
+stream_output = ${config.stream_output ?? true}
 
 ${providers}`.trim()
 }
@@ -84,6 +87,7 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
             max_steps: parsed.max_steps ?? DEFAULT_CONFIG.max_steps,
+            stream_output: parsed.stream_output ?? DEFAULT_CONFIG.stream_output,
             providers: parsed.providers ?? [],
         }
         const needsSetup = !merged.providers.length
