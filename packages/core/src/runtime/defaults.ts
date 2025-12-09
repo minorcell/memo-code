@@ -4,6 +4,7 @@ import { createTokenCounter } from '@memo/core/utils/tokenizer'
 import {
     buildSessionPath,
     getSessionsDir,
+    getMemoryPath,
     loadMemoConfig,
     selectProvider,
 } from '@memo/core/config/config'
@@ -37,7 +38,22 @@ export async function withDefaultDeps(
     const loaded = await loadMemoConfig()
     const config = loaded.config
     const tools = deps.tools ?? TOOLKIT
-    const loadPrompt = deps.loadPrompt ?? defaultLoadPrompt
+    const loadPrompt = async () => {
+        const basePrompt = await (deps.loadPrompt ?? defaultLoadPrompt)()
+        const memoryPath = getMemoryPath(loaded)
+        try {
+            const file = Bun.file(memoryPath)
+            if (await file.exists()) {
+                const memory = (await file.text()).trim()
+                if (memory) {
+                    return `${basePrompt}\n\n# 长期记忆\n${memory}`
+                }
+            }
+        } catch (err) {
+            console.warn(`读取 memory 失败: ${(err as Error).message}`)
+        }
+        return basePrompt
+    }
     const streamOutput = options.stream ?? config.stream_output ?? true
     return {
         tools,

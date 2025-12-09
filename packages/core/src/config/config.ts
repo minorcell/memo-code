@@ -21,6 +21,7 @@ export type MemoConfig = {
 
 const DEFAULT_MEMO_HOME = join(homedir(), '.memo')
 const DEFAULT_SESSIONS_DIR = 'sessions'
+const DEFAULT_MEMORY_FILE = 'memory.md'
 
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
@@ -107,6 +108,10 @@ export function selectProvider(config: MemoConfig, preferred?: string): Provider
 export function getSessionsDir(loaded: LoadedConfig, options: AgentSessionOptions) {
     const base = options.historyDir ?? join(loaded.home, DEFAULT_SESSIONS_DIR)
     return expandHome(base)
+}
+
+export function getMemoryPath(loaded: LoadedConfig) {
+    return join(loaded.home, DEFAULT_MEMORY_FILE)
 }
 
 export function buildSessionPath(baseDir: string, sessionId: string) {
