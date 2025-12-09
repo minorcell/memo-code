@@ -22,6 +22,8 @@
 current_provider = "deepseek"
 # 每个 trun 最大的步骤数
 max_steps = 100
+# 是否启用流式输出（默认 true）
+stream_output = true
 
 [[providers]]
 name = "deepseek"
@@ -44,6 +46,7 @@ base_url = "https://api.openai.com/v1"
     - `env_api_key`: 读取的环境变量名称（不在文件中存密钥）。
     - `model`: 默认模型名。
     - `base_url`: 可选，兼容 OpenAI 生态；缺省则使用 SDK 默认。
+- `stream_output`: 是否默认使用 LLM 流式输出（stream=true）。
 
 ## 核心改造要点
 

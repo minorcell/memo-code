@@ -40,11 +40,11 @@ function accumulateUsage(target: TokenUsage, delta?: Partial<TokenUsage>) {
     target.total += totalDelta
 }
 
-function normalizeLLMResponse(raw: LLMResponse): { content: string; usage?: Partial<TokenUsage> } {
+function normalizeLLMResponse(raw: LLMResponse): { content: string; usage?: Partial<TokenUsage>; streamed?: boolean } {
     if (typeof raw === 'string') {
         return { content: raw }
     }
-    return { content: raw.content, usage: raw.usage }
+    return { content: raw.content, usage: raw.usage, streamed: raw.streamed }
 }
 
 async function emitEventToSinks(event: HistoryEvent, sinks: HistorySink[]) {
@@ -180,11 +180,15 @@ class AgentSessionImpl implements AgentSession {
 
             let assistantText = ''
             let usageFromLLM: Partial<TokenUsage> | undefined
+            let streamed = false
             try {
-                const llmResult = await this.deps.callLLM(this.history)
+                const llmResult = await this.deps.callLLM(this.history, (chunk) =>
+                    this.deps.onAssistantStep?.(chunk, step),
+                )
                 const normalized = normalizeLLMResponse(llmResult)
                 assistantText = normalized.content
                 usageFromLLM = normalized.usage
+                streamed = Boolean(normalized.streamed)
             } catch (err) {
                 const msg = `LLM 调用失败: ${(err as Error).message}`
                 const finalPayload = JSON.stringify({ final: msg })
@@ -196,7 +200,9 @@ class AgentSessionImpl implements AgentSession {
                 break
             }
 
-            this.deps.onAssistantStep?.(assistantText, step)
+            if (!streamed) {
+                this.deps.onAssistantStep?.(assistantText, step)
+            }
             this.history.push({ role: 'assistant', content: assistantText })
 
             // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。

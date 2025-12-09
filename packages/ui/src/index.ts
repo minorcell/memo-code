@@ -107,9 +107,14 @@ async function runInteractive(parsed: ParsedArgs) {
         mode: parsed.options.once ? 'once' : 'interactive',
     }
 
+    const streamedSteps = new Set<number>()
     const deps: AgentSessionDeps = {
         onAssistantStep: (text: string, step: number) => {
-            console.log(`\n[LLM 第 ${step + 1} 轮输出]\n${text}\n`)
+            if (!streamedSteps.has(step)) {
+                streamedSteps.add(step)
+                process.stdout.write(`\n[LLM 第 ${step + 1} 轮输出]\n`)
+            }
+            process.stdout.write(text)
         },
         onObservation: (tool: string, observation: string, step: number) => {
             console.log(`\n[第 ${step + 1} 步 工具=${tool}]\n${observation}\n`)
