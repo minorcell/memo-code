@@ -1,0 +1,71 @@
+name: "\U0001F41E Bug 报告 / Bug Report"
+description: '报告问题或异常行为'
+title: '[Bug]: '
+labels:
+    - bug
+body:
+    - type: markdown
+      attributes:
+          value: |
+              感谢反馈！请尽可能提供可复现的信息，方便我们快速定位问题。/ Thanks for reporting. Please include repro details so we can debug quickly.
+    - type: checkboxes
+      id: checklist
+      attributes:
+          label: 提交前请确认 / Please confirm
+          options:
+              - label: 我已搜索过已存在的 issue / I have searched existing issues
+                required: true
+              - label: 我在最新 commit 或版本上验证过问题仍然存在 / Issue reproduces on latest commit or release
+                required: false
+    - type: textarea
+      id: description
+      attributes:
+          label: 问题描述 / What happened?
+          description: 清晰说明问题表现、出现频率、受影响的功能。/ Describe what you observed and how often it happens.
+          placeholder: '示例：在 REPL 输入 /exit 时卡住，无输出，无法退出... / REPL hangs after typing /exit...'
+      validations:
+          required: true
+    - type: textarea
+      id: steps
+      attributes:
+          label: 复现步骤 / Steps to reproduce
+          description: 尽量提供最小复现步骤或脚本。/ Please give minimal steps.
+          placeholder: |
+              1. 安装 memo-cli: bun install
+              2. 运行: bun start "..." --once
+              3. ...
+      validations:
+          required: true
+    - type: textarea
+      id: expected
+      attributes:
+          label: 期望行为 / Expected
+          description: 理想的输出或行为。/ What you expected to see.
+      validations:
+          required: true
+    - type: textarea
+      id: actual
+      attributes:
+          label: 实际行为 / Actual
+          description: 实际输出、错误信息或截图。/ What actually happened.
+      validations:
+          required: true
+    - type: textarea
+      id: environment
+      attributes:
+          label: 环境信息 / Environment
+          description: |
+              包含 OS、Bun 版本、memo-cli 版本或 commit、是否在容器/远程环境。/ OS, Bun version, memo-cli version/commit, container/remote?
+          placeholder: |
+              - OS: macOS 14.6
+              - Bun: 1.1.13
+              - memo-cli: commit abc123 / release v0.x
+              - 运行环境: 本地/容器/SSH
+      validations:
+          required: true
+    - type: textarea
+      id: logs
+      attributes:
+          label: 附加信息 / Logs
+          description: 日志、历史文件片段、截图、其他线索。/ Attach logs or extra clues.
+          render: shell
