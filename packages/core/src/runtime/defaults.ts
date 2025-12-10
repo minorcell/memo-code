@@ -50,7 +50,7 @@ export async function withDefaultDeps(
                 }
             }
         } catch (err) {
-            console.warn(`读取 memory 失败: ${(err as Error).message}`)
+            console.warn(`读取 memo 失败: ${(err as Error).message}`)
         }
         return basePrompt
     }
