@@ -14,7 +14,7 @@
     - `llm/`: OpenAI SDK 适配（DeepSeek 默认）、tokenizer
     - `utils/`: 解析工具
     - `types.ts`: 公共类型（AgentDeps/Session 等）
-- `packages/tools`: 内置工具（bash/read/write/edit/glob/grep/fetch），导出 `TOOLKIT`
+- `packages/tools`: 内置工具（bash/read/write/edit/glob/grep/webfetch 等），导出 `TOOLKIT`
 - `packages/ui`: 简易 CLI（REPL + `--once`），主要做 I/O 与回调订阅
 - `docs/`: 架构、配置、设计说明
 

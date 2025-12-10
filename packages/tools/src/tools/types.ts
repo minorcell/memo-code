@@ -11,8 +11,8 @@ export type ToolName =
     | 'edit'
     | 'glob'
     | 'grep'
-    | 'fetch'
-    | 'memory'
+    | 'webfetch'
+    | 'save_memory'
     | 'todo'
 
 /** MCP 工具定义，输入由 zod 校验，输出为 CallToolResult。 */
