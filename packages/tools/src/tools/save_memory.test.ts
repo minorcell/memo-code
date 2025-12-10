@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, test, beforeAll, afterAll } from 'bun:test'
 import { $ } from 'bun'
-import { memoryTool } from '@memo/tools/tools/memory'
+import { saveMemoryTool } from '@memo/tools/tools/save_memory'
 
 let tempHome: string
 let prevMemoHome: string | undefined
@@ -43,29 +43,30 @@ afterAll(async () => {
 
 describe('memory tool', () => {
     test('rejects empty note', async () => {
-        const parsed = memoryTool.inputSchema.safeParse({ note: '' })
+        const parsed = saveMemoryTool.inputSchema.safeParse({ fact: '' })
         assert.strictEqual(parsed.success, false)
     })
 
     test('rejects too long note', async () => {
-        const parsed = memoryTool.inputSchema.safeParse({ note: 'a'.repeat(40) })
+        const parsed = saveMemoryTool.inputSchema.safeParse({ fact: 'a'.repeat(140) })
         assert.strictEqual(parsed.success, false)
     })
 
     test('appends sanitized note to memory file', async () => {
-        const res = await memoryTool.execute({ note: '  喜欢中文回答\n' })
+        const res = await saveMemoryTool.execute({ fact: '  喜欢中文回答\n' })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
-        assert.ok(text.includes('memory'), 'should report memory path')
-        const memoryPath = join(tempHome, 'memory.md')
+        assert.ok(text.includes('memo.md'), 'should report memory path')
+        const memoryPath = join(tempHome, 'memo.md')
         const content = await readText(memoryPath)
-        assert.ok(content.includes('喜欢中文回答'), 'memory file should contain note')
-        assert.ok(!content.includes('\n\n'), 'note should be sanitized')
+        assert.ok(content.includes('喜欢中文回答'), 'memory file should contain fact')
+        assert.ok(content.includes('Memo Added Memories'), 'should include header')
+        assert.ok(!content.includes('\n\n\n'), 'fact should be sanitized')
     })
 
     test('keeps only 50 most recent notes', async () => {
-        const memoryPath = join(tempHome, 'memory.md')
+        const memoryPath = join(tempHome, 'memo.md')
         for (let i = 0; i < 55; i++) {
-            await memoryTool.execute({ note: `n${i}` })
+            await saveMemoryTool.execute({ fact: `n${i}` })
         }
         const content = await readText(memoryPath)
         const lines = content.split(/\r?\n/).filter((l) => l.trim().startsWith('- '))
