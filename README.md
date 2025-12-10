@@ -5,7 +5,7 @@
 ## 特性
 
 - 多轮对话：交互式 REPL，`--once` 支持单轮退出。
-- 工具驱动：内置 bash/read/write/edit/glob/grep/fetch，按 ReAct 协议调用。
+- 工具驱动：内置 bash/read/write/edit/glob/grep/webfetch（HTML 自动转纯文本）、save_memory、todo，按 ReAct 协议调用。
 - 结构化日志：默认写入 `history/<sessionId>.jsonl`，可携带 token 计数与事件。
 - 可配置 token 预算：本地 tiktoken 预估 + LLM usage 对账，支持提示超限预警/拒绝。
 

@@ -1,10 +1,10 @@
 import type { McpTool, ToolName } from '@memo/tools/tools/types'
 import { bashTool } from '@memo/tools/tools/bash'
 import { editTool } from '@memo/tools/tools/edit'
-import { fetchTool } from '@memo/tools/tools/fetch'
+import { webfetchTool } from '@memo/tools/tools/webfetch'
 import { globTool } from '@memo/tools/tools/glob'
 import { grepTool } from '@memo/tools/tools/grep'
-import { memoryTool } from '@memo/tools/tools/memory'
+import { saveMemoryTool } from '@memo/tools/tools/save_memory'
 import { todoTool } from '@memo/tools/tools/todo'
 import { readTool } from '@memo/tools/tools/read'
 import { writeTool } from '@memo/tools/tools/write'
@@ -17,8 +17,8 @@ export const TOOLKIT: Record<ToolName, McpTool<any>> = {
     edit: editTool,
     glob: globTool,
     grep: grepTool,
-    fetch: fetchTool,
-    memory: memoryTool,
+    webfetch: webfetchTool,
+    save_memory: saveMemoryTool,
     todo: todoTool,
 }
 

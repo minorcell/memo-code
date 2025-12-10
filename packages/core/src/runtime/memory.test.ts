@@ -35,8 +35,8 @@ afterAll(async () => {
 
 describe('memory injection', () => {
     test('loads memory into system prompt when file exists', async () => {
-        const memoryPath = join(tempHome, 'memory.md')
-        await Bun.write(memoryPath, '用户偏好：中文回答\n')
+        const memoryPath = join(tempHome, 'memo.md')
+        await Bun.write(memoryPath, '## Memo Added Memories\n\n- 用户偏好：中文回答\n')
 
         const session = await createAgentSession(
             {

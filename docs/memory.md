@@ -2,25 +2,25 @@
 
 ## 目标
 
-- 为 memo-cli 提供跨 Session 的长期记忆，存储在用户目录（`~/.memo/memory.md`）。
-- 在每次 Session 启动时，将 memory 内容随系统提示词注入，让模型可利用用户画像/偏好。
-- 提供 `memory` 工具，允许模型在给出最终回答前写入一条极短的摘要。
+- 为 memo-cli 提供跨 Session 的长期记忆，存储在用户目录（`~/.memo/memo.md`）。
+- 在每次 Session 启动时，将记忆内容随系统提示词注入，让模型可利用用户画像/偏好。
+- 提供 `save_memory` 工具，允许模型在给出最终回答前写入一条简短事实/偏好。
 
 ## 存储
 
-- 路径：`MEMO_HOME` 下的 `memory.md`（默认 `~/.memo/memory.md`）。
-- 结构：追加式 Markdown 列表（`- <ISO 时间> <摘要>`）。
+- 路径：`MEMO_HOME` 下的 `memo.md`（默认 `~/.memo/memo.md`）。
+- 结构：标题 `## Memo Added Memories` 下的追加式 Markdown 列表（`- <fact>`），无时间戳。
 - 创建：不存在时自动创建所在目录。
 
 ## 注入时机
 
-- `createAgentSession` 启动时读取 `memory.md`，非空则在系统提示词末尾附加「长期记忆」段落。
-- memory 内容不可在回答中直接泄露，只作为参考。
+- `createAgentSession` 启动时读取 `memo.md`，非空则在系统提示词末尾附加「长期记忆」段落。
+- 记忆内容不可在回答中直接泄露，只作为参考。
 
-## memory 工具
+## save_memory 工具
 
-- 名称：`memory`
-- 输入：`{"note":"一句极短摘要，≤32 字符"}`，自动清理多余空白/换行并追加到 `memory.md`。
+- 名称：`save_memory`
+- 输入：`{"fact":"一句简短事实/偏好（≤120 字符，自动单行化）"}`，追加到 `memo.md`。
 - 使用时机：仅在准备返回 final 之前，如发现可复用的用户画像/习惯/偏好信息可调用一次，避免频繁调用。
 - 输出：确认写入的文件路径，失败时返回错误信息。
 
@@ -31,5 +31,5 @@
 
 ## 测试覆盖
 
-- memory 工具：输入校验、写入与内容清理。
-- 注入：存在 `memory.md` 时系统提示词包含记忆内容。
+- save_memory 工具：输入校验、写入与内容清理。
+- 注入：存在 `memo.md` 时系统提示词包含记忆内容。

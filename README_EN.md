@@ -7,7 +7,7 @@ Terminal ReAct agent built with Bun + TypeScript. Supports multi-turn sessions, 
 ## Highlights
 
 - Multi-turn REPL with `--once` for single-turn exits.
-- Tool-driven ReAct: built-in bash/read/write/edit/glob/grep/fetch.
+- Tool-driven ReAct: built-in bash/read/write/edit/glob/grep/webfetch (HTML -> plain text), plus save_memory/todo.
 - Structured logs: JSONL per session (token stats + events).
 - Token budgeting: local tiktoken estimation + LLM usage reconciliation.
 
