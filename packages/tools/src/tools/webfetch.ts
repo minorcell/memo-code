@@ -14,7 +14,8 @@ const WEBFETCH_TIMEOUT_MS = 10_000
 const MAX_BODY_BYTES = 512_000
 const MAX_BODY_PREVIEW = 4_000
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'data:'])
-const HTML_BREAK_TAG = /<\/\s*(p|div|section|article|header|footer|aside|main|h[1-6]|li|tr|table|blockquote)\s*>/gi
+const HTML_BREAK_TAG =
+    /<\/\s*(p|div|section|article|header|footer|aside|main|h[1-6]|li|tr|table|blockquote)\s*>/gi
 const HTML_LINE_BREAK = /<\s*(br|hr)\s*\/?>/gi
 const HTML_LIST_ITEM = /<\s*li[^>]*>/gi
 const HTML_TAG = /<[^>]+>/g
@@ -31,7 +32,10 @@ const decodeEntities = (input: string) => {
 
     const numeric = base.replace(/&#(x?[0-9a-fA-F]+);/g, (_, code: string) => {
         try {
-            const value = code.startsWith('x') || code.startsWith('X') ? parseInt(code.slice(1), 16) : parseInt(code, 10)
+            const value =
+                code.startsWith('x') || code.startsWith('X')
+                    ? parseInt(code.slice(1), 16)
+                    : parseInt(code, 10)
             return Number.isFinite(value) ? String.fromCharCode(value) : ''
         } catch {
             return ''
@@ -54,7 +58,9 @@ const htmlToPlainText = (html: string) => {
         .replace(/\r/g, '')
         .split('\n')
         .map((line) => line.trim().replace(/[ \t]{2,}/g, ' '))
-    const normalizedLines = lines.filter((line, idx) => line.length > 0 || (idx > 0 && lines[idx - 1].length > 0))
+    const normalizedLines = lines.filter(
+        (line, idx) => line.length > 0 || (idx > 0 && lines[idx - 1].length > 0),
+    )
     return normalizedLines.join('\n').trim()
 }
 
@@ -133,7 +139,8 @@ export const webfetchTool: McpTool<WebFetchInput> = {
                 normalizedText.length > MAX_BODY_PREVIEW
                     ? `${normalizedText.slice(0, MAX_BODY_PREVIEW)}...`
                     : normalizedText
-            const truncatedNote = normalizedText.length > MAX_BODY_PREVIEW ? ' text_truncated=true' : ''
+            const truncatedNote =
+                normalizedText.length > MAX_BODY_PREVIEW ? ' text_truncated=true' : ''
             const formatNote = looksLikeHtml ? ' source=html_stripped' : ''
 
             return textResult(
