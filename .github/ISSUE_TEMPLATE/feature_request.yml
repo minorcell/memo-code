@@ -1,0 +1,51 @@
+name: "\U0001F680 功能需求 / Feature Request"
+description: '提出新功能或改进建议'
+title: '[Feat]: '
+labels:
+    - enhancement
+body:
+    - type: markdown
+      attributes:
+          value: |
+              欢迎提出想法！请说明需求场景、期望行为，以及对现有流程的影响。/ Share the context, desired behavior, and impact.
+    - type: checkboxes
+      id: checklist
+      attributes:
+          label: 提交前请确认 / Please confirm
+          options:
+              - label: 我已搜索过已存在的 issue / I have searched existing issues
+                required: true
+              - label: 这是明确的需求，不是提问或求助 / This is a feature/improvement request, not a question
+                required: true
+    - type: textarea
+      id: motivation
+      attributes:
+          label: 背景与动机 / Motivation
+          description: 业务/使用场景、痛点、当前的限制。/ What problem are you facing today?
+          placeholder: '示例：在无网环境下希望支持离线模型调用...'
+      validations:
+          required: true
+    - type: textarea
+      id: proposal
+      attributes:
+          label: 方案设想 / Proposal
+          description: 期望的功能表现、接口或 CLI 用法。/ Describe the behavior you want.
+          placeholder: '示例：新增 --offline 标志，自动切换到本地模型...'
+      validations:
+          required: true
+    - type: textarea
+      id: scope
+      attributes:
+          label: 影响范围 / Scope
+          description: 涉及的模块、兼容性/安全/性能影响。/ Which areas are impacted?
+          placeholder: 'Core/Tools/UI、是否需要额外依赖、向后兼容性...'
+    - type: textarea
+      id: alternatives
+      attributes:
+          label: 备选方案 / Alternatives
+          description: 是否尝试过其他方案或手动变通。/ Any workarounds or alternatives tried?
+    - type: textarea
+      id: extra
+      attributes:
+          label: 其他信息 / Extra
+          description: 附加上下文、相关讨论、参考链接等。/ Additional context or references.

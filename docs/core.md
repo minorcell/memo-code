@@ -5,7 +5,7 @@
 ## 目录/模块
 
 - `config/`：配置与路径
-    - `config.ts`：读取/写入 `~/.memo/config.toml`，provider 选择（name/env_api_key/model/base_url）、会话路径（`sessions/<sanitized-cwd>/<yyyy-mm-dd>_<HHMMss>_<id>.jsonl`）、sessionId 生成。
+    - `config.ts`：读取/写入 `~/.memo/config.toml`，provider 选择（name/env*api_key/model/base_url）、会话路径（`sessions/<sanitized-cwd>/<yyyy-mm-dd>*<HHMMss>\_<id>.jsonl`）、sessionId 生成。
 - `runtime/`：运行时与日志
     - `prompt.md/prompt.ts`：系统提示词加载（内容为 JSON 协议说明）。
     - `history.ts`：JSONL sink 与事件构造。
