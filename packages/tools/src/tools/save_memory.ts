@@ -19,10 +19,7 @@ function resolveMemoryPath() {
 }
 
 function sanitizeFact(fact: string) {
-    return fact
-        .replace(/\r?\n/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
+    return fact.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function formatContent(header: string, items: string[]) {
