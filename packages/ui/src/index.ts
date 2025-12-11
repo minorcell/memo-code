@@ -167,4 +167,4 @@ async function main() {
     await runInteractive(parsed)
 }
 
-await main()
+void main()
