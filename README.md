@@ -39,6 +39,25 @@
 - **webfetch**：网页抓取工具，支持 http/https/data 协议，具有 10 秒超时和 512KB 大小限制，能自动将 HTML 转换为纯文本。
 - 更多工具详情请查看 `docs/tool/` 目录下的文档。
 
+## 外部 MCP Server
+
+- 配置文件：`~/.memo/config.toml`（可用 `MEMO_HOME` 覆盖）。在 `[mcp_servers.<name>]` 下添加条目。
+- 本地 stdio 服务器（已有可执行文件）：  
+  ```toml
+  [mcp_servers.local_tools]
+  command = "/path/to/mcp-server"
+  args = []
+  ```
+- 远程 HTTP 服务器（Streamable HTTP，失败会自动回退 SSE）：  
+  ```toml
+  [mcp_servers.bing_cn]
+  type = "streamable_http"
+  url = "https://mcp.api-inference.modelscope.net/496703c5b3ff47/mcp"
+  # 可选：headers = { Authorization = "Bearer xxx" }
+  # 可选：fallback_to_sse = true   # 默认开启
+  ```
+- 保存配置后重启 memo，会在系统提示词中注入外部工具列表（工具名前会带 `<server>_` 前缀）。
+
 ## 项目结构
 
 - `packages/core`
