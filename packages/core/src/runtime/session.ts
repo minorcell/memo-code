@@ -349,6 +349,9 @@ class AgentSessionImpl implements AgentSession {
             }
         }
         this.tokenCounter.dispose()
+        if (this.deps.dispose) {
+            await this.deps.dispose()
+        }
     }
 
     /** 将结构化事件发送到所有历史 sink，独立于主流程错误。 */

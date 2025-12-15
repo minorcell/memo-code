@@ -43,9 +43,7 @@ export const runBunTool: McpTool<BunInput> = {
             ])
             const exitCode = await proc.exited
 
-            return textResult(
-                `exit=${exitCode}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
-            )
+            return textResult(`exit=${exitCode}\nstdout:\n${stdout}\nstderr:\n${stderr}`)
         } catch (err) {
             return textResult(`run_bun failed: ${(err as Error).message}`, true)
         } finally {
@@ -61,4 +59,3 @@ export const runBunTool: McpTool<BunInput> = {
         }
     },
 }
-

@@ -63,15 +63,22 @@
 
 使用 `todo` 工具来管理复杂任务的计划。
 
-- **高质量计划**：
+- **高质量计划示例**（JSON payload）：
+
+    ```json
+    {
+        "type": "add",
+        "todos": [
+            { "content": "1. 设计数据模型 Schema" },
+            { "content": "2. 实现 API 路由" },
+            { "content": "3. 编写集成测试" }
+        ]
+    }
+    ```
+
+- **原则**：
     - 步骤具体、逻辑清晰。
-    - 示例 1（CLI 工具）：`["1. 添加带有文件参数的 CLI 条目", "2. 通过 CommonMark 库解析 Markdown", "3. 应用语义 HTML 模板", "4. 处理代码块、图像、链接", "5. 为无效文件添加错误处理"]`
-    - 示例 2（重构）：`["1. 定义颜色的 CSS 变量", "2. 添加带有 localStorage 状态的切换", "3. 重构组件以使用变量", "4. 验证所有视图的可读性", "5. 添加平滑的主题更改过渡"]`
-    - 示例 3（全栈）：`["1. 设置 Node.js + WebSocket 服务器", "2. 添加加入/离开广播事件", "3. 实现带时间戳的消息传递", "4. 添加用户名 + 提及高亮", "5. 在轻量级数据库中持久化消息"]`
-- **低质量计划（禁止）**：
-    - 废话或无法执行的步骤。
-    - 示例 1（过于笼统）：`["1. 创建 CLI 工具", "2. 添加 Markdown 解析器", "3. 转换为 HTML"]`
-    - 示例 2（缺乏细节）：`["1. 添加暗模式切换", "2. 保存首选项", "3. 使样式看起来不错"]`
+    - 既然使用了工具，请确保 `content` 字段包含序号和简述。
 
 ## 4. 任务执行与验证 (Execution & Verification)
 
@@ -109,10 +116,13 @@
 - **edit**: `{"file_path": "/abs/...", "old_string": "...", "new_string": "...", "replace_all": false}`
 - **run_bun**: `{"code": "..."}`
 - **glob**: `{"pattern": "**/*.ts", "path": "/curr/dir"}`
-- **grep**: `{"pattern": "TODO", "path": "/curr/dir", ...}`
+- **grep**: `{"pattern": "string", "path": "/dir", "glob": "*.ts", "-i": false, "-C": 2}`
 - **webfetch**: `{"url": "..."}`
 - **save_memory**: `{"fact": "..."}`
-- **todo**: `{"type": "add|update|remove", ...}`
+- **todo**:
+    - Add: `{"type": "add", "todos": [{"content": "string", "status": "pending"}]}`
+    - Update: `{"type": "update", "todos": [{"id": "string", "content": "string", "status": "completed"}]}`
+    - Remove: `{"type": "remove", "ids": ["string"]}`
 
 # 启动确认
 
