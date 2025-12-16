@@ -435,7 +435,6 @@ class AgentSessionImpl implements AgentSession {
         })
         await emitEventToSinks(event, this.sinks)
     }
-
 }
 
 /**
