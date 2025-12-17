@@ -116,8 +116,10 @@ async function runInteractive(parsed: ParsedArgs) {
             }
             process.stdout.write(text)
         },
-        onObservation: (tool: string, observation: string, step: number) => {
-            console.log(`\n[第 ${step + 1} 步 工具=${tool}]\n${observation}\n`)
+        hooks: {
+            onObservation: ({ tool, step }) => {
+                console.log(`\n工具=${tool} step=${step}\n`)
+            },
         },
     }
 
@@ -141,10 +143,8 @@ async function runInteractive(parsed: ParsedArgs) {
                 break
             }
 
-            console.log(`\n用户: ${trimmed}`)
+            console.log(`\n用户: ${trimmed}\n`)
             const turnResult = await session.runTurn(trimmed)
-            console.log('\n=== 最终回答 ===')
-            console.log(turnResult.finalText)
             console.log(
                 `\n[tokens] prompt=${turnResult.tokenUsage.prompt} completion=${turnResult.tokenUsage.completion} total=${turnResult.tokenUsage.total}`,
             )
