@@ -5,25 +5,40 @@ import { tmpdir } from 'node:os'
 import { flattenText } from '@memo/tools/tools/mcp'
 import { runBunTool } from '@memo/tools/tools/run_bun'
 
-let originalTmpDir: string | undefined
-let tempDir: string
-
-beforeAll(async () => {
-    originalTmpDir = process.env.TMPDIR
-    tempDir = await mkdtemp(join(tmpdir(), 'memo-run-bun-test-'))
-    process.env.TMPDIR = tempDir
-})
-
-afterAll(async () => {
-    if (originalTmpDir === undefined) {
-        delete process.env.TMPDIR
-    } else {
-        process.env.TMPDIR = originalTmpDir
+const hasSandbox = (() => {
+    if (process.env.MEMO_RUN_BUN_SANDBOX) {
+        return true
     }
-    await rm(tempDir, { recursive: true, force: true })
-})
+    if (process.platform === 'linux') {
+        return Boolean(Bun.which('bwrap'))
+    }
+    if (process.platform === 'darwin') {
+        return Boolean(Bun.which('sandbox-exec'))
+    }
+    return false
+})()
 
-describe('run_bun tool', () => {
+const describeRunBun = hasSandbox ? describe : describe.skip
+
+describeRunBun('run_bun tool', () => {
+    let originalTmpDir: string | undefined
+    let tempDir: string
+
+    beforeAll(async () => {
+        originalTmpDir = process.env.TMPDIR
+        tempDir = await mkdtemp(join(tmpdir(), 'memo-run-bun-test-'))
+        process.env.TMPDIR = tempDir
+    })
+
+    afterAll(async () => {
+        if (originalTmpDir === undefined) {
+            delete process.env.TMPDIR
+        } else {
+            process.env.TMPDIR = originalTmpDir
+        }
+        await rm(tempDir, { recursive: true, force: true })
+    })
+
     test('supports top-level await and TS syntax', async () => {
         const code = `
             type User = { name: string }
