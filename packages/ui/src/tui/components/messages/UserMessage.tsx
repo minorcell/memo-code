@@ -1,6 +1,6 @@
 import { Box, Text, useStdout } from 'ink'
-import { USER_PREFIX } from '../constants'
-import { buildPaddedLine } from '../utils'
+import { USER_PREFIX } from '../../constants'
+import { buildPaddedLine } from '../../utils'
 
 type UserMessageProps = {
     text: string
@@ -14,15 +14,11 @@ export function UserMessage({ text }: UserMessageProps) {
 
     return (
         <Box flexDirection="column">
-            {verticalPadding > 0 ? (
-                <Text backgroundColor="#2b2b2b">{blankLine}</Text>
-            ) : null}
+            {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
             <Text color="white" backgroundColor="#2b2b2b">
                 {line}
             </Text>
-            {verticalPadding > 0 ? (
-                <Text backgroundColor="#2b2b2b">{blankLine}</Text>
-            ) : null}
+            {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
         </Box>
     )
 }

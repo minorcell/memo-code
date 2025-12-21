@@ -1,8 +1,8 @@
 import { Box } from 'ink'
-import type { SystemMessage, TurnView as TurnViewType } from '../types'
-import { SystemMessageView } from './SystemMessageView'
-import { TurnView } from './TurnView'
-import { StatusMessage } from './StatusMessage'
+import type { SystemMessage, TurnView as TurnViewType } from '../../types'
+import { SystemMessageView } from '../messages/SystemMessageView'
+import { TurnView } from '../turns/TurnView'
+import { StatusMessage } from '../messages/StatusMessage'
 
 type MainContentProps = {
     systemMessages: SystemMessage[]
@@ -11,12 +11,7 @@ type MainContentProps = {
     statusKind: 'initializing' | 'running' | 'ready' | 'error'
 }
 
-export function MainContent({
-    systemMessages,
-    turns,
-    statusText,
-    statusKind,
-}: MainContentProps) {
+export function MainContent({ systemMessages, turns, statusText, statusKind }: MainContentProps) {
     const lastTurnIndex = turns.length - 1
     return (
         <Box flexDirection="column" gap={1}>

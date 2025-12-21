@@ -77,22 +77,22 @@ memo-cli 提供现代化的终端用户界面，包含以下特性：
 
 1. **安装依赖**
 
-   ```bash
-   bun install
-   ```
+    ```bash
+    bun install
+    ```
 
 2. **配置 API Key**
 
-   ```bash
-   export OPENAI_API_KEY=your_key    # 或 DEEPSEEK_API_KEY
-   ```
+    ```bash
+    export OPENAI_API_KEY=your_key    # 或 DEEPSEEK_API_KEY
+    ```
 
 3. **首次运行**
 
-   ```bash
-   bun start
-   # 将引导填写 provider/model/base_url，并在 ~/.memo/config.toml 保存
-   ```
+    ```bash
+    bun start
+    # 将引导填写 provider/model/base_url，并在 ~/.memo/config.toml 保存
+    ```
 
 ## CLI 使用
 
@@ -107,6 +107,7 @@ bun start
 ```
 
 **TUI 特性**：
+
 - 实时流式输出显示
 - 工具调用可视化
 - Token 使用统计
@@ -122,6 +123,7 @@ bun start "你的问题" --once
 ```
 
 **纯文本模式**：
+
 - 简洁的文本输出
 - 适合脚本集成
 - 便于日志记录
@@ -226,19 +228,23 @@ memo-cli/
 ## 开发脚本
 
 ### 基础开发
+
 - `bun install`：安装所有依赖
 - `bun start`：启动交互式 TUI
 - `bun start "问题" --once`：运行单轮纯文本模式
 
 ### 构建与部署
+
 - `bun build`：构建 CLI 应用（产物位于 `dist/`）
 - `bun run build:binary`：生成独立二进制文件 `./memo`
 
 ### 代码质量
+
 - `bun run format`：使用 Prettier 格式化代码
 - `bun run format:check`：检查代码格式
 
 ### UI 开发
+
 - 修改 `packages/ui/src/tui/` 下的文件来调整 TUI 界面
 - 添加新的 Slash 命令到 `packages/ui/src/tui/commands.ts`
 - 自定义组件样式在对应的组件文件中
@@ -246,21 +252,25 @@ memo-cli/
 ## 文档索引
 
 ### 核心架构
+
 - `docs/core.md`：核心状态机与 Session API
 - `docs/multi-turn.md`：多轮策略与会话管理
 - `docs/token-counting.md`：token 计费与估算机制
 
 ### UI 与设计
+
 - `docs/design/memo-cli-ui-design.md`：TUI 界面设计与实现
 - `docs/design/hooks-and-middleware.md`：Hooks 与中间件系统
 - `docs/design/gemini-cli.md`：设计参考与灵感
 
 ### 工具文档
+
 - `docs/tool/*.md`：各内置工具的详细参数与返回值
 - `docs/tool/save_memory.md`：记忆管理工具
 - `docs/tool/glob.md`：文件搜索工具
 
 ### 未来发展
+
 - `docs/future-plan.md`：项目路线图与计划
 - `docs/dev-direction.md`：开发方向与架构演进
 

@@ -1,7 +1,7 @@
 import { Box, Text, useInput, useStdout } from 'ink'
 import { useState } from 'react'
-import { USER_PREFIX } from '../constants'
-import { buildPaddedLine } from '../utils'
+import { USER_PREFIX } from '../../constants'
+import { buildPaddedLine } from '../../utils'
 
 type InputPromptProps = {
     disabled: boolean
@@ -11,13 +11,7 @@ type InputPromptProps = {
     history: string[]
 }
 
-export function InputPrompt({
-    disabled,
-    onSubmit,
-    onExit,
-    onClear,
-    history,
-}: InputPromptProps) {
+export function InputPrompt({ disabled, onSubmit, onExit, onClear, history }: InputPromptProps) {
     const { stdout } = useStdout()
     const [value, setValue] = useState('')
     const [historyIndex, setHistoryIndex] = useState<number | null>(null)
@@ -102,15 +96,11 @@ export function InputPrompt({
 
     return (
         <Box flexDirection="column">
-            {verticalPadding > 0 ? (
-                <Text backgroundColor="#2b2b2b">{blankLine}</Text>
-            ) : null}
+            {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
             <Text color={lineColor} backgroundColor="#2b2b2b">
                 {line}
             </Text>
-            {verticalPadding > 0 ? (
-                <Text backgroundColor="#2b2b2b">{blankLine}</Text>
-            ) : null}
+            {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
         </Box>
     )
 }

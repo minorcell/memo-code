@@ -13,10 +13,7 @@ export type SlashCommandResult =
     | { kind: 'clear' }
     | { kind: 'message'; title: string; content: string }
 
-export function resolveSlashCommand(
-    raw: string,
-    context: SlashCommandContext,
-): SlashCommandResult {
+export function resolveSlashCommand(raw: string, context: SlashCommandContext): SlashCommandResult {
     const [command] = raw.trim().slice(1).split(/\s+/)
     switch (command) {
         case 'help':
@@ -34,9 +31,7 @@ export function resolveSlashCommand(
             return {
                 kind: 'message',
                 title: 'tools',
-                content: `Built-in tools (${builtin.length}): ${builtin.join(
-                    ', ',
-                )}\n${external}`,
+                content: `Built-in tools (${builtin.length}): ${builtin.join(', ')}\n${external}`,
             }
         }
         case 'config':

@@ -24,9 +24,9 @@ export function HeaderBar({ providerName, model, cwd }: HeaderBarProps) {
             <Box>
                 <Text color="gray">model: </Text>
                 <Text bold>{model}</Text>
-                <Text color="gray">  provider: </Text>
+                <Text color="gray"> provider: </Text>
                 <Text>{providerName}</Text>
-                <Text color="gray">  /config to view</Text>
+                <Text color="gray"> /config to view</Text>
             </Box>
             <Box>
                 <Text color="gray">directory: </Text>

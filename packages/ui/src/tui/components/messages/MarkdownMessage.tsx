@@ -56,11 +56,7 @@ function renderInlineToken(
             )
         case 'codespan':
             return (
-                <Text
-                    key={key}
-                    color={palette.codeColor}
-                    backgroundColor={INLINE_CODE_BACKGROUND}
-                >
+                <Text key={key} color={palette.codeColor} backgroundColor={INLINE_CODE_BACKGROUND}>
                     {token.text}
                 </Text>
             )
@@ -76,9 +72,7 @@ function renderInlineToken(
                     ? renderInlineTokens(token.tokens, palette, `${key}-link`)
                     : token.text
             const suffix =
-                token.href && token.text && token.text !== token.href
-                    ? ` (${token.href})`
-                    : ''
+                token.href && token.text && token.text !== token.href ? ` (${token.href})` : ''
             return (
                 <Text key={key} underline color={palette.linkColor}>
                     {label}
@@ -142,19 +136,10 @@ function renderTable(token: Tokens.Table): string {
 }
 
 function isTableToken(token: Token): token is Tokens.Table {
-    return (
-        token.type === 'table' &&
-        'header' in token &&
-        'rows' in token &&
-        'align' in token
-    )
+    return token.type === 'table' && 'header' in token && 'rows' in token && 'align' in token
 }
 
-function renderBlockToken(
-    token: Token,
-    palette: RenderPalette,
-    key: string,
-): ReactNode | null {
+function renderBlockToken(token: Token, palette: RenderPalette, key: string): ReactNode | null {
     switch (token.type) {
         case 'space':
         case 'def':
@@ -194,14 +179,8 @@ function renderBlockToken(
             return (
                 <Box key={key} flexDirection="column">
                     {token.items.map((item: Tokens.ListItem, index: number) => {
-                        const bullet = token.ordered
-                            ? `${startIndex + index}.`
-                            : '-'
-                        const taskPrefix = item.task
-                            ? item.checked
-                                ? '[x] '
-                                : '[ ] '
-                            : ''
+                        const bullet = token.ordered ? `${startIndex + index}.` : '-'
+                        const taskPrefix = item.task ? (item.checked ? '[x] ' : '[ ] ') : ''
                         const inlineTokens = listItemInlineTokens(item)
                         return (
                             <Box key={`${key}-item-${index}`}>
@@ -257,11 +236,7 @@ function renderBlockToken(
     }
 }
 
-function renderBlocks(
-    tokens: TokensList,
-    palette: RenderPalette,
-    keyPrefix: string,
-): ReactNode[] {
+function renderBlocks(tokens: TokensList, palette: RenderPalette, keyPrefix: string): ReactNode[] {
     return tokens.flatMap((token, index) => {
         const rendered = renderBlockToken(token, palette, `${keyPrefix}-${index}`)
         return rendered ? [rendered] : []
@@ -278,5 +253,9 @@ export function MarkdownMessage({ text, tone = 'normal' }: MarkdownMessageProps)
     const tokens = marked.lexer(text, { gfm: true, breaks: true })
     const blocks = renderBlocks(tokens, palette, 'markdown')
 
-    return <Box flexDirection="column" gap={1}>{blocks}</Box>
+    return (
+        <Box flexDirection="column" gap={1}>
+            {blocks}
+        </Box>
+    )
 }

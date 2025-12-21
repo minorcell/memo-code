@@ -7,10 +7,10 @@ import {
     type AgentSessionOptions,
 } from '@memo/core'
 import type { SystemMessage, TurnView } from './types'
-import { HeaderBar } from './components/HeaderBar'
-import { TokenBar } from './components/TokenBar'
-import { MainContent } from './components/MainContent'
-import { InputPrompt } from './components/InputPrompt'
+import { HeaderBar } from './components/layout/HeaderBar'
+import { TokenBar } from './components/layout/TokenBar'
+import { MainContent } from './components/layout/MainContent'
+import { InputPrompt } from './components/layout/InputPrompt'
 import { inferToolStatus, formatTokenUsage } from './utils'
 import { resolveSlashCommand } from './commands'
 
@@ -49,23 +49,20 @@ export function App({
         setSystemMessages((prev) => [...prev, { id, title, content }])
     }, [])
 
-    const updateTurn = useCallback(
-        (turnIndex: number, updater: (turn: TurnView) => TurnView) => {
-            setTurns((prev) => {
-                const next = [...prev]
-                let idx = next.findIndex((turn) => turn.index === turnIndex)
-                if (idx === -1) {
-                    next.push(createEmptyTurn(turnIndex))
-                    idx = next.length - 1
-                }
-                const existing = next[idx]
-                if (!existing) return next
-                next[idx] = updater(existing)
-                return next
-            })
-        },
-        [],
-    )
+    const updateTurn = useCallback((turnIndex: number, updater: (turn: TurnView) => TurnView) => {
+        setTurns((prev) => {
+            const next = [...prev]
+            let idx = next.findIndex((turn) => turn.index === turnIndex)
+            if (idx === -1) {
+                next.push(createEmptyTurn(turnIndex))
+                idx = next.length - 1
+            }
+            const existing = next[idx]
+            if (!existing) return next
+            next[idx] = updater(existing)
+            return next
+        })
+    }, [])
 
     const deps = useMemo<AgentSessionDeps>(
         () => ({
@@ -236,25 +233,14 @@ export function App({
     )
 
     const lastTurn = turns[turns.length - 1]
-    const statusLine =
-        statusMessage ?? (!session ? 'Initializing...' : busy ? 'Running' : 'Ready')
+    const statusLine = statusMessage ?? (!session ? 'Initializing...' : busy ? 'Running' : 'Ready')
     const statusKind =
-        statusMessage !== null
-            ? 'error'
-            : !session
-              ? 'initializing'
-              : busy
-                ? 'running'
-                : 'ready'
+        statusMessage !== null ? 'error' : !session ? 'initializing' : busy ? 'running' : 'ready'
     const tokenLine = formatTokenUsage(lastTurn?.tokenUsage)
 
     return (
         <Box flexDirection="column" gap={1}>
-            <HeaderBar
-                providerName={providerName}
-                model={model}
-                cwd={cwd}
-            />
+            <HeaderBar providerName={providerName} model={model} cwd={cwd} />
             <MainContent
                 systemMessages={systemMessages}
                 turns={turns}
