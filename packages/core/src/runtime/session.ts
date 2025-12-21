@@ -240,7 +240,15 @@ class AgentSessionImpl implements AgentSession {
             if (!streamed) {
                 this.deps.onAssistantStep?.(assistantText, step)
             }
-            this.history.push({ role: 'assistant', content: assistantText })
+
+            const parsed: ParsedAssistant = parseAssistant(assistantText)
+            const historyContent = parsed.action
+                ? JSON.stringify({
+                      tool: parsed.action.tool,
+                      input: parsed.action.input,
+                  })
+                : assistantText
+            this.history.push({ role: 'assistant', content: historyContent })
 
             // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。
             const completionTokens = this.tokenCounter.countText(assistantText)
@@ -255,7 +263,6 @@ class AgentSessionImpl implements AgentSession {
             accumulateUsage(turnUsage, stepUsage)
             accumulateUsage(this.sessionUsage, stepUsage)
 
-            const parsed: ParsedAssistant = parseAssistant(assistantText)
             steps.push({
                 index: step,
                 assistantText,
