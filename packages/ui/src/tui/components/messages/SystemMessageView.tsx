@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink'
-import type { SystemMessage } from '../types'
+import type { SystemMessage } from '../../types'
 
 type SystemMessageViewProps = {
     message: SystemMessage

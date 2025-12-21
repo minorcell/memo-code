@@ -1,8 +1,8 @@
 import { Box, Text } from 'ink'
-import type { TurnView as TurnViewType } from '../types'
+import type { TurnView as TurnViewType } from '../../types'
 import { StepView } from './StepView'
-import { UserMessage } from './UserMessage'
-import { AssistantMessage } from './AssistantMessage'
+import { UserMessage } from '../messages/UserMessage'
+import { AssistantMessage } from '../messages/AssistantMessage'
 
 type TurnViewProps = {
     turn: TurnViewType
@@ -14,9 +14,7 @@ export function TurnView({ turn, showDuration = false }: TurnViewProps) {
     const finalText = turn.finalText?.trim() ?? ''
     const shouldRenderFinal = finalText.length > 0 && finalText !== lastStepText
     const durationSeconds =
-        typeof turn.durationMs === 'number'
-            ? Math.max(1, Math.round(turn.durationMs / 1000))
-            : null
+        typeof turn.durationMs === 'number' ? Math.max(1, Math.round(turn.durationMs / 1000)) : null
     const shouldShowDuration = showDuration && durationSeconds !== null
 
     return (

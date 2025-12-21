@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink'
-import { ASSISTANT_PREFIX } from '../constants'
+import { ASSISTANT_PREFIX } from '../../constants'
 import { MarkdownMessage } from './MarkdownMessage'
 
 type AssistantMessageProps = {
