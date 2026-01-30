@@ -1,32 +1,33 @@
-# Memo CLI `save_memory` 工具
+# Memo CLI `save_memory` Tool
 
-将简短事实/偏好追加到本地记忆文件（默认 `~/.memo/memo.md`），供后续会话注入系统提示词。
+Appends **user-related identity traits/preferences** to a local memory file (default `~/.memo/Agents.md`) for injection into system prompts in subsequent sessions.
 
-## 基本信息
+## Basic Info
 
-- 工具名称：`save_memory`
-- 描述：保存一条简短事实/偏好，跨会话复用（写入 ~/.memo/memo.md）
-- 文件：`packages/tools/src/tools/save_memory.ts`
-- 确认：否
+- Tool name: `save_memory`
+- Description: Save user-related identity traits or preferences (e.g., language habits, tech preferences) for cross-session reuse. Do not save project-specific technical details or file structures.
+- File: `packages/tools/src/tools/save_memory.ts`
+- Confirmation: No
 
-## 参数
+## Parameters
 
-- `fact`（字符串，必填）：要保存的简短事实，限制 ≤120 字符。
+- `fact` (string, required): User-related identity traits or preferences, max 120 characters. Examples: "User prefers Chinese responses", "User is a frontend engineer". **Do not** store project-specific technical details, file structures, or business logic.
 
-## 行为
+## Behavior
 
-- 清洗输入：替换换行为空格、压缩空白、trim；为空时报错。
-- 解析存储路径：优先 `MEMO_HOME` 环境变量，否则 `~/.memo/memo.md`；递归创建父目录。
-- 读取现有内容（若存在），截取 header `## Memo Added Memories` 之后的条目（前缀 `- `）。
-- 追加新 fact，保留最近 50 条，重新写入带 header 的列表。
-- 写入异常时返回错误；维护过程中的警告仅打印到控制台。
-- 成功返回写入路径。
+- Sanitizes input: replaces newlines with spaces, compresses whitespace, trims; errors if empty.
+- Resolves storage path: prefers `MEMO_HOME` env var, otherwise `~/.memo/Agents.md`; recursively creates parent directories.
+- Reads existing content (if exists), extracts entries after header `## Memo Added Memories` (prefix `- `).
+- Appends new fact, keeps most recent 50, rewrites with header.
+- Returns error on write failure; warnings during maintenance only printed to console.
+- Returns path on success.
 
-## 输出示例
+## Example Output
 
-`已保存记忆到: /Users/you/.memo/memo.md`
+`Memory saved to: /Users/you/.memo/Agents.md`
 
-## 注意
+## Notes
 
-- 仅维护单一分节，不保留其它自定义内容。
-- 进程外共享文件，需确保对路径有写权限。
+- Only maintains a single section, does not preserve other custom content.
+- File is shared across processes, ensure write permissions to the path.
+- **Important**: This tool is for storing user identity information, not project-specific technical details. Project context should be managed via `AGENTS.md` or the working directory for each session.
