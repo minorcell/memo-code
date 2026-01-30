@@ -6,6 +6,7 @@ export type SlashResolveContext = {
     model: string
     mcpServerNames: string[]
     providers: ProviderConfig[]
+    contextLimit: number
 }
 
 export type SlashCommandResult =
@@ -13,6 +14,7 @@ export type SlashCommandResult =
     | { kind: 'clear' }
     | { kind: 'message'; title: string; content: string }
     | { kind: 'switch_model'; provider: ProviderConfig }
+    | { kind: 'set_context_limit'; limit: number }
 
 const HELP_TEXT = `Available commands:
   /help       Show help and shortcuts
@@ -20,6 +22,7 @@ const HELP_TEXT = `Available commands:
   /clear      Clear the screen
   /models     Pick a model from config
   /history    Show session history
+  /context    Show or set context length (e.g. /context 120k)
 
 Shortcuts:
   Enter       Send message
@@ -32,6 +35,17 @@ Shortcuts:
 
 export function resolveSlashCommand(raw: string, context: SlashResolveContext): SlashCommandResult {
     const [command, ...rest] = raw.trim().slice(1).split(/\s+/)
+    const CONTEXT_CHOICES = [80000, 120000, 150000, 200000] as const
+
+    const parseContextLimit = (input: string | undefined): number | null => {
+        if (!input) return null
+        const normalized = input.toLowerCase().replace(/,/g, '')
+        const match = normalized.match(/^(\d+)(k)?$/)
+        if (!match) return null
+        const value = Number(match[1]) * (match[2] ? 1000 : 1)
+        return Number.isFinite(value) ? value : null
+    }
+
     switch (command) {
         case 'exit':
             return { kind: 'exit' }
@@ -55,6 +69,25 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
                 title: 'History',
                 content: 'Type "history" to filter and select from session history.',
             }
+        case 'context': {
+            const candidate = parseContextLimit(rest[0])
+            const options = CONTEXT_CHOICES.map((n) => `${n / 1000}k`).join(', ')
+            if (candidate === null) {
+                return {
+                    kind: 'message',
+                    title: 'Context',
+                    content: `Current: ${(context.contextLimit / 1000).toFixed(0)}k\nUsage: /context <length>\nChoices: ${options}`,
+                }
+            }
+            if (!CONTEXT_CHOICES.includes(candidate as (typeof CONTEXT_CHOICES)[number])) {
+                return {
+                    kind: 'message',
+                    title: 'Context',
+                    content: `Unsupported length: ${candidate}. Pick one of: ${options}`,
+                }
+            }
+            return { kind: 'set_context_limit', limit: candidate }
+        }
         case 'models': {
             if (!context.providers.length) {
                 return {
