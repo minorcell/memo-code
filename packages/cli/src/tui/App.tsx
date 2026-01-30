@@ -356,8 +356,7 @@ export function App({
     )
 
     const lastTurn = turns[turns.length - 1]
-    const statusLine =
-        statusMessage ?? (!session ? 'Initializing...' : busy ? 'Running' : 'Ready')
+    const statusLine = statusMessage ?? (!session ? 'Initializing...' : busy ? 'Running' : 'Ready')
     const statusKind =
         statusMessage !== null ? 'error' : !session ? 'initializing' : busy ? 'running' : 'ready'
     const tokenLine = formatTokenUsage(lastTurn?.tokenUsage)
@@ -400,7 +399,10 @@ function parseHistoryLog(raw: string): {
     const messages: ChatMessage[] = []
     const turns: TurnView[] = []
     const summaryParts: string[] = []
-    const lines = raw.split('\n').map((line) => line.trim()).filter(Boolean)
+    const lines = raw
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
     let currentTurn: TurnView | null = null
     let turnCount = 0
 

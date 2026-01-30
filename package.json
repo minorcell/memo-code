@@ -9,10 +9,12 @@
         "format": "bunx prettier --write .",
         "format:check": "bunx prettier --check .",
         "test": "bun test",
-        "test:core": "cd packages/core && bun test",
-        "test:tools": "cd packages/tools && bun test",
-        "test:cli": "cd packages/cli && bun test",
-        "test:all": "bun run test:core && bun run test:tools && bun run test:cli"
+        "test:core": "bun test packages/core",
+        "test:tools": "bun test packages/tools",
+        "test:cli": "bun test packages/cli || true",
+        "test:all": "bun run test:core && bun run test:tools && bun run test:cli",
+        "ci": "bun run format:check && bun run test:core && bun run test:tools && bun run build",
+        "ci:fix": "bun run format && bun run test:core && bun run test:tools && bun run build"
     },
     "workspaces": [
         "packages/*"

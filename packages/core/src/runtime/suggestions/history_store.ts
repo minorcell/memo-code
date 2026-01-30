@@ -2,11 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import type {
-    InputHistoryEntry,
-    InputHistoryQuery,
-    InputHistoryStoreOptions,
-} from './types'
+import type { InputHistoryEntry, InputHistoryQuery, InputHistoryStoreOptions } from './types'
 
 const DEFAULT_MAX_ENTRIES = 500
 

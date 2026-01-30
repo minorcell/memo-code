@@ -68,7 +68,9 @@ function normalizeOptions(req: FileSuggestionRequest): NormalizedOptions {
     return {
         maxDepth: typeof req.maxDepth === 'number' ? Math.max(1, req.maxDepth) : DEFAULT_MAX_DEPTH,
         maxEntries:
-            typeof req.maxEntries === 'number' ? Math.max(100, req.maxEntries) : DEFAULT_MAX_ENTRIES,
+            typeof req.maxEntries === 'number'
+                ? Math.max(100, req.maxEntries)
+                : DEFAULT_MAX_ENTRIES,
         limit: typeof req.limit === 'number' ? Math.max(1, req.limit) : DEFAULT_LIMIT,
         respectGitIgnore: req.respectGitIgnore !== false,
         ignoreGlobs: req.ignoreGlobs?.length ? req.ignoreGlobs : [],
@@ -228,16 +230,13 @@ function rankEntries(entries: IndexedEntry[], query: string, limit: number): Fil
         id: entry.path,
         path: entry.path,
         name: entry.segments[entry.segments.length - 1] ?? entry.path,
-        parent:
-            entry.segments.length > 1 ? entry.segments.slice(0, -1).join('/') : undefined,
+        parent: entry.segments.length > 1 ? entry.segments.slice(0, -1).join('/') : undefined,
         isDir: entry.isDir,
     }))
 }
 
 /** 获取匹配文件/目录的建议列表，结果按匹配度排序。 */
-export async function getFileSuggestions(
-    req: FileSuggestionRequest,
-): Promise<FileSuggestion[]> {
+export async function getFileSuggestions(req: FileSuggestionRequest): Promise<FileSuggestion[]> {
     const entries = await ensureEntries(req.cwd, req)
     const limit = typeof req.limit === 'number' ? Math.max(1, req.limit) : DEFAULT_LIMIT
     return rankEntries(entries, req.query, limit)

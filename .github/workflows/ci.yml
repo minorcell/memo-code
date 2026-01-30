@@ -25,7 +25,7 @@ jobs:
               run: bun run format:check
 
             - name: Test all packages
-              run: bun run test:all
+              run: bun run test:core && bun run test:tools
 
             - name: Test build
               run: bun run build

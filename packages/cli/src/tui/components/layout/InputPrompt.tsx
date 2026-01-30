@@ -83,18 +83,15 @@ export function InputPrompt({
         return detectSuggestionTrigger(value)
     }, [disabled, suppressSuggestions, value])
 
-    const closeSuggestions = useCallback(
-        (suppress = true) => {
-            if (suppress) {
-                setSuppressSuggestions(true)
-            }
-            setSuggestionMode('none')
-            setSuggestionItems([])
-            setActiveIndex(0)
-            setLoadingSuggestions(false)
-        },
-        [],
-    )
+    const closeSuggestions = useCallback((suppress = true) => {
+        if (suppress) {
+            setSuppressSuggestions(true)
+        }
+        setSuggestionMode('none')
+        setSuggestionItems([])
+        setActiveIndex(0)
+        setLoadingSuggestions(false)
+    }, [])
 
     useEffect(() => {
         if (disabled) {
@@ -314,9 +311,7 @@ export function InputPrompt({
 
         if (key.upArrow) {
             if (canNavigate) {
-                setActiveIndex((prev) =>
-                    prev <= 0 ? suggestionItems.length - 1 : prev - 1,
-                )
+                setActiveIndex((prev) => (prev <= 0 ? suggestionItems.length - 1 : prev - 1))
                 return
             }
             if (!history.length) return
@@ -424,7 +419,9 @@ type HistoryLoadOptions = {
     limit?: number
 }
 
-async function loadSessionHistoryEntries(options: HistoryLoadOptions): Promise<InputHistoryEntry[]> {
+async function loadSessionHistoryEntries(
+    options: HistoryLoadOptions,
+): Promise<InputHistoryEntry[]> {
     const logDir = getSessionLogDir(options.sessionsDir, options.cwd)
     let dirEntries: import('node:fs').Dirent[]
     try {
@@ -435,9 +432,7 @@ async function loadSessionHistoryEntries(options: HistoryLoadOptions): Promise<I
         }
         return []
     }
-    const normalizedActive = options.activeSessionFile
-        ? resolve(options.activeSessionFile)
-        : null
+    const normalizedActive = options.activeSessionFile ? resolve(options.activeSessionFile) : null
     const candidates = await Promise.all(
         dirEntries
             .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
@@ -462,7 +457,11 @@ async function loadSessionHistoryEntries(options: HistoryLoadOptions): Promise<I
     const entries: InputHistoryEntry[] = []
     for (const candidate of sorted) {
         if (entries.length >= limit) break
-        const entry = await buildHistoryEntryFromFile(candidate.path, options.cwd, candidate.mtimeMs)
+        const entry = await buildHistoryEntryFromFile(
+            candidate.path,
+            options.cwd,
+            candidate.mtimeMs,
+        )
         if (!entry) continue
         if (keyword && !entry.input.toLowerCase().includes(keyword)) {
             continue
