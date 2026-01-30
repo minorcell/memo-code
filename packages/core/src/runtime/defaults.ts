@@ -42,8 +42,8 @@ export async function withDefaultDeps(
     const loaded = await loadMemoConfig()
     const config = loaded.config
 
-    // 1. 加载外部 MCP 工具（遵循 MEMO_HOME）
-    const { tools: mcpTools, cleanup } = await loadExternalMcpTools(config.mcp_servers, loaded.home)
+    // 1. 加载外部 MCP 工具
+    const { tools: mcpTools, cleanup } = await loadExternalMcpTools(config.mcp_servers)
 
     // 2. 合并工具: deps.tools > mcpTools > TOOLKIT
     const baseTools = deps.tools ?? TOOLKIT

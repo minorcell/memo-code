@@ -184,10 +184,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             sessionsDir={sessionsDir}
             providers={loaded.config.providers}
         />,
-        {
-            exitOnCtrlC: false,
-            patchConsole: false,
-        },
+        { exitOnCtrlC: false },
     )
     await app.waitUntilExit()
 }

@@ -7,13 +7,7 @@ import { textResult } from '@memo/tools/tools/mcp'
 
 const SAVE_MEMORY_INPUT_SCHEMA = z
     .object({
-        fact: z
-            .string()
-            .min(1, 'fact cannot be empty')
-            .max(120, 'Please keep facts concise (≤120 characters)')
-            .describe(
-                'User-related identity traits or preferences, e.g., "User prefers Chinese responses", "User is a frontend engineer". Do not store project-specific technical details.',
-            ),
+        fact: z.string().min(1, 'fact 不能为空').max(120, '请尽量简短事实（≤120 字符）'),
     })
     .strict()
 
@@ -21,7 +15,7 @@ type SaveMemoryInput = z.infer<typeof SAVE_MEMORY_INPUT_SCHEMA>
 
 function resolveMemoryPath() {
     const base = process.env.MEMO_HOME?.trim() || join(homedir(), '.memo')
-    return join(base, 'Agents.md')
+    return join(base, 'memo.md')
 }
 
 function sanitizeFact(fact: string) {
@@ -35,21 +29,16 @@ function formatContent(header: string, items: string[]) {
 }
 
 /**
- * Appends user-related identity traits/preferences to ~/.memo/Agents.md ("Memo Added Memories" section)
- * for injection into system prompts in subsequent sessions.
- *
- * Note: Only stores user-related information (language habits, identity traits, etc.),
- * not project-specific content.
+ * 将简短事实/偏好追加到 ~/.memo/memo.md（“Memo Added Memories”分节），供后续会话注入系统提示词。
  */
 export const saveMemoryTool: McpTool<SaveMemoryInput> = {
     name: 'save_memory',
-    description:
-        'Save user-related identity traits or preferences (e.g., language habits, tech preferences) for cross-session reuse. Do not save project-specific technical details or file structures.',
+    description: '保存一条简短事实/偏好，跨会话复用（写入 ~/.memo/memo.md）',
     inputSchema: SAVE_MEMORY_INPUT_SCHEMA,
     execute: async (input) => {
         const fact = sanitizeFact(input.fact)
         if (!fact) {
-            return textResult('fact cannot be empty', true)
+            return textResult('fact 不能为空', true)
         }
         const memoryPath = resolveMemoryPath()
         const dir = dirname(memoryPath)
@@ -71,12 +60,12 @@ export const saveMemoryTool: McpTool<SaveMemoryInput> = {
                 const finalContent = formatContent(header, pruned)
                 await Bun.write(memoryPath, finalContent)
             } catch (err) {
-                console.warn(`Memory maintenance failed: ${(err as Error).message}`)
+                console.warn(`memory 维护失败: ${(err as Error).message}`)
             }
 
-            return textResult(`Memory saved to: ${memoryPath}`)
+            return textResult(`已保存记忆到: ${memoryPath}`)
         } catch (err) {
-            return textResult(`Failed to write memory: ${(err as Error).message}`, true)
+            return textResult(`写入 memory 失败: ${(err as Error).message}`, true)
         }
     },
 }

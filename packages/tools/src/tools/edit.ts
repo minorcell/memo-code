@@ -6,7 +6,7 @@ import { textResult } from '@memo/tools/tools/mcp'
 const EDIT_INPUT_SCHEMA = z
     .object({
         file_path: z.string().min(1),
-        old_string: z.string().min(1, 'old_string 不能为空'),
+        old_string: z.string(),
         new_string: z.string(),
         replace_all: z.boolean().optional(),
     })
@@ -25,9 +25,6 @@ export const editTool: McpTool<EditInput> = {
     execute: async (input) => {
         const path = normalizePath(input.file_path)
         const replaceAll = input.replace_all ?? false
-        if (!input.old_string.trim()) {
-            return textResult('old_string 不能为空', true)
-        }
 
         try {
             const file = Bun.file(path)
