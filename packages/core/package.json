@@ -2,6 +2,7 @@
     "name": "@memo/core",
     "type": "module",
     "module": "src/index.ts",
+    "version": "0.1",
     "private": true,
     "scripts": {
         "test": "bun test"

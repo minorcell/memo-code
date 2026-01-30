@@ -2,6 +2,7 @@
     "name": "@memo/cli",
     "type": "module",
     "module": "src/index.tsx",
+    "version": "0.1",
     "private": true,
     "scripts": {
         "test": "bun test"
