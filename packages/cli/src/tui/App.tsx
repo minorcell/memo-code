@@ -56,7 +56,6 @@ export function App({
     const [session, setSession] = useState<AgentSession | null>(null)
     const [turns, setTurns] = useState<TurnView[]>([])
     const [systemMessages, setSystemMessages] = useState<SystemMessage[]>([])
-    const [statusMessage, setStatusMessage] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
     const currentTurnRef = useRef<number | null>(null)
     const [inputHistory, setInputHistory] = useState<string[]>([])
@@ -213,7 +212,6 @@ export function App({
     const handleClear = useCallback(() => {
         setTurns([])
         setSystemMessages([])
-        setStatusMessage(null)
         setHistoricalTurns([])
         setPendingHistoryMessages(null)
     }, [])
@@ -230,7 +228,6 @@ export function App({
                 setHistoricalTurns(parsed.turns)
                 setPendingHistoryMessages(parsed.messages)
                 setBusy(false)
-                setStatusMessage(null)
                 setTurns([])
                 setSession(null)
                 setSessionLogPath(null)
@@ -276,7 +273,6 @@ export function App({
                 appendSystemMessage('模型切换', '当前正在运行，按 Esc Esc 取消后再切换模型。')
                 return
             }
-            setStatusMessage(null)
             setTurns([])
             setHistoricalTurns([])
             setPendingHistoryMessages(null)
@@ -344,7 +340,6 @@ export function App({
     const handleSubmit = useCallback(
         async (value: string) => {
             if (!session || busy) return
-            setStatusMessage(null)
             if (value.startsWith('/')) {
                 await handleCommand(value)
                 return
@@ -354,7 +349,6 @@ export function App({
             try {
                 await session.runTurn(value)
             } catch (err) {
-                setStatusMessage(`Failed: ${(err as Error).message}`)
                 setBusy(false)
             }
         },
@@ -362,9 +356,6 @@ export function App({
     )
 
     const lastTurn = turns[turns.length - 1]
-    const statusLine = statusMessage ?? (!session ? 'Initializing...' : busy ? 'Running' : 'Ready')
-    const statusKind =
-        statusMessage !== null ? 'error' : !session ? 'initializing' : busy ? 'running' : 'ready'
     const tokenLine = formatTokenUsage(lastTurn?.tokenUsage)
     const contextPercent = calculateContextPercent(lastTurn?.tokenUsage)
 
@@ -380,7 +371,7 @@ export function App({
     }
 
     return (
-        <Box flexDirection="column" gap={1}>
+        <Box flexDirection="column">
             <HeaderBar
                 providerName={currentProvider}
                 model={currentModel}
@@ -402,12 +393,7 @@ export function App({
                 currentSessionFile={sessionLogPath ?? undefined}
                 providers={providers}
             />
-            <TokenBar
-                tokenLine={tokenLine}
-                model={currentModel}
-                mode={busy ? 'thinking' : 'normal'}
-                contextPercent={contextPercent}
-            />
+            <TokenBar contextPercent={contextPercent} />
         </Box>
     )
 }
