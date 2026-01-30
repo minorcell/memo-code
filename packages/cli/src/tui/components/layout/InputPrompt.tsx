@@ -82,9 +82,23 @@ export function InputPrompt({
     const lastEscTimeRef = useRef(0)
     // Use ref to track input value for synchronous updates during rapid input (paste)
     const valueRef = useRef('')
+    // Blinking cursor state
+    const [showCursor, setShowCursor] = useState(true)
 
     const username = useMemo(() => getUsername(), [])
     const cwdName = useMemo(() => cwd.split('/').pop() || cwd, [cwd])
+
+    // Cursor blink effect
+    useEffect(() => {
+        if (disabled) {
+            setShowCursor(false)
+            return
+        }
+        const interval = setInterval(() => {
+            setShowCursor((prev) => !prev)
+        }, 530) // Blink every 530ms
+        return () => clearInterval(interval)
+    }, [disabled])
 
     // Sync ref with state
     useEffect(() => {
@@ -383,6 +397,16 @@ export function InputPrompt({
                 applySuggestion(suggestionItems[activeIndex])
                 return
             }
+
+            // Shift+Enter: insert newline
+            if (key.shift) {
+                const newValue = valueRef.current + '\n'
+                valueRef.current = newValue
+                setValue(newValue)
+                return
+            }
+
+            // Enter: submit
             const trimmed = valueRef.current.trim()
             if (trimmed) {
                 onSubmit(trimmed)
@@ -411,6 +435,10 @@ export function InputPrompt({
 
     const placeholder = disabled ? 'Running...' : ''
     const displayText = value || placeholder
+    const cursor = showCursor && !disabled ? '▊' : ' '
+
+    // Split text into lines for multi-line display
+    const lines = displayText.split('\n')
 
     const suggestionListItems: SuggestionListItem[] = suggestionItems.map(
         ({ value: _value, meta: _meta, ...rest }) => rest,
@@ -419,16 +447,29 @@ export function InputPrompt({
     return (
         <Box flexDirection="column" gap={1}>
             {/* Prompt line with username@cwd */}
-            <Box>
-                <Text color="cyan">{username}</Text>
-                <Text color="gray">@</Text>
-                <Text color="cyan">{cwdName}</Text>
-                <Text color="yellow"> </Text>
-                {disabled ? (
-                    <Text color="gray">{placeholder}</Text>
-                ) : (
-                    <Text color="white">{displayText}</Text>
-                )}
+            <Box flexDirection="column">
+                <Box>
+                    <Text color="cyan">{username}</Text>
+                    <Text color="gray">@</Text>
+                    <Text color="cyan">{cwdName}</Text>
+                    <Text color="yellow"> </Text>
+                    {disabled ? (
+                        <Text color="gray">{lines[0]}</Text>
+                    ) : (
+                        <>
+                            <Text color="white">{lines[0]}</Text>
+                            {lines.length === 1 && <Text color="cyan">{cursor}</Text>}
+                        </>
+                    )}
+                </Box>
+                {/* Additional lines (if multi-line input) */}
+                {lines.slice(1).map((line, index) => (
+                    <Box key={`line-${index}`} paddingLeft={username.length + cwdName.length + 2}>
+                        <Text color="white">{line}</Text>
+                        {/* Show cursor on the last line */}
+                        {index === lines.length - 2 && <Text color="cyan">{cursor}</Text>}
+                    </Box>
+                ))}
             </Box>
 
             {suggestionMode !== 'none' ? (
