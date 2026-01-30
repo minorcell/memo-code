@@ -49,7 +49,7 @@ type ParsedMemoConfig = Omit<Partial<MemoConfig>, 'providers'> & { providers?: u
 
 const DEFAULT_MEMO_HOME = join(homedir(), '.memo')
 const DEFAULT_SESSIONS_DIR = 'sessions'
-const DEFAULT_MEMORY_FILE = 'memo.md'
+const DEFAULT_MEMORY_FILE = 'Agents.md'
 
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
