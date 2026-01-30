@@ -12,9 +12,8 @@ export function parseAssistant(content: string): ParsedAssistant {
     const parsed: ParsedAssistant = {}
 
     // 尝试提取 JSON Block
-    // 匹配 ```json {...} ``` 或 ``` {...} ```
-    // 同时也支持没有闭合 ``` 的情况（流式输出中断）
-    const jsonBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
+    // 匹配 ```json {...} ``` 或 ``` {...} ```，允许缺失闭合 ```（流式截断）
+    const jsonBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*(?:```|$)/
     const match = content.match(jsonBlockRegex)
 
     if (match) {
