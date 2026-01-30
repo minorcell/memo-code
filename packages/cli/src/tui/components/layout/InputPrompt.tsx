@@ -2,14 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { Box, Text, useInput, useStdout } from 'ink'
+import os from 'node:os'
 import {
     getFileSuggestions,
     getSessionLogDir,
     type InputHistoryEntry,
     type ProviderConfig,
 } from '@memo/core'
-import { USER_PREFIX } from '../../constants'
-import { buildPaddedLine } from '../../utils'
 import { SuggestionList, type SuggestionListItem } from '../input/SuggestionList'
 import { SLASH_COMMANDS, type SlashCommand } from '../../slash'
 
@@ -48,6 +47,15 @@ type SlashTrigger = { type: 'slash'; keyword: string }
 type ModelsTrigger = { type: 'models'; keyword: string }
 type SuggestionTrigger = FileTrigger | HistoryTrigger | SlashTrigger | ModelsTrigger
 
+function getUsername(): string {
+    try {
+        const info = os.userInfo()
+        return info.username || 'user'
+    } catch {
+        return 'user'
+    }
+}
+
 export function InputPrompt({
     disabled,
     onSubmit,
@@ -73,6 +81,9 @@ export function InputPrompt({
     const [suppressSuggestions, setSuppressSuggestions] = useState(false)
     const requestIdRef = useRef(0)
     const lastEscTimeRef = useRef(0)
+
+    const username = useMemo(() => getUsername(), [])
+    const cwdName = useMemo(() => cwd.split('/').pop() || cwd, [cwd])
 
     useEffect(() => {
         setSuppressSuggestions(false)
@@ -377,15 +388,8 @@ export function InputPrompt({
         }
     })
 
-    const placeholder = disabled ? 'Running...' : 'Input...'
+    const placeholder = disabled ? 'Running...' : ''
     const displayText = value || placeholder
-    const lineColor = value && !disabled ? 'white' : 'gray'
-    const { line, blankLine } = buildPaddedLine(
-        `${USER_PREFIX} ${displayText}`,
-        stdout?.columns ?? 80,
-        1,
-    )
-    const verticalPadding = 1
 
     const suggestionListItems: SuggestionListItem[] = suggestionItems.map(
         ({ value: _value, meta: _meta, ...rest }) => rest,
@@ -393,13 +397,20 @@ export function InputPrompt({
 
     return (
         <Box flexDirection="column" gap={1}>
-            <Box flexDirection="column">
-                {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
-                <Text color={lineColor} backgroundColor="#2b2b2b">
-                    {line}
-                </Text>
-                {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
+            {/* Prompt line with username@cwd */}
+            <Box>
+                <Text color="cyan">{username}</Text>
+                <Text color="gray">@</Text>
+                <Text color="cyan">{cwdName}</Text>
+                <Text color="yellow"> 💫 </Text>
+                {disabled ? (
+                    <Text color="gray">{placeholder}</Text>
+                ) : (
+                    <Text color="white">{displayText}</Text>
+                )}
+                {!disabled && !value && <Text color="gray">_</Text>}
             </Box>
+
             {suggestionMode !== 'none' ? (
                 <SuggestionList
                     items={suggestionListItems}

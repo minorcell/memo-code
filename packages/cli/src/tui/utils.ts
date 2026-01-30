@@ -65,7 +65,38 @@ export function inferToolStatus(observation?: string): ToolStatus {
     return 'success'
 }
 
-export function formatTokenUsage(usage?: TokenUsage) {
-    if (!usage) return 'tokens: -'
-    return `Tokens: prompt ${usage.prompt}  completion ${usage.completion}  total ${usage.total}`
+// Estimated max context size for different models (in tokens)
+const CONTEXT_LIMITS = {
+    'gpt-4': 8192,
+    'gpt-4o': 128000,
+    'gpt-4o-mini': 128000,
+    claude: 200000,
+    'claude-3': 200000,
+    deepseek: 64000,
+    'deepseek-chat': 64000,
+    'deepseek-coder': 64000,
+    kimi: 200000,
+    'kimi-k2': 200000,
+    default: 128000,
+} as const
+
+function getContextLimit(model: string): number {
+    type LimitKey = keyof typeof CONTEXT_LIMITS
+    const lowerModel = model.toLowerCase()
+    for (const key of Object.keys(CONTEXT_LIMITS) as LimitKey[]) {
+        if (lowerModel.includes(key)) return CONTEXT_LIMITS[key]
+    }
+    return CONTEXT_LIMITS.default
+}
+
+export function calculateContextPercent(usage?: TokenUsage): number {
+    if (!usage || !usage.total) return 0
+    // Estimate: use total tokens as a rough approximation of context usage
+    // This is simplified - real implementation might track actual context window
+    return Math.min(100, (usage.total / 128000) * 100)
+}
+
+export function formatTokenUsage(usage?: TokenUsage): string {
+    if (!usage) return ''
+    return `${usage.total} tokens`
 }
