@@ -94,6 +94,20 @@ describe('read tool', () => {
         assert.ok(lines.length >= 2, 'should return some lines')
         assert.ok(lines[lines.length - 1]?.includes('truncated'), 'should append truncated note')
     })
+
+    test('encodes image to base64 with compression', async () => {
+        const target = join(tempDir, 'img.png')
+        // minimal PNG (1x1 transparent)
+        const pngBase64 =
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO3fWqUAAAAASUVORK5CYII='
+        const bytes = Uint8Array.from(Buffer.from(pngBase64, 'base64'))
+        await writeTool.execute({ file_path: target, content: bytes })
+        const res = await readTool.execute({ file_path: target })
+        const text = res.content?.find((item) => item.type === 'text')?.text ?? ''
+        assert.ok(text.includes('image_base64'), 'should return base64 payload')
+        assert.ok(text.includes('encoding='), 'should include encoding info')
+        assert.ok(text.includes('base64_length='), 'should include length info')
+    })
 })
 
 describe('edit tool', () => {
