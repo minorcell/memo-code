@@ -178,6 +178,7 @@ class AgentSessionImpl implements AgentSession {
                 sessionId: this.id,
                 turn,
                 input,
+                promptTokens,
                 history: snapshotHistory(this.history),
             })
 

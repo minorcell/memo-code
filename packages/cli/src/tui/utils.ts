@@ -67,33 +67,43 @@ export function inferToolStatus(observation?: string): ToolStatus {
 
 // Estimated max context size for different models (in tokens)
 const CONTEXT_LIMITS = {
-    'gpt-4': 8192,
-    'gpt-4o': 128000,
     'gpt-4o-mini': 128000,
-    claude: 200000,
+    'gpt-4o': 128000,
+    'gpt-4': 8192,
+    'gpt-3.5': 16384,
     'claude-3': 200000,
-    deepseek: 64000,
-    'deepseek-chat': 64000,
+    claude: 200000,
     'deepseek-coder': 64000,
-    kimi: 200000,
+    'deepseek-chat': 64000,
+    deepseek: 64000,
     'kimi-k2': 200000,
-    default: 128000,
+    kimi: 200000,
+    default: 120000,
 } as const
 
 function getContextLimit(model: string): number {
-    type LimitKey = keyof typeof CONTEXT_LIMITS
+    type LimitEntry = [keyof typeof CONTEXT_LIMITS, number]
     const lowerModel = model.toLowerCase()
-    for (const key of Object.keys(CONTEXT_LIMITS) as LimitKey[]) {
-        if (lowerModel.includes(key)) return CONTEXT_LIMITS[key]
+    const candidates = (Object.entries(CONTEXT_LIMITS) as LimitEntry[]).filter(
+        ([key]) => key !== 'default',
+    )
+    // match the most specific key first to avoid substring collisions (e.g. gpt-4 vs gpt-4o)
+    for (const [key, limit] of candidates.sort((a, b) => b[0].length - a[0].length)) {
+        if (lowerModel.includes(key)) return limit
     }
     return CONTEXT_LIMITS.default
 }
 
-export function calculateContextPercent(usage?: TokenUsage): number {
-    if (!usage || !usage.total) return 0
-    // Estimate: use total tokens as a rough approximation of context usage
-    // This is simplified - real implementation might track actual context window
-    return Math.min(100, (usage.total / 128000) * 100)
+export function calculateContextPercent(usageOrTokens?: TokenUsage | number, contextLimit?: number): number {
+    if (usageOrTokens === undefined || usageOrTokens === null) return 0
+    // Accept raw token count or TokenUsage.
+    const usedTokens =
+        typeof usageOrTokens === 'number'
+            ? usageOrTokens
+            : usageOrTokens.prompt ?? usageOrTokens.total ?? 0
+    if (usedTokens <= 0) return 0
+    const limit = contextLimit && contextLimit > 0 ? contextLimit : getContextLimit('')
+    return Math.min(100, (usedTokens / limit) * 100)
 }
 
 export function formatTokenUsage(usage?: TokenUsage): string {

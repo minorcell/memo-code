@@ -64,6 +64,11 @@ export function App({
     const [pendingHistoryMessages, setPendingHistoryMessages] = useState<ChatMessage[] | null>(null)
     const sessionRef = useRef<AgentSession | null>(null)
     const [exitMessage, setExitMessage] = useState<string | null>(null)
+    const [contextLimit, setContextLimit] = useState<number>(
+        sessionOptions.maxPromptTokens ?? 120000,
+    )
+    // Track current session's actual context size (cumulative prompt tokens at turn start)
+    const [currentContextTokens, setCurrentContextTokens] = useState<number>(0)
 
     const appendSystemMessage = useCallback((title: string, content: string) => {
         const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -106,14 +111,19 @@ export function App({
                 })
             },
             hooks: {
-                onTurnStart: ({ turn, input }) => {
+                onTurnStart: ({ turn, input, promptTokens }) => {
                     currentTurnRef.current = turn
+                    // Update the cumulative context tokens for display
+                    if (promptTokens && promptTokens > 0) {
+                        setCurrentContextTokens(promptTokens)
+                    }
                     updateTurn(turn, (existing) => ({
                         ...existing,
                         index: turn,
                         userInput: input,
                         steps: [],
                         startedAt: Date.now(),
+                        contextPromptTokens: promptTokens ?? existing.contextPromptTokens,
                     }))
                 },
                 onAction: ({ turn, step, action, thinking }) => {
@@ -149,15 +159,18 @@ export function App({
                         return { ...turnState, steps }
                     })
                 },
-                onFinal: ({ turn, finalText, status, turnUsage }) => {
+                onFinal: ({ turn, finalText, status, turnUsage, tokenUsage }) => {
                     updateTurn(turn, (turnState) => {
                         const startedAt = turnState.startedAt ?? Date.now()
                         const durationMs = Math.max(0, Date.now() - startedAt)
+                        const promptTokens =
+                            tokenUsage?.prompt ?? turnState.contextPromptTokens
                         return {
                             ...turnState,
                             finalText,
                             status,
                             tokenUsage: turnUsage,
+                            contextPromptTokens: promptTokens,
                             startedAt,
                             durationMs,
                         }
@@ -214,6 +227,7 @@ export function App({
         setSystemMessages([])
         setHistoricalTurns([])
         setPendingHistoryMessages(null)
+        setCurrentContextTokens(0) // Reset context tokens on clear
     }, [])
 
     const handleHistorySelect = useCallback(
@@ -231,6 +245,7 @@ export function App({
                 setTurns([])
                 setSession(null)
                 setSessionLogPath(null)
+                setCurrentContextTokens(0) // Reset context tokens when loading history
                 currentTurnRef.current = null
                 // 重新拉起 session，避免旧上下文残留/计数错位
                 setSessionOptionsState((prev) => ({ ...prev, sessionId: randomUUID() }))
@@ -276,6 +291,7 @@ export function App({
             setTurns([])
             setHistoricalTurns([])
             setPendingHistoryMessages(null)
+            setCurrentContextTokens(0) // Reset context tokens on model switch
             currentTurnRef.current = null
             setSession(null)
             setSessionLogPath(null)
@@ -300,6 +316,7 @@ export function App({
                 model: currentModel,
                 mcpServerNames,
                 providers,
+                contextLimit,
             })
             if (result.kind === 'exit') {
                 await handleExit()
@@ -313,6 +330,11 @@ export function App({
                 await handleModelSelect(result.provider)
                 return
             }
+            if (result.kind === 'set_context_limit') {
+                setContextLimit(result.limit)
+                appendSystemMessage('Context length', `已设置上下文上限为 ${(result.limit / 1000).toFixed(0)}k tokens`)
+                return
+            }
             appendSystemMessage(result.title, result.content)
         },
         [
@@ -324,6 +346,7 @@ export function App({
             mcpServerNames,
             currentModel,
             currentProvider,
+            contextLimit,
             providers,
         ],
     )
@@ -357,8 +380,8 @@ export function App({
 
     const lastTurn = turns[turns.length - 1]
     const tokenLine = formatTokenUsage(lastTurn?.tokenUsage)
-    const contextPercent = calculateContextPercent(lastTurn?.tokenUsage)
-
+    // Use cumulative context tokens (updated on each turn start) for accurate context usage display
+    const contextPercent = calculateContextPercent(currentContextTokens, contextLimit)
     const displayTurns = useMemo(() => [...historicalTurns, ...turns], [historicalTurns, turns])
 
     // Show exit message
@@ -393,7 +416,9 @@ export function App({
                 currentSessionFile={sessionLogPath ?? undefined}
                 providers={providers}
             />
-            <TokenBar contextPercent={contextPercent} />
+            <TokenBar
+                contextPercent={contextPercent}
+            />
         </Box>
     )
 }
