@@ -3,8 +3,10 @@ import { clearCommand } from './clear'
 import { exitCommand } from './exit'
 import { historyCommand } from './history'
 import { modelsCommand } from './models'
+import { helpCommand } from './help'
 
 export const SLASH_COMMANDS: SlashCommand[] = [
+    helpCommand,
     exitCommand,
     clearCommand,
     historyCommand,
