@@ -28,8 +28,12 @@ type McpCache = {
 
 type ClientTransport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport
 
-const MCP_CACHE_FILE = join(homedir(), '.memo', 'mcp_cache.json')
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 小时
+
+function getCacheFile(memoHome?: string) {
+    const base = memoHome ? memoHome : join(homedir(), '.memo')
+    return join(base, 'mcp_cache.json')
+}
 
 function hashConfig(config: MCPServerConfig): string {
     return JSON.stringify(config)
@@ -102,9 +106,9 @@ async function connectWithConfig(
     return { client, transport }
 }
 
-async function loadMcpCache(): Promise<McpCache> {
+async function loadMcpCache(cacheFile: string): Promise<McpCache> {
     try {
-        const file = Bun.file(MCP_CACHE_FILE)
+        const file = Bun.file(cacheFile)
         if (await file.exists()) {
             const content = await file.text()
             return JSON.parse(content) as McpCache
@@ -115,9 +119,9 @@ async function loadMcpCache(): Promise<McpCache> {
     return { servers: {} }
 }
 
-async function saveMcpCache(cache: McpCache): Promise<void> {
+async function saveMcpCache(cacheFile: string, cache: McpCache): Promise<void> {
     try {
-        await Bun.write(MCP_CACHE_FILE, JSON.stringify(cache, null, 2))
+        await Bun.write(cacheFile, JSON.stringify(cache, null, 2))
     } catch (err) {
         console.warn(`Failed to write MCP cache: ${(err as Error).message}`)
     }
@@ -129,16 +133,28 @@ function isCacheValid(entry: McpCacheEntry): boolean {
     return now - cachedAt < CACHE_TTL_MS
 }
 
-function deserializeTool(
+function createLazyTool(
     serverName: string,
     serialized: SerializedMcpTool,
-    client: Client,
+    config: MCPServerConfig,
 ): McpTool {
+    let clientPromise: Promise<Client> | null = null
+    const ensureClient = async () => {
+        if (!clientPromise) {
+            clientPromise = (async () => {
+                const { client } = await connectWithConfig(config)
+                return client
+            })()
+        }
+        return clientPromise
+    }
+
     return {
         name: serialized.name,
         description: serialized.description,
         inputSchema: z.object({}).passthrough(),
         execute: async (input: any): Promise<CallToolResult> => {
+            const client = await ensureClient()
             const originalName = serialized.name.replace(`${serverName}_`, '')
             const res = await client.callTool({
                 name: originalName,
@@ -218,58 +234,55 @@ export class McpClientWrapper {
  */
 export async function loadExternalMcpTools(
     servers: Record<string, MCPServerConfig> | undefined,
+    memoHome?: string,
 ): Promise<{ tools: McpTool[]; cleanup: () => Promise<void> }> {
     if (!servers || Object.keys(servers).length === 0) {
         return { tools: [], cleanup: async () => {} }
     }
 
-    const cache = await loadMcpCache()
+    const cacheFile = getCacheFile(memoHome)
+    const cache = await loadMcpCache(cacheFile)
     const wrappers: McpClientWrapper[] = []
     const allTools: McpTool[] = []
     const needsUpdate: Array<{ name: string; config: MCPServerConfig; wrapper: McpClientWrapper }> =
         []
 
-    // 并行处理所有 server
     await Promise.all(
         Object.entries(servers).map(async ([name, config]) => {
             try {
                 const configHash = hashConfig(config)
                 const cached = cache.servers[name]
-                const serverStartTime = performance.now()
+                const hasValidCache =
+                    cached && cached.config_hash === configHash && isCacheValid(cached)
 
-                // 先连接（所有情况都需要）
+                if (hasValidCache) {
+                    const tools = cached.tools.map((t) => createLazyTool(name, t, config))
+                    allTools.push(...tools)
+                    return
+                }
+
                 const wrapper = new McpClientWrapper(name, config)
                 await wrapper.connect()
-                const connectTime = performance.now()
                 wrappers.push(wrapper)
 
-                // 检查缓存是否有效
-                if (cached && cached.config_hash === configHash && isCacheValid(cached)) {
-                    // 反序列化缓存的工具
-                    const tools = cached.tools.map((t) => deserializeTool(name, t, wrapper.client))
-                    allTools.push(...tools)
-                } else {
-                    const tools = await wrapper.listTools()
-                    allTools.push(...tools)
+                const tools = await wrapper.listTools()
+                allTools.push(...tools)
 
-                    // 立即更新缓存
-                    const serialized = wrapper.serializeTools(tools)
-                    cache.servers[name] = {
-                        tools: serialized,
-                        cached_at: new Date().toISOString(),
-                        config_hash: configHash,
-                    }
-                    needsUpdate.push({ name, config, wrapper })
+                const serialized = wrapper.serializeTools(tools)
+                cache.servers[name] = {
+                    tools: serialized,
+                    cached_at: new Date().toISOString(),
+                    config_hash: configHash,
                 }
+                needsUpdate.push({ name, config, wrapper })
             } catch (err) {
                 console.error(`[MCP] Failed to connect to server '${name}':`, err)
             }
         }),
     )
 
-    // 持久化更新的缓存
     if (needsUpdate.length > 0) {
-        await saveMcpCache(cache)
+        await saveMcpCache(cacheFile, cache)
     }
 
     return {
