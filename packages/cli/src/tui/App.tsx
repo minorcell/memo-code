@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { Box, useApp } from 'ink'
+import { Box, useApp, Text } from 'ink'
 import {
     createAgentSession,
     loadMemoConfig,
@@ -18,7 +18,7 @@ import { HeaderBar } from './components/layout/HeaderBar'
 import { TokenBar } from './components/layout/TokenBar'
 import { MainContent } from './components/layout/MainContent'
 import { InputPrompt } from './components/layout/InputPrompt'
-import { inferToolStatus, formatTokenUsage } from './utils'
+import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
 import { resolveSlashCommand } from './commands'
 
 export type AppProps = {
@@ -64,6 +64,7 @@ export function App({
     const [historicalTurns, setHistoricalTurns] = useState<TurnView[]>([])
     const [pendingHistoryMessages, setPendingHistoryMessages] = useState<ChatMessage[] | null>(null)
     const sessionRef = useRef<AgentSession | null>(null)
+    const [exitMessage, setExitMessage] = useState<string | null>(null)
 
     const appendSystemMessage = useCallback((title: string, content: string) => {
         const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -116,7 +117,7 @@ export function App({
                         startedAt: Date.now(),
                     }))
                 },
-                onAction: ({ turn, step, action }) => {
+                onAction: ({ turn, step, action, thinking }) => {
                     updateTurn(turn, (turnState) => {
                         const steps = turnState.steps.slice()
                         while (steps.length <= step) {
@@ -127,6 +128,7 @@ export function App({
                         steps[step] = {
                             ...target,
                             action,
+                            thinking,
                             toolStatus: 'executing',
                         }
                         return { ...turnState, steps }
@@ -201,7 +203,11 @@ export function App({
         if (sessionRef.current) {
             await sessionRef.current.close()
         }
-        exit()
+        setExitMessage('Bye!')
+        // Give time for the message to render
+        setTimeout(() => {
+            exit()
+        }, 300)
     }, [exit])
 
     const handleClear = useCallback(() => {
@@ -360,18 +366,28 @@ export function App({
     const statusKind =
         statusMessage !== null ? 'error' : !session ? 'initializing' : busy ? 'running' : 'ready'
     const tokenLine = formatTokenUsage(lastTurn?.tokenUsage)
+    const contextPercent = calculateContextPercent(lastTurn?.tokenUsage)
 
     const displayTurns = useMemo(() => [...historicalTurns, ...turns], [historicalTurns, turns])
 
+    // Show exit message
+    if (exitMessage) {
+        return (
+            <Box>
+                <Text color="green">{exitMessage}</Text>
+            </Box>
+        )
+    }
+
     return (
         <Box flexDirection="column" gap={1}>
-            <HeaderBar providerName={currentProvider} model={currentModel} cwd={cwd} />
-            <MainContent
-                systemMessages={systemMessages}
-                turns={displayTurns}
-                statusText={statusLine}
-                statusKind={statusKind}
+            <HeaderBar
+                providerName={currentProvider}
+                model={currentModel}
+                cwd={cwd}
+                sessionId={sessionOptionsState.sessionId}
             />
+            <MainContent systemMessages={systemMessages} turns={displayTurns} />
             <InputPrompt
                 disabled={!session || busy}
                 onSubmit={handleSubmit}
@@ -386,7 +402,12 @@ export function App({
                 currentSessionFile={sessionLogPath ?? undefined}
                 providers={providers}
             />
-            <TokenBar tokenLine={tokenLine} />
+            <TokenBar
+                tokenLine={tokenLine}
+                model={currentModel}
+                mode={busy ? 'thinking' : 'normal'}
+                contextPercent={contextPercent}
+            />
         </Box>
     )
 }
