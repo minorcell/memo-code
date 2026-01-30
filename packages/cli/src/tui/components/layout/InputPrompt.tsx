@@ -80,11 +80,15 @@ export function InputPrompt({
     const [suppressSuggestions, setSuppressSuggestions] = useState(false)
     const requestIdRef = useRef(0)
     const lastEscTimeRef = useRef(0)
+    // Use ref to track input value for synchronous updates during rapid input (paste)
+    const valueRef = useRef('')
 
     const username = useMemo(() => getUsername(), [])
     const cwdName = useMemo(() => cwd.split('/').pop() || cwd, [cwd])
 
+    // Sync ref with state
     useEffect(() => {
+        valueRef.current = value
         setSuppressSuggestions(false)
     }, [value])
 
@@ -229,6 +233,7 @@ export function InputPrompt({
                 const prefix = value.slice(0, trigger.tokenStart)
                 const suffix = value.slice(trigger.tokenStart + trigger.query.length)
                 const nextValue = `${prefix}${item.value}${suffix}`
+                valueRef.current = nextValue
                 setValue(nextValue)
                 setHistoryIndex(null)
                 setDraft('')
@@ -241,7 +246,17 @@ export function InputPrompt({
                 if (item.meta?.historyEntry) {
                     onHistorySelect?.(item.meta.historyEntry)
                 }
+                valueRef.current = item.value
                 setValue(item.value)
+                setHistoryIndex(null)
+                setDraft('')
+                closeSuggestions()
+                return
+            }
+            if (suggestionMode === 'model' && item.meta?.provider) {
+                void onModelSelect?.(item.meta.provider)
+                valueRef.current = ''
+                setValue('')
                 setHistoryIndex(null)
                 setDraft('')
                 closeSuggestions()
@@ -251,6 +266,7 @@ export function InputPrompt({
                 const slashCommand = item.meta.slashCommand
                 slashCommand.run({
                     setInputValue: (next) => {
+                        valueRef.current = next
                         setValue(next)
                         setHistoryIndex(null)
                         setDraft('')
@@ -265,14 +281,6 @@ export function InputPrompt({
                 })
                 return
             }
-            if (suggestionMode === 'model' && item.meta?.provider) {
-                void onModelSelect?.(item.meta.provider)
-                setValue('')
-                setHistoryIndex(null)
-                setDraft('')
-                closeSuggestions()
-                return
-            }
         },
         [closeSuggestions, onClear, onExit, onModelSelect, suggestionMode, trigger, value],
     )
@@ -283,6 +291,7 @@ export function InputPrompt({
             return
         }
         if (key.ctrl && input === 'l') {
+            valueRef.current = ''
             setValue('')
             setHistoryIndex(null)
             setDraft('')
@@ -301,6 +310,7 @@ export function InputPrompt({
                 if (disabled) {
                     onCancelRun()
                 } else {
+                    valueRef.current = ''
                     setValue('')
                     setHistoryIndex(null)
                     setDraft('')
@@ -326,15 +336,19 @@ export function InputPrompt({
             }
             if (!history.length) return
             if (historyIndex === null) {
-                setDraft(value)
+                setDraft(valueRef.current)
                 const nextIndex = history.length - 1
                 setHistoryIndex(nextIndex)
-                setValue(history[nextIndex] ?? '')
+                const nextValue = history[nextIndex] ?? ''
+                valueRef.current = nextValue
+                setValue(nextValue)
                 return
             }
             const nextIndex = Math.max(0, historyIndex - 1)
             setHistoryIndex(nextIndex)
-            setValue(history[nextIndex] ?? '')
+            const nextValue = history[nextIndex] ?? ''
+            valueRef.current = nextValue
+            setValue(nextValue)
             return
         }
 
@@ -347,12 +361,15 @@ export function InputPrompt({
             const nextIndex = historyIndex + 1
             if (nextIndex >= history.length) {
                 setHistoryIndex(null)
+                valueRef.current = draft
                 setValue(draft)
                 setDraft('')
                 return
             }
             setHistoryIndex(nextIndex)
-            setValue(history[nextIndex] ?? '')
+            const nextValue = history[nextIndex] ?? ''
+            valueRef.current = nextValue
+            setValue(nextValue)
             return
         }
 
@@ -366,9 +383,10 @@ export function InputPrompt({
                 applySuggestion(suggestionItems[activeIndex])
                 return
             }
-            const trimmed = value.trim()
+            const trimmed = valueRef.current.trim()
             if (trimmed) {
                 onSubmit(trimmed)
+                valueRef.current = ''
                 setValue('')
                 setHistoryIndex(null)
                 setDraft('')
@@ -378,12 +396,16 @@ export function InputPrompt({
         }
 
         if (key.backspace || key.delete) {
-            setValue((prev) => prev.slice(0, Math.max(0, prev.length - 1)))
+            const newValue = valueRef.current.slice(0, Math.max(0, valueRef.current.length - 1))
+            valueRef.current = newValue
+            setValue(newValue)
             return
         }
 
         if (input) {
-            setValue((prev) => prev + input)
+            const newValue = valueRef.current + input
+            valueRef.current = newValue
+            setValue(newValue)
         }
     })
 
