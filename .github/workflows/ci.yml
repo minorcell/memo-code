@@ -1,0 +1,81 @@
+name: CI
+
+on:
+    push:
+        branches: ['**']
+    pull_request:
+        branches: ['**']
+
+jobs:
+    # 在 Linux 上运行所有检查
+    test:
+        name: Test & Lint
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v1
+
+            - name: Install ripgrep
+              run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+            - name: Install dependencies
+              run: bun install
+
+            - name: Format check
+              run: bun run format:check
+
+            - name: Test all packages
+              run: bun run test:all
+
+            - name: Test build
+              run: bun run build
+
+    # 仅在主要分支构建二进制文件
+    build:
+        name: Build Binaries
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/')
+        needs: test
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      artifact: memo-linux-x64
+                    - os: macos-latest
+                      artifact: memo-darwin-arm64
+                    - os: windows-latest
+                      artifact: memo-windows-x64.exe
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v1
+
+            - name: Install ripgrep (Linux)
+              if: runner.os == 'Linux'
+              run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+            - name: Install ripgrep (macOS)
+              if: runner.os == 'macOS'
+              run: brew install ripgrep
+
+            - name: Install ripgrep (Windows)
+              if: runner.os == 'Windows'
+              run: choco install ripgrep -y
+
+            - run: bun install
+
+            - name: Build
+              run: bun build packages/cli/src/index.tsx --target=bun --compile --outfile=${{ matrix.artifact }}
+
+            - name: Test binary
+              run: ./${{ matrix.artifact }} --help
+              if: runner.os != 'Windows'
+
+            - name: Test binary (Windows)
+              run: .\${{ matrix.artifact }} --help
+              if: runner.os == 'Windows'
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.artifact }}
+                  path: ${{ matrix.artifact }}
+                  retention-days: 7
