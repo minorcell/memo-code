@@ -70,7 +70,6 @@ export function InputPrompt({
     onHistorySelect,
     providers,
 }: InputPromptProps) {
-    const { stdout } = useStdout()
     const [value, setValue] = useState('')
     const [historyIndex, setHistoryIndex] = useState<number | null>(null)
     const [draft, setDraft] = useState('')
@@ -402,13 +401,12 @@ export function InputPrompt({
                 <Text color="cyan">{username}</Text>
                 <Text color="gray">@</Text>
                 <Text color="cyan">{cwdName}</Text>
-                <Text color="yellow"> 💫 </Text>
+                <Text color="yellow"> </Text>
                 {disabled ? (
                     <Text color="gray">{placeholder}</Text>
                 ) : (
                     <Text color="white">{displayText}</Text>
                 )}
-                {!disabled && !value && <Text color="gray">_</Text>}
             </Box>
 
             {suggestionMode !== 'none' ? (

@@ -23,11 +23,7 @@ export function TurnView({ turn }: TurnViewProps) {
             ))}
 
             {/* Final response - shown in normal color */}
-            {shouldRenderFinal ? (
-                <Box>
-                    <AssistantMessage text={finalText} isThinking={false} />
-                </Box>
-            ) : null}
+            {shouldRenderFinal ? <AssistantMessage text={finalText} isThinking={false} /> : null}
 
             {/* Status indicator */}
             {turn.status && turn.status !== 'ok' ? (

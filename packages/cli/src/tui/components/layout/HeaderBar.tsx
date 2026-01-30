@@ -39,11 +39,6 @@ export function HeaderBar({ providerName, model, cwd, sessionId }: HeaderBarProp
         >
             {/* Logo and Title Row */}
             <Box gap={1} alignItems="center">
-                <Box paddingX={1} {...({ backgroundColor: 'blue' } as any)}>
-                    <Text bold color="white">
-                        M
-                    </Text>
-                </Box>
                 <Box flexDirection="column">
                     <Text bold>Welcome to Memo CLI!</Text>
                     <Text color="gray">Send /help for help information.</Text>

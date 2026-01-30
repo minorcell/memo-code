@@ -58,7 +58,7 @@ export function StepView({ step, hideAssistantText = false }: StepViewProps) {
             {/* Render thinking text as muted (gray) */}
             {step.thinking && (
                 <Box>
-                    <Text color="gray">• </Text>
+                    <Text color="gray">● </Text>
                     <Box flexDirection="column" flexGrow={1}>
                         <MarkdownMessage text={step.thinking} tone="muted" />
                     </Box>
