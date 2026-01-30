@@ -17,6 +17,8 @@ export type TurnView = {
     steps: StepView[]
     status?: TurnStatus
     tokenUsage?: TokenUsage
+    /** Estimated prompt/context tokens used at turn completion (single LLM call). */
+    contextPromptTokens?: number
     finalText?: string
     startedAt?: number
     durationMs?: number

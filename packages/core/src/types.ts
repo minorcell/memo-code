@@ -165,6 +165,8 @@ export type TurnStartHookPayload = {
     sessionId: string
     turn: number
     input: string
+    /** Estimated prompt/context tokens at turn start (includes system+history+user). */
+    promptTokens?: number
     history: ChatMessage[]
 }
 
