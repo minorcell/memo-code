@@ -3,11 +3,16 @@
     "type": "module",
     "private": true,
     "scripts": {
-        "start": "bun run packages/ui/src/index.tsx",
-        "build": "bun build packages/ui/src/index.tsx --target bun --outdir dist --minify",
-        "build:binary": "bun build packages/ui/src/index.tsx --target=bun --compile --outfile=memo",
+        "start": "bun run packages/cli/src/index.tsx",
+        "build": "bun build packages/cli/src/index.tsx --target bun --outdir dist --minify",
+        "build:binary": "bun build packages/cli/src/index.tsx --target=bun --compile --outfile=memo",
         "format": "bunx prettier --write .",
-        "format:check": "bunx prettier --check ."
+        "format:check": "bunx prettier --check .",
+        "test": "bun test",
+        "test:core": "cd packages/core && bun test",
+        "test:tools": "cd packages/tools && bun test",
+        "test:cli": "cd packages/cli && bun test",
+        "test:all": "bun run test:core && bun run test:tools && bun run test:cli"
     },
     "workspaces": [
         "packages/*"
