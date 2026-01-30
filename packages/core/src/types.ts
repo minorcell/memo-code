@@ -69,6 +69,8 @@ export type ParsedAssistant = {
     action?: { tool: string; input: unknown }
     /** 最终回答。 */
     final?: string
+    /** 思考内容（当 action/final 与思考文本混合时）。 */
+    thinking?: string
 }
 
 /** 工具注册表，键为工具名称，值为 MCP 工具定义。 */
@@ -163,6 +165,8 @@ export type TurnStartHookPayload = {
     sessionId: string
     turn: number
     input: string
+    /** Estimated prompt/context tokens at turn start (includes system+history+user). */
+    promptTokens?: number
     history: ChatMessage[]
 }
 
@@ -171,6 +175,7 @@ export type ActionHookPayload = {
     turn: number
     step: number
     action: NonNullable<ParsedAssistant['action']>
+    thinking?: string
     history: ChatMessage[]
 }
 
