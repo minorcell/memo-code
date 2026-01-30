@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import { memo } from 'react'
 import type { StepView as StepViewType } from '../../types'
 import { MarkdownMessage } from '../messages/MarkdownMessage'
 
@@ -47,7 +48,22 @@ function getMainParam(toolInput: Record<string, any> | undefined): string | unde
     return undefined
 }
 
-export function StepView({ step, hideAssistantText = false }: StepViewProps) {
+// Custom comparison for step memo
+function areStepsEqual(prevProps: StepViewProps, nextProps: StepViewProps): boolean {
+    const prev = prevProps.step
+    const next = nextProps.step
+
+    if (prev.index !== next.index) return false
+    if (prev.assistantText !== next.assistantText) return false
+    if (prev.thinking !== next.thinking) return false
+    if (prev.action?.tool !== next.action?.tool) return false
+    if (prev.observation !== next.observation) return false
+    if (prev.toolStatus !== next.toolStatus) return false
+
+    return true
+}
+
+export const StepView = memo(function StepView({ step, hideAssistantText = false }: StepViewProps) {
     // Extract tool name and main parameter from action
     const toolName = step.action?.tool
     const toolInput = step.action?.input as Record<string, any> | undefined
@@ -82,4 +98,4 @@ export function StepView({ step, hideAssistantText = false }: StepViewProps) {
             )}
         </Box>
     )
-}
+}, areStepsEqual)

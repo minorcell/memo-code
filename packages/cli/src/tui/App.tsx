@@ -14,7 +14,6 @@ import {
     type ProviderConfig,
 } from '@memo/core'
 import type { StepView, SystemMessage, TurnView } from './types'
-import { HeaderBar } from './components/layout/HeaderBar'
 import { TokenBar } from './components/layout/TokenBar'
 import { MainContent } from './components/layout/MainContent'
 import { InputPrompt } from './components/layout/InputPrompt'
@@ -163,8 +162,7 @@ export function App({
                     updateTurn(turn, (turnState) => {
                         const startedAt = turnState.startedAt ?? Date.now()
                         const durationMs = Math.max(0, Date.now() - startedAt)
-                        const promptTokens =
-                            tokenUsage?.prompt ?? turnState.contextPromptTokens
+                        const promptTokens = tokenUsage?.prompt ?? turnState.contextPromptTokens
                         return {
                             ...turnState,
                             finalText,
@@ -332,7 +330,10 @@ export function App({
             }
             if (result.kind === 'set_context_limit') {
                 setContextLimit(result.limit)
-                appendSystemMessage('Context length', `已设置上下文上限为 ${(result.limit / 1000).toFixed(0)}k tokens`)
+                appendSystemMessage(
+                    'Context length',
+                    `已设置上下文上限为 ${(result.limit / 1000).toFixed(0)}k tokens`,
+                )
                 return
             }
             appendSystemMessage(result.title, result.content)
@@ -395,13 +396,16 @@ export function App({
 
     return (
         <Box flexDirection="column">
-            <HeaderBar
-                providerName={currentProvider}
-                model={currentModel}
-                cwd={cwd}
-                sessionId={sessionOptionsState.sessionId}
+            <MainContent
+                systemMessages={systemMessages}
+                turns={displayTurns}
+                headerInfo={{
+                    providerName: currentProvider,
+                    model: currentModel,
+                    cwd,
+                    sessionId: sessionOptionsState.sessionId,
+                }}
             />
-            <MainContent systemMessages={systemMessages} turns={displayTurns} />
             <InputPrompt
                 disabled={!session || busy}
                 onSubmit={handleSubmit}
@@ -416,9 +420,7 @@ export function App({
                 currentSessionFile={sessionLogPath ?? undefined}
                 providers={providers}
             />
-            <TokenBar
-                contextPercent={contextPercent}
-            />
+            <TokenBar contextPercent={contextPercent} />
         </Box>
     )
 }

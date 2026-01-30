@@ -7,7 +7,13 @@ import { textResult } from '@memo/tools/tools/mcp'
 
 const SAVE_MEMORY_INPUT_SCHEMA = z
     .object({
-        fact: z.string().min(1, 'fact cannot be empty').max(120, 'Please keep facts concise (≤120 characters)').describe('User-related identity traits or preferences, e.g., "User prefers Chinese responses", "User is a frontend engineer". Do not store project-specific technical details.'),
+        fact: z
+            .string()
+            .min(1, 'fact cannot be empty')
+            .max(120, 'Please keep facts concise (≤120 characters)')
+            .describe(
+                'User-related identity traits or preferences, e.g., "User prefers Chinese responses", "User is a frontend engineer". Do not store project-specific technical details.',
+            ),
     })
     .strict()
 
@@ -37,7 +43,8 @@ function formatContent(header: string, items: string[]) {
  */
 export const saveMemoryTool: McpTool<SaveMemoryInput> = {
     name: 'save_memory',
-    description: 'Save user-related identity traits or preferences (e.g., language habits, tech preferences) for cross-session reuse. Do not save project-specific technical details or file structures.',
+    description:
+        'Save user-related identity traits or preferences (e.g., language habits, tech preferences) for cross-session reuse. Do not save project-specific technical details or file structures.',
     inputSchema: SAVE_MEMORY_INPUT_SCHEMA,
     execute: async (input) => {
         const fact = sanitizeFact(input.fact)
