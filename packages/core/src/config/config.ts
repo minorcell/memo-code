@@ -98,23 +98,21 @@ function expandHome(path: string) {
 
 function serializeConfig(config: MemoConfig) {
     const providers = config.providers
-        .map(
-            (p) => {
-                const name = typeof p?.name === 'string' ? p.name : ''
-                if (!name) return ''
-                const key = formatTomlKey(name)
-                const lines = [
-                    `[[providers.${key}]]`,
-                    `name = ${JSON.stringify(name)}`,
-                    `env_api_key = ${JSON.stringify(String(p.env_api_key ?? ''))}`,
-                    `model = ${JSON.stringify(String(p.model ?? ''))}`,
-                ]
-                if (p.base_url) {
-                    lines.push(`base_url = ${JSON.stringify(String(p.base_url))}`)
-                }
-                return lines.join('\n')
-            },
-        )
+        .map((p) => {
+            const name = typeof p?.name === 'string' ? p.name : ''
+            if (!name) return ''
+            const key = formatTomlKey(name)
+            const lines = [
+                `[[providers.${key}]]`,
+                `name = ${JSON.stringify(name)}`,
+                `env_api_key = ${JSON.stringify(String(p.env_api_key ?? ''))}`,
+                `model = ${JSON.stringify(String(p.model ?? ''))}`,
+            ]
+            if (p.base_url) {
+                lines.push(`base_url = ${JSON.stringify(String(p.base_url))}`)
+            }
+            return lines.join('\n')
+        })
         .filter(Boolean)
         .join('\n\n')
 

@@ -187,62 +187,87 @@ class AgentSessionImpl implements AgentSession {
 
             // ReAct 主循环，受 MAX_STEPS 保护。
             for (let step = 0; step < this.maxSteps; step++) {
-            const estimatedPrompt = this.tokenCounter.countMessages(this.history)
-            if (this.options.maxPromptTokens && estimatedPrompt > this.options.maxPromptTokens) {
-                const limitMessage = `Context tokens (${estimatedPrompt}) exceed the limit. Please shorten the input or restart the session.`
-                const finalPayload = JSON.stringify({ final: limitMessage })
-                this.history.push({ role: 'assistant', content: finalPayload })
-                status = 'prompt_limit'
-                finalText = limitMessage
-                errorMessage = limitMessage
-                await this.emitEvent('final', {
-                    turn,
-                    step,
-                    content: limitMessage,
-                    role: 'assistant',
-                    meta: { tokens: { prompt: estimatedPrompt } },
-                })
-                await runHook(this.hooks, 'onFinal', {
-                    sessionId: this.id,
-                    turn,
-                    step,
-                    finalText: limitMessage,
-                    status,
-                    errorMessage,
-                    turnUsage: { ...turnUsage },
-                    steps,
-                })
-                break
-            }
-            if (this.options.warnPromptTokens && estimatedPrompt > this.options.warnPromptTokens) {
-                console.warn(`Prompt tokens are near the limit: ${estimatedPrompt}`)
-            }
-
-            let assistantText = ''
-            let usageFromLLM: Partial<TokenUsage> | undefined
-            let streamed = false
-            try {
-                const llmResult = await this.deps.callLLM(
-                    this.history,
-                    (chunk) => this.deps.onAssistantStep?.(chunk, step),
-                    { signal: abortController.signal },
-                )
-                const normalized = normalizeLLMResponse(llmResult)
-                assistantText = normalized.content
-                usageFromLLM = normalized.usage
-                streamed = Boolean(normalized.streamed)
-            } catch (err) {
-                if (this.cancelling && isAbortError(err)) {
-                    status = 'cancelled'
-                    finalText = ''
-                    errorMessage = 'Turn cancelled'
+                const estimatedPrompt = this.tokenCounter.countMessages(this.history)
+                if (
+                    this.options.maxPromptTokens &&
+                    estimatedPrompt > this.options.maxPromptTokens
+                ) {
+                    const limitMessage = `Context tokens (${estimatedPrompt}) exceed the limit. Please shorten the input or restart the session.`
+                    const finalPayload = JSON.stringify({ final: limitMessage })
+                    this.history.push({ role: 'assistant', content: finalPayload })
+                    status = 'prompt_limit'
+                    finalText = limitMessage
+                    errorMessage = limitMessage
                     await this.emitEvent('final', {
                         turn,
                         step,
-                        content: '',
+                        content: limitMessage,
                         role: 'assistant',
-                        meta: { cancelled: true },
+                        meta: { tokens: { prompt: estimatedPrompt } },
                     })
+                    await runHook(this.hooks, 'onFinal', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        finalText: limitMessage,
+                        status,
+                        errorMessage,
+                        turnUsage: { ...turnUsage },
+                        steps,
+                    })
+                    break
+                }
+                if (
+                    this.options.warnPromptTokens &&
+                    estimatedPrompt > this.options.warnPromptTokens
+                ) {
+                    console.warn(`Prompt tokens are near the limit: ${estimatedPrompt}`)
+                }
+
+                let assistantText = ''
+                let usageFromLLM: Partial<TokenUsage> | undefined
+                let streamed = false
+                try {
+                    const llmResult = await this.deps.callLLM(
+                        this.history,
+                        (chunk) => this.deps.onAssistantStep?.(chunk, step),
+                        { signal: abortController.signal },
+                    )
+                    const normalized = normalizeLLMResponse(llmResult)
+                    assistantText = normalized.content
+                    usageFromLLM = normalized.usage
+                    streamed = Boolean(normalized.streamed)
+                } catch (err) {
+                    if (this.cancelling && isAbortError(err)) {
+                        status = 'cancelled'
+                        finalText = ''
+                        errorMessage = 'Turn cancelled'
+                        await this.emitEvent('final', {
+                            turn,
+                            step,
+                            content: '',
+                            role: 'assistant',
+                            meta: { cancelled: true },
+                        })
+                        await runHook(this.hooks, 'onFinal', {
+                            sessionId: this.id,
+                            turn,
+                            step,
+                            finalText,
+                            status,
+                            errorMessage,
+                            turnUsage: { ...turnUsage },
+                            steps,
+                        })
+                        break
+                    }
+                    const msg = `LLM call failed: ${(err as Error).message}`
+                    const finalPayload = JSON.stringify({ final: msg })
+                    this.history.push({ role: 'assistant', content: finalPayload })
+                    status = 'error'
+                    finalText = msg
+                    errorMessage = msg
+                    await this.emitEvent('final', { turn, content: msg, role: 'assistant' })
                     await runHook(this.hooks, 'onFinal', {
                         sessionId: this.id,
                         turn,
@@ -255,173 +280,154 @@ class AgentSessionImpl implements AgentSession {
                     })
                     break
                 }
-                const msg = `LLM call failed: ${(err as Error).message}`
-                const finalPayload = JSON.stringify({ final: msg })
-                this.history.push({ role: 'assistant', content: finalPayload })
-                status = 'error'
-                finalText = msg
-                errorMessage = msg
-                await this.emitEvent('final', { turn, content: msg, role: 'assistant' })
+
+                if (!streamed) {
+                    this.deps.onAssistantStep?.(assistantText, step)
+                }
+
+                const parsed: ParsedAssistant = parseAssistant(assistantText)
+                const historyContent = parsed.action
+                    ? JSON.stringify({
+                          tool: parsed.action.tool,
+                          input: parsed.action.input,
+                      })
+                    : assistantText
+                this.history.push({ role: 'assistant', content: historyContent })
+
+                // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。
+                const completionTokens = this.tokenCounter.countText(assistantText)
+                const promptUsed = usageFromLLM?.prompt ?? estimatedPrompt
+                const completionUsed = usageFromLLM?.completion ?? completionTokens
+                const totalUsed = usageFromLLM?.total ?? promptUsed + completionUsed
+                const stepUsage: TokenUsage = {
+                    prompt: promptUsed,
+                    completion: completionUsed,
+                    total: totalUsed,
+                }
+                accumulateUsage(turnUsage, stepUsage)
+                accumulateUsage(this.sessionUsage, stepUsage)
+
+                steps.push({
+                    index: step,
+                    assistantText,
+                    parsed,
+                    tokenUsage: stepUsage,
+                })
+
+                await this.emitEvent('assistant', {
+                    turn,
+                    step,
+                    content: assistantText,
+                    role: 'assistant',
+                    meta: { tokens: stepUsage },
+                })
+
+                if (parsed.final) {
+                    finalText = parsed.final
+                    await this.emitEvent('final', {
+                        turn,
+                        step,
+                        content: parsed.final,
+                        role: 'assistant',
+                        meta: { tokens: stepUsage },
+                    })
+                    await runHook(this.hooks, 'onFinal', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        finalText,
+                        status,
+                        tokenUsage: stepUsage,
+                        turnUsage: { ...turnUsage },
+                        steps,
+                    })
+                    break
+                }
+
+                if (parsed.action) {
+                    await this.emitEvent('action', {
+                        turn,
+                        step,
+                        meta: { tool: parsed.action.tool, input: parsed.action.input },
+                    })
+                    await runHook(this.hooks, 'onAction', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        action: parsed.action,
+                        history: snapshotHistory(this.history),
+                    })
+
+                    const tool = this.deps.tools[parsed.action.tool]
+                    let observation: string
+                    try {
+                        if (tool) {
+                            const parsedInput = parseToolInput(tool, parsed.action.input)
+                            if (!parsedInput.ok) {
+                                observation = parsedInput.error
+                            } else {
+                                const result = await tool.execute(parsedInput.data)
+                                observation = flattenCallToolResult(result) || '(no tool output)'
+                            }
+                        } else {
+                            observation = `Unknown tool: ${parsed.action.tool}`
+                        }
+                    } catch (err) {
+                        observation = `Tool execution failed: ${(err as Error).message}`
+                    }
+
+                    this.history.push({
+                        role: 'user',
+                        content: JSON.stringify({ observation, tool: parsed.action.tool }),
+                    })
+                    const lastStep = steps[steps.length - 1]
+                    if (lastStep) {
+                        lastStep.observation = observation
+                    }
+                    await this.emitEvent('observation', {
+                        turn,
+                        step,
+                        content: observation,
+                        meta: { tool: parsed.action.tool },
+                    })
+                    await runHook(this.hooks, 'onObservation', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        tool: parsed.action.tool,
+                        observation,
+                        history: snapshotHistory(this.history),
+                    })
+                    continue
+                }
+
+                // 无 action/final，跳出并兜底
+                break
+            }
+
+            if (!finalText && status !== 'cancelled') {
+                if (status === 'ok') {
+                    status = steps.length >= this.maxSteps ? 'max_steps' : 'error'
+                }
+                finalText = 'Unable to produce a final answer. Please retry or adjust the request.'
+                errorMessage = finalText
+                const payload = JSON.stringify({ final: finalText })
+                this.history.push({ role: 'assistant', content: payload })
+                await this.emitEvent('final', {
+                    turn,
+                    content: finalText,
+                    role: 'assistant',
+                })
                 await runHook(this.hooks, 'onFinal', {
                     sessionId: this.id,
                     turn,
-                    step,
                     finalText,
                     status,
                     errorMessage,
                     turnUsage: { ...turnUsage },
                     steps,
                 })
-                break
             }
-
-            if (!streamed) {
-                this.deps.onAssistantStep?.(assistantText, step)
-            }
-
-            const parsed: ParsedAssistant = parseAssistant(assistantText)
-            const historyContent = parsed.action
-                ? JSON.stringify({
-                      tool: parsed.action.tool,
-                      input: parsed.action.input,
-                  })
-                : assistantText
-            this.history.push({ role: 'assistant', content: historyContent })
-
-            // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。
-            const completionTokens = this.tokenCounter.countText(assistantText)
-            const promptUsed = usageFromLLM?.prompt ?? estimatedPrompt
-            const completionUsed = usageFromLLM?.completion ?? completionTokens
-            const totalUsed = usageFromLLM?.total ?? promptUsed + completionUsed
-            const stepUsage: TokenUsage = {
-                prompt: promptUsed,
-                completion: completionUsed,
-                total: totalUsed,
-            }
-            accumulateUsage(turnUsage, stepUsage)
-            accumulateUsage(this.sessionUsage, stepUsage)
-
-            steps.push({
-                index: step,
-                assistantText,
-                parsed,
-                tokenUsage: stepUsage,
-            })
-
-            await this.emitEvent('assistant', {
-                turn,
-                step,
-                content: assistantText,
-                role: 'assistant',
-                meta: { tokens: stepUsage },
-            })
-
-            if (parsed.final) {
-                finalText = parsed.final
-                await this.emitEvent('final', {
-                    turn,
-                    step,
-                    content: parsed.final,
-                    role: 'assistant',
-                    meta: { tokens: stepUsage },
-                })
-                await runHook(this.hooks, 'onFinal', {
-                    sessionId: this.id,
-                    turn,
-                    step,
-                    finalText,
-                    status,
-                    tokenUsage: stepUsage,
-                    turnUsage: { ...turnUsage },
-                    steps,
-                })
-                break
-            }
-
-            if (parsed.action) {
-                await this.emitEvent('action', {
-                    turn,
-                    step,
-                    meta: { tool: parsed.action.tool, input: parsed.action.input },
-                })
-                await runHook(this.hooks, 'onAction', {
-                    sessionId: this.id,
-                    turn,
-                    step,
-                    action: parsed.action,
-                    history: snapshotHistory(this.history),
-                })
-
-                const tool = this.deps.tools[parsed.action.tool]
-                let observation: string
-                try {
-                    if (tool) {
-                        const parsedInput = parseToolInput(tool, parsed.action.input)
-                        if (!parsedInput.ok) {
-                            observation = parsedInput.error
-                        } else {
-                            const result = await tool.execute(parsedInput.data)
-                            observation = flattenCallToolResult(result) || '(no tool output)'
-                        }
-                    } else {
-                        observation = `Unknown tool: ${parsed.action.tool}`
-                    }
-                } catch (err) {
-                    observation = `Tool execution failed: ${(err as Error).message}`
-                }
-
-                this.history.push({
-                    role: 'user',
-                    content: JSON.stringify({ observation, tool: parsed.action.tool }),
-                })
-                const lastStep = steps[steps.length - 1]
-                if (lastStep) {
-                    lastStep.observation = observation
-                }
-                await this.emitEvent('observation', {
-                    turn,
-                    step,
-                    content: observation,
-                    meta: { tool: parsed.action.tool },
-                })
-                await runHook(this.hooks, 'onObservation', {
-                    sessionId: this.id,
-                    turn,
-                    step,
-                    tool: parsed.action.tool,
-                    observation,
-                    history: snapshotHistory(this.history),
-                })
-                continue
-            }
-
-            // 无 action/final，跳出并兜底
-            break
-        }
-
-        if (!finalText && status !== 'cancelled') {
-            if (status === 'ok') {
-                status = steps.length >= this.maxSteps ? 'max_steps' : 'error'
-            }
-            finalText = 'Unable to produce a final answer. Please retry or adjust the request.'
-            errorMessage = finalText
-            const payload = JSON.stringify({ final: finalText })
-            this.history.push({ role: 'assistant', content: payload })
-            await this.emitEvent('final', {
-                turn,
-                content: finalText,
-                role: 'assistant',
-            })
-            await runHook(this.hooks, 'onFinal', {
-                sessionId: this.id,
-                turn,
-                finalText,
-                status,
-                errorMessage,
-                turnUsage: { ...turnUsage },
-                steps,
-            })
-        }
 
             await this.emitEvent('turn_end', {
                 turn,
