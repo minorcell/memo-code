@@ -6,27 +6,30 @@ import { AssistantMessage } from '../messages/AssistantMessage'
 
 type TurnViewProps = {
     turn: TurnViewType
-    showDuration?: boolean
 }
 
-export function TurnView({ turn, showDuration = false }: TurnViewProps) {
-    const lastStepText = turn.steps[turn.steps.length - 1]?.assistantText?.trim() ?? ''
+export function TurnView({ turn }: TurnViewProps) {
     const finalText = turn.finalText?.trim() ?? ''
-    const shouldRenderFinal = finalText.length > 0 && finalText !== lastStepText
-    const durationSeconds =
-        typeof turn.durationMs === 'number' ? Math.max(1, Math.round(turn.durationMs / 1000)) : null
-    const shouldShowDuration = showDuration && durationSeconds !== null
+    const shouldRenderFinal = finalText.length > 0
 
     return (
-        <Box flexDirection="column" gap={1}>
+        <Box flexDirection="column" gap={0}>
+            {/* User input with border */}
             <UserMessage text={turn.userInput} />
+
+            {/* Thinking steps - shown in muted color */}
             {turn.steps.map((step) => (
                 <StepView key={`step-${turn.index}-${step.index}`} step={step} />
             ))}
-            {shouldShowDuration ? (
-                <Text color="gray">— Worked for {durationSeconds}s —</Text>
+
+            {/* Final response - shown in normal color */}
+            {shouldRenderFinal ? (
+                <Box>
+                    <AssistantMessage text={finalText} isThinking={false} />
+                </Box>
             ) : null}
-            {shouldRenderFinal ? <AssistantMessage text={finalText} /> : null}
+
+            {/* Status indicator */}
             {turn.status && turn.status !== 'ok' ? (
                 <Text color="red">Status: {turn.status}</Text>
             ) : null}

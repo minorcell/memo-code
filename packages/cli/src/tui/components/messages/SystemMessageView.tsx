@@ -7,9 +7,9 @@ type SystemMessageViewProps = {
 
 export function SystemMessageView({ message }: SystemMessageViewProps) {
     return (
-        <Box flexDirection="column">
-            <Text color="magenta">System: {message.title}</Text>
-            <Text>{message.content}</Text>
+        <Box flexDirection="column" gap={0}>
+            <Text color="cyan">● {message.title}</Text>
+            <Text color="gray">{message.content}</Text>
         </Box>
     )
 }

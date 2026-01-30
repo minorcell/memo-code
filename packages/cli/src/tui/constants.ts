@@ -1,17 +1,21 @@
-export const HELP_TEXT = [
-    'Available commands:',
-    '  /help   Show help and shortcuts',
-    '  /exit   Exit the session',
-    '  /clear  Clear the screen',
-    '  /tools  List tools',
-    '  /models Pick a model from config',
-    '  /config Show config and provider info',
-    '',
-    'Shortcuts:',
-    '  Enter    Send',
-    '  Ctrl+L   Clear',
-    '  Ctrl+C   Exit',
-].join('\n')
-
 export const USER_PREFIX = '>'
 export const ASSISTANT_PREFIX = '•'
+
+// UI Colors
+export const COLORS = {
+    primary: 'blue',
+    secondary: 'cyan',
+    success: 'green',
+    warning: 'yellow',
+    error: 'red',
+    muted: 'gray',
+    text: 'white',
+}
+
+// Emoji
+export const EMOJIS = {
+    prompt: '💫',
+    thinking: '💭',
+    success: '✓',
+    error: '✗',
+}

@@ -5,6 +5,7 @@ export type ToolStatus = 'pending' | 'executing' | 'success' | 'error'
 export type StepView = {
     index: number
     assistantText: string
+    thinking?: string
     action?: { tool: string; input: unknown }
     observation?: string
     toolStatus?: ToolStatus
