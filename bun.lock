@@ -33,8 +33,8 @@
         "zod": "^4.1.13",
       },
     },
-    "packages/ui": {
-      "name": "@memo/ui",
+    "packages/cli": {
+      "name": "@memo/cli",
       "dependencies": {
         "@memo/core": "workspace:*",
         "@memo/tools": "workspace:*",
@@ -58,7 +58,7 @@
 
     "@memo/tools": ["@memo/tools@workspace:packages/tools"],
 
-    "@memo/ui": ["@memo/ui@workspace:packages/ui"],
+    "@memo/cli": ["@memo/cli@workspace:packages/cli"],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.24.3", "https://registry.npmmirror.com/@modelcontextprotocol/sdk/-/sdk-1.24.3.tgz", { "dependencies": { "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "jose": "^6.1.1", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.0" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-YgSHW29fuzKKAHTGe9zjNoo+yF8KaQPzDC2W9Pv41E7/57IfY+AMGJ/aDFlgTLcVVELoggKE4syABCE75u3NCw=="],
 

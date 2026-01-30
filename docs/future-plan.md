@@ -14,7 +14,7 @@ memo-cli 是一个基于 Bun + TypeScript 的 ReAct Agent CLI 工具，具有以
 
 - `packages/core`：配置、运行时（Session/Turn）、LLM 适配、工具集装配
 - `packages/tools`：内置工具实现与测试
-- `packages/ui`：CLI 入口，组装 Core + Tools
+- `packages/cli`：CLI 入口，组装 Core + Tools
 - `docs/`：架构与设计文档
 
 ## 2. 市场竞品对比

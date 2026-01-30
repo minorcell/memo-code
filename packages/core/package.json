@@ -3,6 +3,9 @@
     "type": "module",
     "module": "src/index.ts",
     "private": true,
+    "scripts": {
+        "test": "bun test"
+    },
     "dependencies": {
         "ignore": "^7.0.5",
         "zod": "^4.1.13"
