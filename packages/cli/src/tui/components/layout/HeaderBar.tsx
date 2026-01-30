@@ -29,8 +29,9 @@ export function HeaderBar({ providerName, model, cwd, sessionId }: HeaderBarProp
 
     return (
         <Box
-            borderStyle="single"
-            borderColor="blue"
+            width={60}
+            borderStyle="round"
+            borderColor="blueBright"
             paddingX={2}
             paddingY={1}
             flexDirection="column"
