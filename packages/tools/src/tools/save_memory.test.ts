@@ -55,8 +55,8 @@ describe('memory tool', () => {
     test('appends sanitized note to memory file', async () => {
         const res = await saveMemoryTool.execute({ fact: '  喜欢中文回答\n' })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
-        assert.ok(text.includes('memo.md'), 'should report memory path')
-        const memoryPath = join(tempHome, 'memo.md')
+        assert.ok(text.includes('Agents.md'), 'should report memory path')
+        const memoryPath = join(tempHome, 'Agents.md')
         const content = await readText(memoryPath)
         assert.ok(content.includes('喜欢中文回答'), 'memory file should contain fact')
         assert.ok(content.includes('Memo Added Memories'), 'should include header')
@@ -64,7 +64,7 @@ describe('memory tool', () => {
     })
 
     test('keeps only 50 most recent notes', async () => {
-        const memoryPath = join(tempHome, 'memo.md')
+        const memoryPath = join(tempHome, 'Agents.md')
         for (let i = 0; i < 55; i++) {
             await saveMemoryTool.execute({ fact: `n${i}` })
         }
