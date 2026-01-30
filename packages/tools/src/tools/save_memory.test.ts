@@ -55,12 +55,12 @@ describe('memory tool', () => {
     test('appends sanitized note to memory file', async () => {
         const res = await saveMemoryTool.execute({ fact: '  喜欢中文回答\n' })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
-        assert.ok(text.includes('Agents.md'), 'should report memory path')
+        assert.ok(text.includes('Agents.md'), 'should report Agents.md in path')
         const memoryPath = join(tempHome, 'Agents.md')
         const content = await readText(memoryPath)
-        assert.ok(content.includes('喜欢中文回答'), 'memory file should contain fact')
+        assert.ok(content.includes('喜欢中文回答'), 'memory file should contain the Chinese fact')
         assert.ok(content.includes('Memo Added Memories'), 'should include header')
-        assert.ok(!content.includes('\n\n\n'), 'fact should be sanitized')
+        assert.ok(!content.includes('\n\n\n'), 'newlines should be sanitized')
     })
 
     test('keeps only 50 most recent notes', async () => {
