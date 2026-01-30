@@ -94,13 +94,16 @@ function getContextLimit(model: string): number {
     return CONTEXT_LIMITS.default
 }
 
-export function calculateContextPercent(usageOrTokens?: TokenUsage | number, contextLimit?: number): number {
+export function calculateContextPercent(
+    usageOrTokens?: TokenUsage | number,
+    contextLimit?: number,
+): number {
     if (usageOrTokens === undefined || usageOrTokens === null) return 0
     // Accept raw token count or TokenUsage.
     const usedTokens =
         typeof usageOrTokens === 'number'
             ? usageOrTokens
-            : usageOrTokens.prompt ?? usageOrTokens.total ?? 0
+            : (usageOrTokens.prompt ?? usageOrTokens.total ?? 0)
     if (usedTokens <= 0) return 0
     const limit = contextLimit && contextLimit > 0 ? contextLimit : getContextLimit('')
     return Math.min(100, (usedTokens / limit) * 100)

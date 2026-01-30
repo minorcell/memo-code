@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import { memo } from 'react'
 import { MarkdownMessage } from './MarkdownMessage'
 
 type AssistantMessageProps = {
@@ -6,7 +7,10 @@ type AssistantMessageProps = {
     isThinking?: boolean
 }
 
-export function AssistantMessage({ text, isThinking = false }: AssistantMessageProps) {
+export const AssistantMessage = memo(function AssistantMessage({
+    text,
+    isThinking = false,
+}: AssistantMessageProps) {
     if (isThinking) {
         return (
             <Box flexDirection="column" flexGrow={1}>
@@ -20,19 +24,25 @@ export function AssistantMessage({ text, isThinking = false }: AssistantMessageP
             <MarkdownMessage text={text} tone="normal" />
         </Box>
     )
-}
+})
 
 // Thinking/Reasoning message shown during processing
-export function ThinkingMessage({ text }: { text: string }) {
+export const ThinkingMessage = memo(function ThinkingMessage({ text }: { text: string }) {
     return (
         <Box>
             <Text color="gray">• {text}</Text>
         </Box>
     )
-}
+})
 
 // Tool usage message
-export function ToolUsageMessage({ toolName, fileName }: { toolName: string; fileName?: string }) {
+export const ToolUsageMessage = memo(function ToolUsageMessage({
+    toolName,
+    fileName,
+}: {
+    toolName: string
+    fileName?: string
+}) {
     return (
         <Box>
             <Text color="green">● </Text>
@@ -47,4 +57,4 @@ export function ToolUsageMessage({ toolName, fileName }: { toolName: string; fil
             )}
         </Box>
     )
-}
+})

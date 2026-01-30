@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import { memo } from 'react'
 import os from 'node:os'
 
 type HeaderBarProps = {
@@ -23,13 +24,17 @@ function formatSessionId(id: string | undefined): string {
     return id
 }
 
-export function HeaderBar({ providerName, model, cwd, sessionId }: HeaderBarProps) {
+export const HeaderBar = memo(function HeaderBar({
+    providerName,
+    model,
+    cwd,
+    sessionId,
+}: HeaderBarProps) {
     const displayCwd = formatCwd(cwd)
     const displaySession = formatSessionId(sessionId)
 
     return (
         <Box
-            width={60}
             borderStyle="round"
             borderColor="blueBright"
             paddingX={2}
@@ -63,4 +68,4 @@ export function HeaderBar({ providerName, model, cwd, sessionId }: HeaderBarProp
             </Box>
         </Box>
     )
-}
+})
