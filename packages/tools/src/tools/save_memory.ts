@@ -15,7 +15,8 @@ type SaveMemoryInput = z.infer<typeof SAVE_MEMORY_INPUT_SCHEMA>
 
 function resolveMemoryPath() {
     const base = process.env.MEMO_HOME?.trim() || join(homedir(), '.memo')
-    return join(base, 'memo.md')
+    // 需求：改为写入 Agents.md
+    return join(base, 'Agents.md')
 }
 
 function sanitizeFact(fact: string) {
