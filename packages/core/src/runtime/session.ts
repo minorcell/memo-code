@@ -178,6 +178,7 @@ class AgentSessionImpl implements AgentSession {
                 sessionId: this.id,
                 turn,
                 input,
+                promptTokens,
                 history: snapshotHistory(this.history),
             })
 
@@ -348,13 +349,18 @@ class AgentSessionImpl implements AgentSession {
                     await this.emitEvent('action', {
                         turn,
                         step,
-                        meta: { tool: parsed.action.tool, input: parsed.action.input },
+                        meta: {
+                            tool: parsed.action.tool,
+                            input: parsed.action.input,
+                            thinking: parsed.thinking,
+                        },
                     })
                     await runHook(this.hooks, 'onAction', {
                         sessionId: this.id,
                         turn,
                         step,
                         action: parsed.action,
+                        thinking: parsed.thinking,
                         history: snapshotHistory(this.history),
                     })
 

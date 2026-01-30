@@ -73,11 +73,55 @@ describe('read tool', () => {
         const text = res.content?.find((item) => item.type === 'text')?.text ?? ''
         assert.strictEqual(text, '2: b\n3: c')
     })
+
+    test('rejects binary-like files', async () => {
+        const target = join(tempDir, 'bin.dat')
+        const bytes = new Uint8Array([0, 1, 2, 3])
+        await writeTool.execute({ file_path: target, content: bytes })
+        const res = await readTool.execute({ file_path: target })
+        const text = res.content?.find((item) => item.type === 'text')?.text ?? ''
+        assert.ok(res.isError, 'should be error for binary')
+        assert.ok(text.includes('二进制'), 'should mention binary')
+    })
+
+    test('truncates when exceeding max lines', async () => {
+        const target = join(tempDir, 'many.txt')
+        const content = Array.from({ length: 1200 }, (_, i) => `line-${i + 1}`).join('\n')
+        await writeTool.execute({ file_path: target, content })
+        const res = await readTool.execute({ file_path: target, offset: 1 })
+        const text = res.content?.find((item) => item.type === 'text')?.text ?? ''
+        const lines = text.split('\n')
+        assert.ok(lines.length >= 2, 'should return some lines')
+        assert.ok(lines[lines.length - 1]?.includes('truncated'), 'should append truncated note')
+    })
+
+    test('encodes image to base64 with compression', async () => {
+        const target = join(tempDir, 'img.png')
+        // minimal PNG (1x1 transparent)
+        const pngBase64 =
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO3fWqUAAAAASUVORK5CYII='
+        const bytes = Uint8Array.from(Buffer.from(pngBase64, 'base64'))
+        await writeTool.execute({ file_path: target, content: bytes })
+        const res = await readTool.execute({ file_path: target })
+        const text = res.content?.find((item) => item.type === 'text')?.text ?? ''
+        assert.ok(text.includes('image_base64'), 'should return base64 payload')
+        assert.ok(text.includes('encoding='), 'should include encoding info')
+        assert.ok(text.includes('base64_length='), 'should include length info')
+    })
 })
 
 describe('edit tool', () => {
     test('rejects missing fields', async () => {
         const res = editTool.inputSchema.safeParse({})
+        assert.strictEqual(res.success, false)
+    })
+
+    test('rejects empty old_string', async () => {
+        const res = editTool.inputSchema.safeParse({
+            file_path: 'x',
+            old_string: '',
+            new_string: 'y',
+        })
         assert.strictEqual(res.success, false)
     })
 
