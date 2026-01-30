@@ -1,6 +1,7 @@
 {
     "name": "memo-cli",
     "type": "module",
+    "version": "0.1",
     "private": true,
     "scripts": {
         "start": "bun run packages/cli/src/index.tsx",
