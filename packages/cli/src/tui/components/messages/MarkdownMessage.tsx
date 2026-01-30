@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink'
 import { marked } from 'marked'
+import { useMemo, memo } from 'react'
 import type { ReactNode } from 'react'
 import type { Token, Tokens, TokensList } from 'marked'
 
@@ -243,19 +244,28 @@ function renderBlocks(tokens: TokensList, palette: RenderPalette, keyPrefix: str
     })
 }
 
-export function MarkdownMessage({ text, tone = 'normal' }: MarkdownMessageProps) {
-    const palette: RenderPalette = {
-        textColor: tone === 'muted' ? 'gray' : undefined,
-        codeColor: tone === 'muted' ? 'gray' : 'cyan',
-        linkColor: tone === 'muted' ? 'gray' : 'blue',
-        muted: tone === 'muted',
-    }
-    const tokens = marked.lexer(text, { gfm: true, breaks: true })
-    const blocks = renderBlocks(tokens, palette, 'markdown')
+export const MarkdownMessage = memo(function MarkdownMessage({
+    text,
+    tone = 'normal',
+}: MarkdownMessageProps) {
+    const palette: RenderPalette = useMemo(
+        () => ({
+            textColor: tone === 'muted' ? 'gray' : undefined,
+            codeColor: tone === 'muted' ? 'gray' : 'cyan',
+            linkColor: tone === 'muted' ? 'gray' : 'blue',
+            muted: tone === 'muted',
+        }),
+        [tone],
+    )
+
+    const blocks = useMemo(() => {
+        const tokens = marked.lexer(text, { gfm: true, breaks: true })
+        return renderBlocks(tokens, palette, 'markdown')
+    }, [text, palette])
 
     return (
         <Box flexDirection="column" gap={1}>
             {blocks}
         </Box>
     )
-}
+})
