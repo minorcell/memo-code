@@ -7,8 +7,7 @@ type UserMessageProps = {
 export function UserMessage({ text }: UserMessageProps) {
     return (
         <Box
-            borderStyle="single"
-            borderColor="gray"
+            borderStyle="round"
             paddingX={1}
             paddingY={0}
             flexDirection="column"
