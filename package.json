@@ -9,9 +9,9 @@
         "format": "bunx prettier --write .",
         "format:check": "bunx prettier --check .",
         "test": "bun test",
-        "test:core": "bun test packages/core",
-        "test:tools": "bun test packages/tools",
-        "test:cli": "bun test packages/cli || true",
+        "test:core": "bun run --filter @memo/core test",
+        "test:tools": "bun run --filter @memo/tools test",
+        "test:cli": "bun run --filter @memo/cli test",
         "test:all": "bun run test:core && bun run test:tools && bun run test:cli",
         "ci": "bun run format:check && bun run test:core && bun run test:tools && bun run build",
         "ci:fix": "bun run format && bun run test:core && bun run test:tools && bun run build"

@@ -3,6 +3,9 @@
     "type": "module",
     "module": "src/index.tsx",
     "private": true,
+    "scripts": {
+        "test": "bun test"
+    },
     "dependencies": {
         "@memo/core": "workspace:*",
         "@memo/tools": "workspace:*",
