@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { Box, useApp, Text } from 'ink'
+import { Box, useApp } from 'ink'
 import {
     createAgentSession,
     loadMemoConfig,
@@ -14,10 +14,11 @@ import {
     type ProviderConfig,
 } from '@memo/core'
 import type { StepView, SystemMessage, TurnView } from './types'
+import { HeaderBar } from './components/layout/HeaderBar'
 import { TokenBar } from './components/layout/TokenBar'
 import { MainContent } from './components/layout/MainContent'
 import { InputPrompt } from './components/layout/InputPrompt'
-import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
+import { inferToolStatus, formatTokenUsage } from './utils'
 import { resolveSlashCommand } from './commands'
 
 export type AppProps = {
@@ -55,6 +56,7 @@ export function App({
     const [session, setSession] = useState<AgentSession | null>(null)
     const [turns, setTurns] = useState<TurnView[]>([])
     const [systemMessages, setSystemMessages] = useState<SystemMessage[]>([])
+    const [statusMessage, setStatusMessage] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
     const currentTurnRef = useRef<number | null>(null)
     const [inputHistory, setInputHistory] = useState<string[]>([])
@@ -62,12 +64,6 @@ export function App({
     const [historicalTurns, setHistoricalTurns] = useState<TurnView[]>([])
     const [pendingHistoryMessages, setPendingHistoryMessages] = useState<ChatMessage[] | null>(null)
     const sessionRef = useRef<AgentSession | null>(null)
-    const [exitMessage, setExitMessage] = useState<string | null>(null)
-    const [contextLimit, setContextLimit] = useState<number>(
-        sessionOptions.maxPromptTokens ?? 120000,
-    )
-    // Track current session's actual context size (cumulative prompt tokens at turn start)
-    const [currentContextTokens, setCurrentContextTokens] = useState<number>(0)
 
     const appendSystemMessage = useCallback((title: string, content: string) => {
         const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -110,22 +106,17 @@ export function App({
                 })
             },
             hooks: {
-                onTurnStart: ({ turn, input, promptTokens }) => {
+                onTurnStart: ({ turn, input }) => {
                     currentTurnRef.current = turn
-                    // Update the cumulative context tokens for display
-                    if (promptTokens && promptTokens > 0) {
-                        setCurrentContextTokens(promptTokens)
-                    }
                     updateTurn(turn, (existing) => ({
                         ...existing,
                         index: turn,
                         userInput: input,
                         steps: [],
                         startedAt: Date.now(),
-                        contextPromptTokens: promptTokens ?? existing.contextPromptTokens,
                     }))
                 },
-                onAction: ({ turn, step, action, thinking }) => {
+                onAction: ({ turn, step, action }) => {
                     updateTurn(turn, (turnState) => {
                         const steps = turnState.steps.slice()
                         while (steps.length <= step) {
@@ -136,7 +127,6 @@ export function App({
                         steps[step] = {
                             ...target,
                             action,
-                            thinking,
                             toolStatus: 'executing',
                         }
                         return { ...turnState, steps }
@@ -158,17 +148,15 @@ export function App({
                         return { ...turnState, steps }
                     })
                 },
-                onFinal: ({ turn, finalText, status, turnUsage, tokenUsage }) => {
+                onFinal: ({ turn, finalText, status, turnUsage }) => {
                     updateTurn(turn, (turnState) => {
                         const startedAt = turnState.startedAt ?? Date.now()
                         const durationMs = Math.max(0, Date.now() - startedAt)
-                        const promptTokens = tokenUsage?.prompt ?? turnState.contextPromptTokens
                         return {
                             ...turnState,
                             finalText,
                             status,
                             tokenUsage: turnUsage,
-                            contextPromptTokens: promptTokens,
                             startedAt,
                             durationMs,
                         }
@@ -213,19 +201,15 @@ export function App({
         if (sessionRef.current) {
             await sessionRef.current.close()
         }
-        setExitMessage('Bye!')
-        // Give time for the message to render
-        setTimeout(() => {
-            exit()
-        }, 300)
+        exit()
     }, [exit])
 
     const handleClear = useCallback(() => {
         setTurns([])
         setSystemMessages([])
+        setStatusMessage(null)
         setHistoricalTurns([])
         setPendingHistoryMessages(null)
-        setCurrentContextTokens(0) // Reset context tokens on clear
     }, [])
 
     const handleHistorySelect = useCallback(
@@ -240,10 +224,10 @@ export function App({
                 setHistoricalTurns(parsed.turns)
                 setPendingHistoryMessages(parsed.messages)
                 setBusy(false)
+                setStatusMessage(null)
                 setTurns([])
                 setSession(null)
                 setSessionLogPath(null)
-                setCurrentContextTokens(0) // Reset context tokens when loading history
                 currentTurnRef.current = null
                 // 重新拉起 session，避免旧上下文残留/计数错位
                 setSessionOptionsState((prev) => ({ ...prev, sessionId: randomUUID() }))
@@ -286,10 +270,10 @@ export function App({
                 appendSystemMessage('模型切换', '当前正在运行，按 Esc Esc 取消后再切换模型。')
                 return
             }
+            setStatusMessage(null)
             setTurns([])
             setHistoricalTurns([])
             setPendingHistoryMessages(null)
-            setCurrentContextTokens(0) // Reset context tokens on model switch
             currentTurnRef.current = null
             setSession(null)
             setSessionLogPath(null)
@@ -314,7 +298,6 @@ export function App({
                 model: currentModel,
                 mcpServerNames,
                 providers,
-                contextLimit,
             })
             if (result.kind === 'exit') {
                 await handleExit()
@@ -328,14 +311,6 @@ export function App({
                 await handleModelSelect(result.provider)
                 return
             }
-            if (result.kind === 'set_context_limit') {
-                setContextLimit(result.limit)
-                appendSystemMessage(
-                    'Context length',
-                    `已设置上下文上限为 ${(result.limit / 1000).toFixed(0)}k tokens`,
-                )
-                return
-            }
             appendSystemMessage(result.title, result.content)
         },
         [
@@ -347,7 +322,6 @@ export function App({
             mcpServerNames,
             currentModel,
             currentProvider,
-            contextLimit,
             providers,
         ],
     )
@@ -364,6 +338,7 @@ export function App({
     const handleSubmit = useCallback(
         async (value: string) => {
             if (!session || busy) return
+            setStatusMessage(null)
             if (value.startsWith('/')) {
                 await handleCommand(value)
                 return
@@ -373,6 +348,7 @@ export function App({
             try {
                 await session.runTurn(value)
             } catch (err) {
+                setStatusMessage(`Failed: ${(err as Error).message}`)
                 setBusy(false)
             }
         },
@@ -380,31 +356,21 @@ export function App({
     )
 
     const lastTurn = turns[turns.length - 1]
+    const statusLine = statusMessage ?? (!session ? 'Initializing...' : busy ? 'Running' : 'Ready')
+    const statusKind =
+        statusMessage !== null ? 'error' : !session ? 'initializing' : busy ? 'running' : 'ready'
     const tokenLine = formatTokenUsage(lastTurn?.tokenUsage)
-    // Use cumulative context tokens (updated on each turn start) for accurate context usage display
-    const contextPercent = calculateContextPercent(currentContextTokens, contextLimit)
+
     const displayTurns = useMemo(() => [...historicalTurns, ...turns], [historicalTurns, turns])
 
-    // Show exit message
-    if (exitMessage) {
-        return (
-            <Box>
-                <Text color="green">{exitMessage}</Text>
-            </Box>
-        )
-    }
-
     return (
-        <Box flexDirection="column">
+        <Box flexDirection="column" gap={1}>
+            <HeaderBar providerName={currentProvider} model={currentModel} cwd={cwd} />
             <MainContent
                 systemMessages={systemMessages}
                 turns={displayTurns}
-                headerInfo={{
-                    providerName: currentProvider,
-                    model: currentModel,
-                    cwd,
-                    sessionId: sessionOptionsState.sessionId,
-                }}
+                statusText={statusLine}
+                statusKind={statusKind}
             />
             <InputPrompt
                 disabled={!session || busy}
@@ -420,7 +386,7 @@ export function App({
                 currentSessionFile={sessionLogPath ?? undefined}
                 providers={providers}
             />
-            <TokenBar contextPercent={contextPercent} />
+            <TokenBar tokenLine={tokenLine} />
         </Box>
     )
 }

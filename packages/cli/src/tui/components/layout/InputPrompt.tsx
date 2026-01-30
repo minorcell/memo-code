@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { Box, Text, useInput, useStdout } from 'ink'
-import os from 'node:os'
 import {
     getFileSuggestions,
     getSessionLogDir,
     type InputHistoryEntry,
     type ProviderConfig,
 } from '@memo/core'
+import { USER_PREFIX } from '../../constants'
+import { buildPaddedLine } from '../../utils'
 import { SuggestionList, type SuggestionListItem } from '../input/SuggestionList'
 import { SLASH_COMMANDS, type SlashCommand } from '../../slash'
 
@@ -47,15 +48,6 @@ type SlashTrigger = { type: 'slash'; keyword: string }
 type ModelsTrigger = { type: 'models'; keyword: string }
 type SuggestionTrigger = FileTrigger | HistoryTrigger | SlashTrigger | ModelsTrigger
 
-function getUsername(): string {
-    try {
-        const info = os.userInfo()
-        return info.username || 'user'
-    } catch {
-        return 'user'
-    }
-}
-
 export function InputPrompt({
     disabled,
     onSubmit,
@@ -70,6 +62,7 @@ export function InputPrompt({
     onHistorySelect,
     providers,
 }: InputPromptProps) {
+    const { stdout } = useStdout()
     const [value, setValue] = useState('')
     const [historyIndex, setHistoryIndex] = useState<number | null>(null)
     const [draft, setDraft] = useState('')
@@ -80,29 +73,8 @@ export function InputPrompt({
     const [suppressSuggestions, setSuppressSuggestions] = useState(false)
     const requestIdRef = useRef(0)
     const lastEscTimeRef = useRef(0)
-    // Use ref to track input value for synchronous updates during rapid input (paste)
-    const valueRef = useRef('')
-    // Blinking cursor state
-    const [showCursor, setShowCursor] = useState(true)
 
-    const username = useMemo(() => getUsername(), [])
-    const cwdName = useMemo(() => cwd.split('/').pop() || cwd, [cwd])
-
-    // Cursor blink effect
     useEffect(() => {
-        if (disabled) {
-            setShowCursor(false)
-            return
-        }
-        const interval = setInterval(() => {
-            setShowCursor((prev) => !prev)
-        }, 530) // Blink every 530ms
-        return () => clearInterval(interval)
-    }, [disabled])
-
-    // Sync ref with state
-    useEffect(() => {
-        valueRef.current = value
         setSuppressSuggestions(false)
     }, [value])
 
@@ -247,7 +219,6 @@ export function InputPrompt({
                 const prefix = value.slice(0, trigger.tokenStart)
                 const suffix = value.slice(trigger.tokenStart + trigger.query.length)
                 const nextValue = `${prefix}${item.value}${suffix}`
-                valueRef.current = nextValue
                 setValue(nextValue)
                 setHistoryIndex(null)
                 setDraft('')
@@ -260,17 +231,7 @@ export function InputPrompt({
                 if (item.meta?.historyEntry) {
                     onHistorySelect?.(item.meta.historyEntry)
                 }
-                valueRef.current = item.value
                 setValue(item.value)
-                setHistoryIndex(null)
-                setDraft('')
-                closeSuggestions()
-                return
-            }
-            if (suggestionMode === 'model' && item.meta?.provider) {
-                void onModelSelect?.(item.meta.provider)
-                valueRef.current = ''
-                setValue('')
                 setHistoryIndex(null)
                 setDraft('')
                 closeSuggestions()
@@ -280,7 +241,6 @@ export function InputPrompt({
                 const slashCommand = item.meta.slashCommand
                 slashCommand.run({
                     setInputValue: (next) => {
-                        valueRef.current = next
                         setValue(next)
                         setHistoryIndex(null)
                         setDraft('')
@@ -295,6 +255,14 @@ export function InputPrompt({
                 })
                 return
             }
+            if (suggestionMode === 'model' && item.meta?.provider) {
+                void onModelSelect?.(item.meta.provider)
+                setValue('')
+                setHistoryIndex(null)
+                setDraft('')
+                closeSuggestions()
+                return
+            }
         },
         [closeSuggestions, onClear, onExit, onModelSelect, suggestionMode, trigger, value],
     )
@@ -305,7 +273,6 @@ export function InputPrompt({
             return
         }
         if (key.ctrl && input === 'l') {
-            valueRef.current = ''
             setValue('')
             setHistoryIndex(null)
             setDraft('')
@@ -324,7 +291,6 @@ export function InputPrompt({
                 if (disabled) {
                     onCancelRun()
                 } else {
-                    valueRef.current = ''
                     setValue('')
                     setHistoryIndex(null)
                     setDraft('')
@@ -350,19 +316,15 @@ export function InputPrompt({
             }
             if (!history.length) return
             if (historyIndex === null) {
-                setDraft(valueRef.current)
+                setDraft(value)
                 const nextIndex = history.length - 1
                 setHistoryIndex(nextIndex)
-                const nextValue = history[nextIndex] ?? ''
-                valueRef.current = nextValue
-                setValue(nextValue)
+                setValue(history[nextIndex] ?? '')
                 return
             }
             const nextIndex = Math.max(0, historyIndex - 1)
             setHistoryIndex(nextIndex)
-            const nextValue = history[nextIndex] ?? ''
-            valueRef.current = nextValue
-            setValue(nextValue)
+            setValue(history[nextIndex] ?? '')
             return
         }
 
@@ -375,15 +337,12 @@ export function InputPrompt({
             const nextIndex = historyIndex + 1
             if (nextIndex >= history.length) {
                 setHistoryIndex(null)
-                valueRef.current = draft
                 setValue(draft)
                 setDraft('')
                 return
             }
             setHistoryIndex(nextIndex)
-            const nextValue = history[nextIndex] ?? ''
-            valueRef.current = nextValue
-            setValue(nextValue)
+            setValue(history[nextIndex] ?? '')
             return
         }
 
@@ -397,20 +356,9 @@ export function InputPrompt({
                 applySuggestion(suggestionItems[activeIndex])
                 return
             }
-
-            // Shift+Enter: insert newline
-            if (key.shift) {
-                const newValue = valueRef.current + '\n'
-                valueRef.current = newValue
-                setValue(newValue)
-                return
-            }
-
-            // Enter: submit
-            const trimmed = valueRef.current.trim()
+            const trimmed = value.trim()
             if (trimmed) {
                 onSubmit(trimmed)
-                valueRef.current = ''
                 setValue('')
                 setHistoryIndex(null)
                 setDraft('')
@@ -420,25 +368,24 @@ export function InputPrompt({
         }
 
         if (key.backspace || key.delete) {
-            const newValue = valueRef.current.slice(0, Math.max(0, valueRef.current.length - 1))
-            valueRef.current = newValue
-            setValue(newValue)
+            setValue((prev) => prev.slice(0, Math.max(0, prev.length - 1)))
             return
         }
 
         if (input) {
-            const newValue = valueRef.current + input
-            valueRef.current = newValue
-            setValue(newValue)
+            setValue((prev) => prev + input)
         }
     })
 
-    const placeholder = disabled ? 'Running...' : ''
+    const placeholder = disabled ? 'Running...' : 'Input...'
     const displayText = value || placeholder
-    const cursor = showCursor && !disabled ? '▊' : ' '
-
-    // Split text into lines for multi-line display
-    const lines = displayText.split('\n')
+    const lineColor = value && !disabled ? 'white' : 'gray'
+    const { line, blankLine } = buildPaddedLine(
+        `${USER_PREFIX} ${displayText}`,
+        stdout?.columns ?? 80,
+        1,
+    )
+    const verticalPadding = 1
 
     const suggestionListItems: SuggestionListItem[] = suggestionItems.map(
         ({ value: _value, meta: _meta, ...rest }) => rest,
@@ -446,32 +393,13 @@ export function InputPrompt({
 
     return (
         <Box flexDirection="column" gap={1}>
-            {/* Prompt line with username@cwd */}
             <Box flexDirection="column">
-                <Box>
-                    <Text color="cyan">{username}</Text>
-                    <Text color="gray">@</Text>
-                    <Text color="cyan">{cwdName}</Text>
-                    <Text color="yellow"> </Text>
-                    {disabled ? (
-                        <Text color="gray">{lines[0]}</Text>
-                    ) : (
-                        <>
-                            <Text color="white">{lines[0]}</Text>
-                            {lines.length === 1 && <Text color="cyan">{cursor}</Text>}
-                        </>
-                    )}
-                </Box>
-                {/* Additional lines (if multi-line input) */}
-                {lines.slice(1).map((line, index) => (
-                    <Box key={`line-${index}`} paddingLeft={username.length + cwdName.length + 2}>
-                        <Text color="white">{line}</Text>
-                        {/* Show cursor on the last line */}
-                        {index === lines.length - 2 && <Text color="cyan">{cursor}</Text>}
-                    </Box>
-                ))}
+                {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
+                <Text color={lineColor} backgroundColor="#2b2b2b">
+                    {line}
+                </Text>
+                {verticalPadding > 0 ? <Text backgroundColor="#2b2b2b">{blankLine}</Text> : null}
             </Box>
-
             {suggestionMode !== 'none' ? (
                 <SuggestionList
                     items={suggestionListItems}
