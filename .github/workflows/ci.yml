@@ -1,10 +1,11 @@
 name: CI
 
 on:
-    push:
-        branches: ['**']
     pull_request:
-        branches: ['**']
+        branches: [main]
+    push:
+        tags: ['v*']
+    workflow_dispatch:
 
 jobs:
     # 在 Linux 上运行所有检查
@@ -30,10 +31,10 @@ jobs:
             - name: Test build
               run: bun run build
 
-    # 仅在主要分支构建二进制文件
+    # 仅在 tags 构建二进制文件
     build:
         name: Build Binaries
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/')
         needs: test
         runs-on: ${{ matrix.os }}
         strategy:
