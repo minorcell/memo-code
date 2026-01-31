@@ -85,7 +85,6 @@ async function ensureProviderConfig() {
 
         const config: MemoConfig = {
             current_provider: name,
-            max_steps: loaded.config.max_steps ?? 100,
             providers: [
                 {
                     name,
