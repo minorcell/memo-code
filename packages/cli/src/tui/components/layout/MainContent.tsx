@@ -116,7 +116,7 @@ export const MainContent = memo(function MainContent({
                             >
                                 <Box gap={1} alignItems="center">
                                     <Box flexDirection="column">
-                                        <Text bold>Welcome to Memo CLI!</Text>
+                                        <Text bold>Welcome to Memo Code CLI!</Text>
                                         <Text color="gray">Send /help for help information.</Text>
                                     </Box>
                                 </Box>

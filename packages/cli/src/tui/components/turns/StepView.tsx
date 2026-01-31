@@ -9,8 +9,21 @@ type StepViewProps = {
 }
 
 // Extract the most important parameter to display
-function getMainParam(toolInput: Record<string, any> | undefined): string | undefined {
+function getMainParam(toolInput: unknown): string | undefined {
     if (!toolInput) return undefined
+
+    // Handle string input (e.g., raw command)
+    if (typeof toolInput === 'string') {
+        if (toolInput.length > 50) {
+            return toolInput.slice(0, 47) + '...'
+        }
+        return toolInput
+    }
+
+    // Must be an object to proceed
+    if (typeof toolInput !== 'object' || Array.isArray(toolInput)) return undefined
+
+    const input = toolInput as Record<string, any>
 
     // Priority order for common parameter names
     const priorityKeys = [
@@ -25,8 +38,8 @@ function getMainParam(toolInput: Record<string, any> | undefined): string | unde
     ]
 
     for (const key of priorityKeys) {
-        if (toolInput[key]) {
-            const value = String(toolInput[key])
+        if (input[key]) {
+            const value = String(input[key])
             // Truncate if too long
             if (value.length > 50) {
                 return value.slice(0, 47) + '...'
@@ -36,7 +49,7 @@ function getMainParam(toolInput: Record<string, any> | undefined): string | unde
     }
 
     // If no priority key found, use the first string value
-    for (const [key, value] of Object.entries(toolInput)) {
+    for (const [key, value] of Object.entries(input)) {
         if (typeof value === 'string' && key !== 'description') {
             if (value.length > 50) {
                 return value.slice(0, 47) + '...'

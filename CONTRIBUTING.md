@@ -1,6 +1,6 @@
 # Contributing / 贡献指南
 
-感谢你对 memo-cli 的关注！为了让协作顺畅，请在提交 PR 前阅读以下约定。
+感谢你对 **Memo Code CLI** 的关注！为了让协作顺畅，请在提交 PR 前阅读以下约定。
 
 ## 快速开始 / Getting Started
 

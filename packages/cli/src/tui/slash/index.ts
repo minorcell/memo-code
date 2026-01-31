@@ -1,5 +1,5 @@
 import type { SlashCommand } from './types'
-import { clearCommand } from './clear'
+import { newCommand } from './new'
 import { exitCommand } from './exit'
 import { historyCommand } from './history'
 import { modelsCommand } from './models'
@@ -9,7 +9,7 @@ import { contextCommand } from './context'
 export const SLASH_COMMANDS: SlashCommand[] = [
     helpCommand,
     exitCommand,
-    clearCommand,
+    newCommand,
     historyCommand,
     modelsCommand,
     contextCommand,
