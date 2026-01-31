@@ -26,7 +26,7 @@ Memo Code 目前对所有工具调用“直接执行、无确认”，风险包�
 
 **低风险（无需审批）：**
 
-- `read`、`glob`、`grep`、`time`、`webfetch`
+- `read`、`glob`、`grep`、`webfetch`
 
 ## 🔗 参考
 
