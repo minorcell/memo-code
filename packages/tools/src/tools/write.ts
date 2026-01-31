@@ -8,18 +8,9 @@ import { textResult } from '@memo/tools/tools/mcp'
 const WRITE_INPUT_SCHEMA = z
     .object({
         file_path: z.string().min(1),
-        content: z
-            .union([
-                z.string(),
-                z.number(),
-                z.boolean(),
-                z.null(),
-                z.array(z.any()),
-                z.record(z.string(), z.any()),
-                z.instanceof(Uint8Array),
-                z.instanceof(ArrayBuffer),
-            ])
-            .optional(),
+        // 使用 z.any() 允许任意类型，实际类型检查在 execute 中进行
+        // Uint8Array/ArrayBuffer 无法被 JSON Schema 表达
+        content: z.any().optional(),
     })
     .strict()
 

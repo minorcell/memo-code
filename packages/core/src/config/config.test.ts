@@ -140,7 +140,6 @@ describe('mcp config serialization', () => {
         const configText = `
 current_provider = "deepseek"
 stream_output = false
-max_steps = 42
 
 [[providers.deepseek]]
 name = "deepseek"
