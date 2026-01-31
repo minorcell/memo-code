@@ -15,6 +15,7 @@ export type SlashCommandResult =
     | { kind: 'message'; title: string; content: string }
     | { kind: 'switch_model'; provider: ProviderConfig }
     | { kind: 'set_context_limit'; limit: number }
+    | { kind: 'init_agents_md' }
 
 const HELP_TEXT = `Available commands:
   /help       Show help and shortcuts
@@ -23,6 +24,7 @@ const HELP_TEXT = `Available commands:
   /models     Pick a model from config
   /history    Show session history
   /context    Show or set context length (e.g. /context 120k)
+  /init       Generate AGENTS.md for current project
 
 Shortcuts:
   Enter       Send message
@@ -88,6 +90,8 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
             }
             return { kind: 'set_context_limit', limit: candidate }
         }
+        case 'init':
+            return { kind: 'init_agents_md' }
         case 'models': {
             if (!context.providers.length) {
                 return {
