@@ -15,10 +15,7 @@ function createMcpClient(): Client {
             version: '1.0.0',
         },
         {
-            capabilities: {
-                // 声明客户端支持的能力
-                tools: {},
-            },
+            capabilities: {},
         },
     )
 }

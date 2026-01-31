@@ -1,11 +1,10 @@
 /** @file 内置工具注册表 */
 import type { NativeTool, ToolRegistry, JSONSchema } from '../types'
-import type { ZodTypeAny } from 'zod'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 
 /** 从 zod schema 转换为 JSON Schema */
-function convertZodToJSONSchema(zodSchema: ZodTypeAny): JSONSchema {
-    const jsonSchema = zodToJsonSchema(zodSchema, { target: 'jsonSchema7' })
+function convertZodToJSONSchema(zodSchema: object): JSONSchema {
+    const jsonSchema = zodToJsonSchema(zodSchema as any, { target: 'jsonSchema7' })
     // 移除 $schema 等额外字段，保持简洁
     const { $schema, ...rest } = jsonSchema as JSONSchema & { $schema?: string }
     return rest
@@ -61,7 +60,7 @@ export class NativeToolRegistry {
 export function createNativeTool(
     name: string,
     description: string,
-    inputSchema: ZodTypeAny,
+    inputSchema: object,
     execute: (input: unknown) => Promise<import('@modelcontextprotocol/sdk/types').CallToolResult>,
 ): NativeTool {
     return {
