@@ -8,6 +8,6 @@
         "test": "bun test"
     },
     "dependencies": {
-        "zod": "^4.1.13"
+        "zod": "^4.3.6"
     }
 }

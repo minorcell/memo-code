@@ -61,6 +61,31 @@ function getMainParam(toolInput: unknown): string | undefined {
     return undefined
 }
 
+// Parse parallel tool calls from observation
+function parseParallelTools(
+    observation: string | undefined,
+): Array<{ tool: string; output: string }> {
+    if (!observation) return []
+
+    const tools: Array<{ tool: string; output: string }> = []
+    const regex = /\[(\w+)\]: ([\s\S]*?)(?=\n\n\[|$)/g
+    let match
+
+    while ((match = regex.exec(observation)) !== null) {
+        const output = match[2]?.trim() ?? ''
+        const toolName = match[1] ?? 'unknown'
+        // Extract meaningful preview (first non-empty line or first 60 chars)
+        const lines = output.split('\n').filter((l) => l.trim())
+        const preview = lines[0] ?? output
+        tools.push({
+            tool: toolName,
+            output: preview.slice(0, 60) + (preview.length > 60 ? '...' : ''),
+        })
+    }
+
+    return tools
+}
+
 // Custom comparison for step memo
 function areStepsEqual(prevProps: StepViewProps, nextProps: StepViewProps): boolean {
     const prev = prevProps.step
@@ -82,6 +107,10 @@ export const StepView = memo(function StepView({ step, hideAssistantText = false
     const toolInput = step.action?.input as Record<string, any> | undefined
     const mainParam = getMainParam(toolInput)
 
+    // Check if this is a parallel tool call
+    const parallelTools = parseParallelTools(step.observation)
+    const isParallel = parallelTools.length > 1
+
     return (
         <Box flexDirection="column" gap={0}>
             {/* Render thinking text as muted (gray) */}
@@ -94,8 +123,28 @@ export const StepView = memo(function StepView({ step, hideAssistantText = false
                 </Box>
             )}
 
-            {/* Render tool usage */}
-            {toolName && (
+            {/* Render parallel tool usage */}
+            {isParallel && (
+                <>
+                    {parallelTools.map((tool, idx) => (
+                        <Box key={idx}>
+                            <Text color="green">● </Text>
+                            <Text color="gray">Used </Text>
+                            <Text color="cyan">{tool.tool}</Text>
+                            {tool.output && (
+                                <>
+                                    <Text color="gray"> (</Text>
+                                    <Text color="cyan">{tool.output}</Text>
+                                    <Text color="gray">)</Text>
+                                </>
+                            )}
+                        </Box>
+                    ))}
+                </>
+            )}
+
+            {/* Render single tool usage */}
+            {!isParallel && toolName && (
                 <Box>
                     <Text color="green">● </Text>
                     <Text color="gray">Used </Text>

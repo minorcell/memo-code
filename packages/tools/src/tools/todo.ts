@@ -12,46 +12,53 @@ type StoredTask = {
 const MAX_TASKS = 10
 const tasks: StoredTask[] = []
 
-const TASK_SCHEMA = z
+// 为了兼容 OpenAI Function Calling API，使用单一 object schema 而不是 discriminatedUnion
+// 因为 API 要求 parameters 必须有 type: "object"
+const TODO_INPUT_SCHEMA = z
     .object({
-        content: z.string().trim().min(1, 'content 不能为空').max(200, 'content 最长 200 字符'),
-        status: z.enum(['pending', 'in_progress', 'completed']).optional().default('pending'),
+        type: z.enum(['add', 'replace', 'update', 'remove']),
+        // add/replace/update 时使用
+        todos: z
+            .array(
+                z.object({
+                    content: z
+                        .string()
+                        .trim()
+                        .min(1, 'content 不能为空')
+                        .max(200, 'content 最长 200 字符'),
+                    status: z
+                        .enum(['pending', 'in_progress', 'completed'])
+                        .optional()
+                        .default('pending'),
+                    // update 时需要
+                    id: z.string().min(1, 'id 不能为空').optional(),
+                }),
+            )
+            .optional(),
+        // remove 时使用
+        ids: z.array(z.string().min(1, 'id 不能为空')).optional(),
     })
     .strict()
-
-const ADD_SCHEMA = z.object({
-    type: z.literal('add'),
-    todos: z.array(TASK_SCHEMA).min(1, 'todos 不能为空').max(20, 'todos 最多 20 条'),
-})
-
-const REPLACE_SCHEMA = z.object({
-    type: z.literal('replace'),
-    todos: z.array(TASK_SCHEMA).min(1, 'todos 不能为空').max(20, 'todos 最多 20 条'),
-})
-
-const UPDATE_SCHEMA = z.object({
-    type: z.literal('update'),
-    todos: z
-        .array(
-            TASK_SCHEMA.extend({
-                id: z.string().min(1, 'id 不能为空'),
-            }),
-        )
-        .min(1, 'todos 不能为空')
-        .max(20, 'todos 最多 20 条'),
-})
-
-const REMOVE_SCHEMA = z.object({
-    type: z.literal('remove'),
-    ids: z.array(z.string().min(1, 'id 不能为空')).min(1, 'ids 不能为空'),
-})
-
-const TODO_INPUT_SCHEMA = z.discriminatedUnion('type', [
-    ADD_SCHEMA,
-    REPLACE_SCHEMA,
-    UPDATE_SCHEMA,
-    REMOVE_SCHEMA,
-])
+    .refine(
+        (data) => {
+            // add/replace/update 必须有 todos
+            if (['add', 'replace', 'update'].includes(data.type)) {
+                if (!data.todos || data.todos.length === 0) return false
+                // update 时每个 todo 必须有 id
+                if (data.type === 'update') {
+                    return data.todos.every((t) => t.id)
+                }
+            }
+            // remove 必须有 ids
+            if (data.type === 'remove') {
+                if (!data.ids || data.ids.length === 0) return false
+            }
+            return true
+        },
+        {
+            message: 'add/replace/update 需要 todos，remove 需要 ids，update 需要 id',
+        },
+    )
 
 type TodoInput = z.infer<typeof TODO_INPUT_SCHEMA>
 
@@ -62,11 +69,12 @@ function cloneTasks() {
 function mutate(input: TodoInput) {
     switch (input.type) {
         case 'add': {
+            const todos = input.todos!
             const remaining = MAX_TASKS - tasks.length
-            if (input.todos.length > remaining) {
+            if (todos.length > remaining) {
                 return { error: `任务上限 ${MAX_TASKS}，当前剩余 ${remaining} 条空位` }
             }
-            const added = input.todos.map((t) => ({
+            const added = todos.map((t) => ({
                 id: crypto.randomUUID(),
                 content: t.content,
                 status: t.status,
@@ -75,11 +83,12 @@ function mutate(input: TodoInput) {
             return { added, tasks: cloneTasks() }
         }
         case 'replace': {
-            if (input.todos.length > MAX_TASKS) {
+            const todos = input.todos!
+            if (todos.length > MAX_TASKS) {
                 return { error: `任务上限 ${MAX_TASKS}` }
             }
             tasks.splice(0, tasks.length)
-            const replaced = input.todos.map((t) => ({
+            const replaced = todos.map((t) => ({
                 id: crypto.randomUUID(),
                 content: t.content,
                 status: t.status,
@@ -88,14 +97,15 @@ function mutate(input: TodoInput) {
             return { replaced: true, tasks: cloneTasks() }
         }
         case 'update': {
-            const ids = input.todos.map((t) => t.id)
+            const todos = input.todos!
+            const ids = todos.map((t) => t.id!)
             const idSet = new Set(ids)
             if (idSet.size !== ids.length) {
                 return { error: '更新列表存在重复 id' }
             }
             const map = new Map(tasks.map((t) => [t.id, t]))
-            for (const upd of input.todos) {
-                const found = map.get(upd.id)
+            for (const upd of todos) {
+                const found = map.get(upd.id!)
                 if (!found) return { error: `未找到任务 id=${upd.id}` }
                 found.content = upd.content
                 if (upd.status) found.status = upd.status
@@ -103,14 +113,15 @@ function mutate(input: TodoInput) {
             return { updated: ids, tasks: cloneTasks() }
         }
         case 'remove': {
+            const ids = input.ids!
             const before = tasks.length
-            const removeSet = new Set(input.ids)
+            const removeSet = new Set(ids)
             const kept = tasks.filter((t) => !removeSet.has(t.id))
             if (kept.length === before) {
                 return { error: '未找到任何可删除的任务 id' }
             }
             tasks.splice(0, tasks.length, ...kept)
-            return { removed: input.ids, tasks: cloneTasks() }
+            return { removed: ids, tasks: cloneTasks() }
         }
     }
 }
