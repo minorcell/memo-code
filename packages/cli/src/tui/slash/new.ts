@@ -1,8 +1,8 @@
 import type { SlashCommand } from './types'
 
-export const clearCommand: SlashCommand = {
-    name: 'clear',
-    description: '清空屏幕',
+export const newCommand: SlashCommand = {
+    name: 'new',
+    description: '开启一个新对话',
     run: ({ closeSuggestions, setInputValue, clearScreen }) => {
         closeSuggestions()
         setInputValue('')

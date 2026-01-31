@@ -1,13 +1,13 @@
 {
-    "name": "@memo/core",
+    "name": "@memo-code/core",
     "type": "module",
     "module": "src/index.ts",
+    "version": "0.1",
     "private": true,
     "scripts": {
         "test": "bun test"
     },
     "dependencies": {
-        "ignore": "^7.0.5",
         "zod": "^4.1.13"
     }
 }

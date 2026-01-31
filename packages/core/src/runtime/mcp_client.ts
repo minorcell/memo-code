@@ -42,7 +42,7 @@ function hashConfig(config: MCPServerConfig): string {
 function createMemoClient() {
     return new Client(
         {
-            name: 'memo-cli-client',
+            name: 'memo-code-cli-client',
             version: '1.0.0',
         },
         {
