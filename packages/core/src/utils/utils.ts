@@ -46,6 +46,34 @@ function extractJSONObjects(
 }
 
 /**
+ * 提取/清理思考标签（<think> 或 <thinking>）内的文本。
+ * 返回去除标签后的文本以及累积的思考内容。
+ */
+function extractThinkingText(raw: string): { thinkingParts: string[]; cleaned: string } {
+    const thinkingParts: string[] = []
+    const regex = /<\s*(think|thinking)\s*>([\s\S]*?)<\/\s*\1\s*>/gi
+    const cleaned = raw.replace(regex, (_full, _tag, inner) => {
+        const trimmed = (inner ?? '').trim()
+        if (trimmed) thinkingParts.push(trimmed)
+        return trimmed
+    })
+    return {
+        thinkingParts,
+        cleaned: cleaned.trim(),
+    }
+}
+
+export function buildThinking(parts: string[]): string | undefined {
+    if (parts.length === 0) return undefined
+    const combined = parts.join('\n')
+    const { thinkingParts, cleaned } = extractThinkingText(combined)
+    if (thinkingParts.length > 0) {
+        return thinkingParts.join('\n\n')
+    }
+    return cleaned || undefined
+}
+
+/**
  * 检查对象是否是有效的 Action 结构
  */
 function isValidAction(obj: unknown): obj is { tool: string; input?: unknown } {
@@ -97,9 +125,8 @@ export function parseAssistant(content: string): ParsedAssistant {
             const thinkingParts: string[] = []
             if (before) thinkingParts.push(before)
             if (after) thinkingParts.push(after)
-            if (thinkingParts.length > 0) {
-                parsed.thinking = thinkingParts.join('\n')
-            }
+            const thinking = buildThinking(thinkingParts)
+            if (thinking) parsed.thinking = thinking
             return parsed
         }
 
