@@ -3,7 +3,7 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { Box, Text, useInput, useStdout } from 'ink'
 import os from 'node:os'
-import { getSessionLogDir, type ProviderConfig } from '@memo/core'
+import { getSessionLogDir, type ProviderConfig, type MCPServerConfig } from '@memo/core'
 import { getFileSuggestions, type InputHistoryEntry } from '../../suggestions'
 import { SuggestionList, type SuggestionListItem } from '../input/SuggestionList'
 import { SLASH_COMMANDS, type SlashCommand } from '../../slash'
@@ -44,6 +44,7 @@ type InputPromptProps = {
     providerName: string
     model: string
     contextLimit: number
+    mcpServers: Record<string, MCPServerConfig>
 }
 
 type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model'
@@ -92,6 +93,7 @@ export function InputPrompt({
     providerName,
     model,
     contextLimit,
+    mcpServers,
 }: InputPromptProps) {
     const [value, setValue] = useState('')
     const [historyIndex, setHistoryIndex] = useState<number | null>(null)
@@ -319,6 +321,7 @@ export function InputPrompt({
                         model,
                         contextLimit,
                         providers,
+                        mcpServers,
                     },
                 })
                 return
@@ -340,6 +343,7 @@ export function InputPrompt({
             model,
             contextLimit,
             providers,
+            mcpServers,
         ],
     )
 

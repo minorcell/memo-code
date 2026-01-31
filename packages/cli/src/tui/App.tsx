@@ -13,6 +13,7 @@ import {
     type ChatMessage,
     type InputHistoryEntry,
     type ProviderConfig,
+    type MCPServerConfig,
 } from '@memo/core'
 import type { StepView, SystemMessage, TurnView } from './types'
 import { TokenBar } from './components/layout/TokenBar'
@@ -26,7 +27,7 @@ export type AppProps = {
     providerName: string
     model: string
     configPath: string
-    mcpServerNames: string[]
+    mcpServers: Record<string, MCPServerConfig>
     cwd: string
     sessionsDir: string
     providers: ProviderConfig[]
@@ -41,7 +42,7 @@ export function App({
     providerName,
     model,
     configPath,
-    mcpServerNames,
+    mcpServers,
     cwd,
     sessionsDir,
     providers,
@@ -314,7 +315,7 @@ export function App({
                 configPath,
                 providerName: currentProvider,
                 model: currentModel,
-                mcpServerNames,
+                mcpServers,
                 providers,
                 contextLimit,
             })
@@ -378,7 +379,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
             handleClear,
             handleExit,
             handleModelSelect,
-            mcpServerNames,
+            mcpServers,
             currentModel,
             currentProvider,
             contextLimit,
@@ -470,6 +471,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 providerName={currentProvider}
                 model={currentModel}
                 contextLimit={contextLimit}
+                mcpServers={mcpServers}
             />
             <TokenBar contextPercent={contextPercent} />
         </Box>
