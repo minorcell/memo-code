@@ -27,6 +27,7 @@
 - Provider 能力字段：`supports_tool_use`、`supports_parallel_tools`、`tool_id_pattern?`、`allows_midturn_system`、`json_stability`。
 - 探针：若未声明 `supports_tool_use`，会话启动发送 dummy tool，返回 `tool_calls` 视为支持，否则降级。
 - 网关流程：
+
     ```
     callLLM(request):
       caps = providerCaps(request.provider)
@@ -38,6 +39,7 @@
 
     - runToolUse：校验 tool_id，`parseToolArguments` 安全解析；失败转文本 `[tool_use parse error] ...`，不抛错；存在 tool_use 才标记 stop_reason=tool_use。
     - runJsonFallback：应用固定 JSON 模板；解析失败记录 `parse_error`，返回“未执行工具”提示文本，可选一次补偿重试；成功则转为 tool_use block。
+
 - 并发策略：`supports_parallel_tools=false` 时强制串行；工具输入校验失败转 observation，不中断。
 
 ## 可观测

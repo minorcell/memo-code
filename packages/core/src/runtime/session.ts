@@ -356,8 +356,8 @@ class AgentSessionImpl implements AgentSession {
                           input: parsed.action.input,
                       })
                     : parsed.final
-                    ? JSON.stringify({ final: parsed.final })
-                    : assistantText
+                      ? JSON.stringify({ final: parsed.final })
+                      : assistantText
                 this.history.push({ role: 'assistant', content: historyContent })
 
                 // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。

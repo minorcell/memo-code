@@ -21,9 +21,9 @@ import type {
     ToolRegistry,
 } from '@memo/core/types'
 
-export function parseToolArguments(raw: string):
-    | { ok: true; data: unknown }
-    | { ok: false; raw: string; error: string } {
+export function parseToolArguments(
+    raw: string,
+): { ok: true; data: unknown } | { ok: false; raw: string; error: string } {
     try {
         return { ok: true, data: JSON.parse(raw) }
     } catch (err) {
