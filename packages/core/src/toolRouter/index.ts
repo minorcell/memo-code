@@ -102,6 +102,22 @@ export class ToolRouter {
     // ==================== Prompt 生成 ====================
 
     /**
+     * 生成 Tool Use API 格式的工具定义列表
+     * @returns 工具定义数组，用于传递给 LLM API
+     */
+    generateToolDefinitions(): Array<{
+        name: string
+        description: string
+        input_schema: Record<string, unknown>
+    }> {
+        return this.getAllTools().map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            input_schema: tool.inputSchema || { type: 'object', properties: {} },
+        }))
+    }
+
+    /**
      * 生成工具描述文本，用于注入到系统 Prompt
      * @returns 格式化的工具描述
      */

@@ -51,16 +51,45 @@ export type TokenCounter = {
     dispose: () => void
 }
 
-/** LLM 响应（兼容仅文本或携带 usage 的返回）。 */
+/** Tool Use Block - 工具调用请求 */
+export type ToolUseBlock = {
+    type: 'tool_use'
+    /** 工具调用的唯一ID */
+    id: string
+    /** 工具名称 */
+    name: string
+    /** 工具输入参数 */
+    input: unknown
+}
+
+/** Text Block - 文本内容 */
+export type TextBlock = {
+    type: 'text'
+    /** 文本内容 */
+    text: string
+}
+
+/** Content Block - 可以是文本或工具调用 */
+export type ContentBlock = TextBlock | ToolUseBlock
+
+/** LLM 响应（支持 Tool Use API 和传统文本模式）。 */
 export type LLMResponse =
     | string
     | {
-          /** 模型输出文本。 */
+          /** 模型输出文本（传统模式）。 */
           content: string
           /** 模型返回的 token usage（可选）。 */
           usage?: Partial<TokenUsage>
           /** 若为流式增量输出，标记已通过 onChunk 传递过部分内容。 */
           streamed?: boolean
+      }
+    | {
+          /** 结构化内容块（Tool Use API 模式）*/
+          content: ContentBlock[]
+          /** 停止原因 */
+          stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
+          /** 模型返回的 token usage（可选）。 */
+          usage?: Partial<TokenUsage>
       }
 
 /** 将 LLM 输出解析成 action/final 结构后的表示。 */
@@ -76,9 +105,18 @@ export type ParsedAssistant = {
 /** 工具注册表，键为工具名称，值为工具定义。 */
 export type ToolRegistry = Record<string, import('./toolRouter/types').Tool>
 
+/** 工具定义结构（用于传递给 LLM API）*/
+export type ToolDefinition = {
+    name: string
+    description: string
+    input_schema: Record<string, unknown>
+}
+
 /** LLM 调用接口：输入历史消息，返回模型回复文本或携带 usage，可选流式回调。 */
 export type CallLLMOptions = {
     signal?: AbortSignal
+    /** 可用工具列表（Tool Use API 模式）*/
+    tools?: ToolDefinition[]
 }
 
 export type CallLLM = (
@@ -124,8 +162,6 @@ export type AgentSessionOptions = {
     historyDir?: string
     /** 指定使用的 provider 名称。 */
     providerName?: string
-    /** 每个 turn 内的最大 step 数。 */
-    maxSteps?: number
     /** tokenizer encoding 名称，默认 cl100k_base。 */
     tokenizerModel?: string
     /** 提示词预警阈值。 */
@@ -145,7 +181,7 @@ export type AgentSessionDeps = AgentDeps & {
 }
 
 /** 单轮对话的状态码。 */
-export type TurnStatus = 'ok' | 'error' | 'max_steps' | 'prompt_limit' | 'cancelled'
+export type TurnStatus = 'ok' | 'error' | 'prompt_limit' | 'cancelled'
 
 /** 单轮对话的运行结果（含步骤与 token）。 */
 export type TurnResult = {
