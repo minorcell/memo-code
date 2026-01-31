@@ -1,5 +1,5 @@
 {
-    "name": "@memo/cli",
+    "name": "@memo-code/cli",
     "type": "module",
     "module": "src/index.tsx",
     "version": "0.1",
@@ -8,8 +8,8 @@
         "test": "bun test"
     },
     "dependencies": {
-        "@memo/core": "workspace:*",
-        "@memo/tools": "workspace:*",
+        "@memo-code/core": "workspace:*",
+        "@memo-code/tools": "workspace:*",
         "ignore": "^7.0.5",
         "ink": "^5.0.0",
         "marked": "^17.0.1",

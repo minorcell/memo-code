@@ -1,5 +1,5 @@
 {
-    "name": "@memo/core",
+    "name": "@memo-code/core",
     "type": "module",
     "module": "src/index.ts",
     "version": "0.1",
