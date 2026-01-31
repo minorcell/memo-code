@@ -21,6 +21,16 @@ import type {
     ToolRegistry,
 } from '@memo/core/types'
 
+export function parseToolArguments(
+    raw: string,
+): { ok: true; data: unknown } | { ok: false; raw: string; error: string } {
+    try {
+        return { ok: true, data: JSON.parse(raw) }
+    } catch (err) {
+        return { ok: false, raw, error: (err as Error).message }
+    }
+}
+
 /**
  * 根据缺省策略补全依赖项（工具、callLLM、prompt、history sinks、tokenizer）。
  * 调用方可仅提供回调/覆盖项，其余使用默认实现。
@@ -35,7 +45,6 @@ export async function withDefaultDeps(
     loadPrompt: () => Promise<string>
     historySinks: HistorySink[]
     tokenCounter: TokenCounter
-    maxSteps: number
     dispose: () => Promise<void>
     historyFilePath?: string
 }> {
@@ -72,7 +81,7 @@ export async function withDefaultDeps(
     const loadPrompt = async () => {
         let basePrompt = await (deps.loadPrompt ?? defaultLoadPrompt)()
 
-        // 注入工具描述到 prompt
+        // 注入工具描述到 prompt（用于非 Tool Use API 模式）
         const toolDescriptions = router.generateToolDescriptions()
         if (toolDescriptions) {
             basePrompt += `\n\n${toolDescriptions}`
@@ -94,6 +103,9 @@ export async function withDefaultDeps(
 
         return basePrompt
     }
+
+    // 7. 生成工具定义（用于 Tool Use API）
+    const toolDefinitions = router.generateToolDefinitions()
 
     const streamOutput = options.stream ?? config.stream_output ?? false
     const sessionsDir = getSessionsDir(loaded, options)
@@ -123,12 +135,26 @@ export async function withDefaultDeps(
                     apiKey,
                     baseURL: provider.base_url,
                 })
+
+                // 构建 OpenAI 格式的工具定义
+                const tools =
+                    toolDefinitions.length > 0
+                        ? toolDefinitions.map((tool) => ({
+                              type: 'function' as const,
+                              function: {
+                                  name: tool.name,
+                                  description: tool.description,
+                                  parameters: tool.input_schema,
+                              },
+                          }))
+                        : undefined
+
                 if (streamOutput) {
+                    // 流式模式暂不支持 Tool Use（OpenAI 限制）
                     const stream = await client.chat.completions.create(
                         {
                             model: provider.model,
                             messages,
-                            temperature: 0.35,
                             stream: true,
                         },
                         { signal: callOptions?.signal },
@@ -147,16 +173,66 @@ export async function withDefaultDeps(
                         {
                             model: provider.model,
                             messages,
-                            temperature: 0.35,
+                            tools,
+                            tool_choice: tools ? 'auto' : undefined,
                         },
                         { signal: callOptions?.signal },
                     )
-                    const content = data.choices?.[0]?.message?.content
+
+                    const message = data.choices?.[0]?.message
+
+                    // 检查是否有工具调用
+                    if (message?.tool_calls && message.tool_calls.length > 0) {
+                        const content: Array<
+                            | { type: 'text'; text: string }
+                            | { type: 'tool_use'; id: string; name: string; input: unknown }
+                        > = []
+
+                        // 添加文本内容（如果有）
+                        if (message.content) {
+                            content.push({ type: 'text', text: message.content })
+                        }
+
+                        // 添加工具调用
+                        for (const toolCall of message.tool_calls) {
+                            if (toolCall.type === 'function') {
+                                const parsedArgs = parseToolArguments(toolCall.function.arguments)
+                                if (parsedArgs.ok) {
+                                    content.push({
+                                        type: 'tool_use',
+                                        id: toolCall.id,
+                                        name: toolCall.function.name,
+                                        input: parsedArgs.data,
+                                    })
+                                } else {
+                                    content.push({
+                                        type: 'text',
+                                        text: `[tool_use parse error] ${parsedArgs.error}; raw: ${parsedArgs.raw}`,
+                                    })
+                                }
+                            }
+                        }
+
+                        const hasToolUse = content.some((c) => c.type === 'tool_use')
+                        return {
+                            content,
+                            stop_reason: hasToolUse ? 'tool_use' : 'end_turn',
+                            usage: {
+                                prompt: data.usage?.prompt_tokens ?? undefined,
+                                completion: data.usage?.completion_tokens ?? undefined,
+                                total: data.usage?.total_tokens ?? undefined,
+                            },
+                        }
+                    }
+
+                    // 普通文本响应
+                    const content = message?.content
                     if (typeof content !== 'string') {
                         throw new Error('OpenAI-compatible API returned empty content')
                     }
                     return {
-                        content,
+                        content: [{ type: 'text', text: content }],
+                        stop_reason: 'end_turn',
                         usage: {
                             prompt: data.usage?.prompt_tokens ?? undefined,
                             completion: data.usage?.completion_tokens ?? undefined,
@@ -168,7 +244,6 @@ export async function withDefaultDeps(
         loadPrompt,
         historySinks: deps.historySinks ?? [defaultHistorySink],
         tokenCounter: deps.tokenCounter ?? createTokenCounter(options.tokenizerModel),
-        maxSteps: options.maxSteps ?? config.max_steps ?? 100,
         historyFilePath: historyFilePath,
     }
 }

@@ -1,16 +1,15 @@
 # @memo/core 概览
 
-Core 提供 **Memo Code CLI** 的核心能力：ReAct 循环、会话状态管理、默认依赖装配（LLM/工具/提示词/历史记录）、配置加载，以及公共类型/工具。设计目标是“厚 Core、薄 UI”：UI 只做交互与回调，其他行为均由 Core 负责。
+Core 提供 **Memo Code CLI** 的核心能力：ReAct 循环、会话状态管理、默认依赖装配（LLM/工具/提示词/历史记录）、配置加载，以及公共类型/工具。设计目标是"厚 Core、薄 UI"：UI 只做交互与回调，其他行为均由 Core 负责。
 
 ## 目录结构
 
 - `config/`
-    - `config.ts`：读取 `~/.memo/config.toml`（providers、max_steps、sessions 路径），提供 provider 选择、会话路径构建、配置写入。
-    - `constants.ts`：兜底常量（如 MAX_STEPS 默认值）。
+    - `config.ts`：读取 `~/.memo/config.toml`（providers、sessions 路径），提供 provider 选择、会话路径构建、配置写入。
 - `runtime/`
     - `prompt.ts/xml`：系统提示词加载。
     - `history.ts`：JSONL 历史 sink 与事件构造。
-    - `defaults.ts`：默认依赖补全（工具集、LLM、prompt、history sink、tokenizer、maxSteps）。
+    - `defaults.ts`：默认依赖补全（工具集、LLM、prompt、history sink、tokenizer）。
     - `session.ts`：Session/Turn 运行时，执行 ReAct 循环、事件写入、token 统计。
 - `types.ts`：公共类型定义（AgentDeps、Session/Turn、TokenUsage、HistoryEvent 等）。
 - `utils/`：
@@ -20,7 +19,7 @@ Core 提供 **Memo Code CLI** 的核心能力：ReAct 循环、会话状态管�
 
 ## 关键流程
 
-- `createAgentSession(deps, options)`：创建 Session，补全默认依赖，加载 prompt，返回可 `runTurn` 的对象。`max_steps` 取自配置或 options。
+- `createAgentSession(deps, options)`：创建 Session，补全默认依赖，加载 prompt，返回可 `runTurn` 的对象。
 - `withDefaultDeps`：根据配置与可选覆盖，注入默认工具集、LLM 客户端、prompt、history sink（写入 `~/.memo/sessions/YY/MM/DD/<uuid>.jsonl`）、tokenizer。
 - 会话记录：JSONL 事件（session_start/turn_start/assistant/action/observation/final/turn_end/session_end），包含 provider、模型、tokenizer、token 用量等元数据。
 - 配置：`~/.memo/config.toml`（可用 `MEMO_HOME` 自定义位置），缺省时会触发 UI 引导创建。

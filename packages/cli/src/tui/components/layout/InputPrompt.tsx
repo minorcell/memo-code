@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
-import { Box, Text, useInput, useStdout } from 'ink'
+import { Box, Text, useInput } from 'ink'
 import os from 'node:os'
 import { getSessionLogDir, type ProviderConfig, type MCPServerConfig } from '@memo/core'
 import { getFileSuggestions, type InputHistoryEntry } from '../../suggestions'
@@ -9,21 +9,6 @@ import { SuggestionList, type SuggestionListItem } from '../input/SuggestionList
 import { SLASH_COMMANDS, type SlashCommand } from '../../slash'
 
 const DOUBLE_ESC_WINDOW_MS = 400
-
-// 终端风格 spinner 字符
-const SPINNER_CHARS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-
-function useSpinner(active: boolean, interval = 80) {
-    const [frame, setFrame] = useState(0)
-    useEffect(() => {
-        if (!active) return
-        const timer = setInterval(() => {
-            setFrame((f) => (f + 1) % SPINNER_CHARS.length)
-        }, interval)
-        return () => clearInterval(timer)
-    }, [active, interval])
-    return active ? SPINNER_CHARS[frame] : ''
-}
 
 type InputPromptProps = {
     disabled: boolean
@@ -483,7 +468,6 @@ export function InputPrompt({
 
     const displayText = value
     const cursor = disabled ? ' ' : '▊'
-    const spinnerEmoji = useSpinner(disabled)
 
     // Split text into lines for multi-line display
     const lines = displayText.split('\n')
@@ -518,13 +502,6 @@ export function InputPrompt({
                         {index === lines.length - 2 && <Text color="cyan">{cursor}</Text>}
                     </Box>
                 ))}
-
-                {/* Running indicator */}
-                {disabled && (
-                    <Box>
-                        <Text color="cyan">{spinnerEmoji}</Text>
-                    </Box>
-                )}
             </Box>
 
             {suggestionMode !== 'none' ? (
