@@ -73,8 +73,8 @@ export type ParsedAssistant = {
     thinking?: string
 }
 
-/** 工具注册表，键为工具名称，值为 MCP 工具定义。 */
-export type ToolRegistry = Record<string, McpTool<any>>
+/** 工具注册表，键为工具名称，值为工具定义。 */
+export type ToolRegistry = Record<string, import('./toolRouter/types').Tool>
 
 /** LLM 调用接口：输入历史消息，返回模型回复文本或携带 usage，可选流式回调。 */
 export type CallLLMOptions = {

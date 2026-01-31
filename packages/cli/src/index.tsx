@@ -179,7 +179,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             providerName={provider.name}
             model={provider.model}
             configPath={loaded.configPath}
-            mcpServerNames={Object.keys(loaded.config.mcp_servers ?? {})}
+            mcpServers={loaded.config.mcp_servers ?? {}}
             cwd={process.cwd()}
             sessionsDir={sessionsDir}
             providers={loaded.config.providers}

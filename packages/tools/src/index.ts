@@ -9,6 +9,8 @@ import { todoTool } from '@memo/tools/tools/todo'
 import { timeTool } from '@memo/tools/tools/time'
 import { readTool } from '@memo/tools/tools/read'
 import { writeTool } from '@memo/tools/tools/write'
+import { adaptTools } from '@memo/tools/tools/adapter'
+import type { Tool } from '@memo/core/toolRouter/types'
 
 /** 对外暴露的工具集合，供 Agent 通过 tool name 查找。 */
 export const TOOLKIT: Record<ToolName, McpTool<any>> = {
@@ -26,5 +28,8 @@ export const TOOLKIT: Record<ToolName, McpTool<any>> = {
 
 /** 工具数组形式，便于直接注册到 MCP Server 等场景。 */
 export const TOOL_LIST: McpTool[] = Object.values(TOOLKIT)
+
+/** 适配为 ToolRouter 格式的工具列表 */
+export const NATIVE_TOOLS: Tool[] = adaptTools(TOOL_LIST)
 
 export type { McpTool }

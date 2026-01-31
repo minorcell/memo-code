@@ -1,4 +1,4 @@
-import type { ProviderConfig } from '@memo/core'
+import type { ProviderConfig, MCPServerConfig } from '@memo/core'
 import type { InputHistoryEntry } from '../suggestions'
 
 export type SlashCommandContext = {
@@ -25,6 +25,7 @@ export type SlashCommandContext = {
         model: string
         contextLimit: number
         providers: ProviderConfig[]
+        mcpServers: Record<string, MCPServerConfig>
     }
 }
 
