@@ -27,7 +27,7 @@ Cursor、Aider 等已通过“敏感操作需审批”降低同类风险。
 
 **高风险**（必审）：`bash`、`write`、`edit`  
 **中风险**（按模式审）：`bash` 匹配 `rm|sudo|chmod|mv|>|curl * | bash` 等；对已存在文件的 `write`；大规模 `edit`  
-**低风险**（免审）：`read`、`glob`、`grep`、`time`、`webfetch`
+**低风险**（免审）：`read`、`glob`、`grep`、`webfetch`
 
 ### 3) 会话级审批规则
 
