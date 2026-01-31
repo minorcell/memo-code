@@ -7,7 +7,7 @@ type UserMessageProps = {
 
 export const UserMessage = memo(function UserMessage({ text }: UserMessageProps) {
     return (
-        <Box borderStyle="round" paddingX={1} paddingY={0} flexDirection="column">
+        <Box borderStyle="round" paddingX={1} paddingY={0}>
             <Text color="white">{text}</Text>
         </Box>
     )
