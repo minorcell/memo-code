@@ -11,7 +11,14 @@ import type { Tool, ToolRegistry, MCPServerConfig, ToolDescription, JSONSchema }
 import { NativeToolRegistry } from './native'
 import { McpToolRegistry } from './mcp'
 
-export type { Tool, ToolRegistry, MCPServerConfig, ToolDescription, NativeTool, McpTool }
+export type {
+    Tool,
+    ToolRegistry,
+    MCPServerConfig,
+    ToolDescription,
+    NativeTool,
+    McpTool,
+} from './types'
 export { NativeToolRegistry, McpToolRegistry }
 
 /** 工具路由管理器 */
