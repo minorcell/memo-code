@@ -1,18 +1,18 @@
 {
-    "name": "memo-cli",
+    "name": "memo-code",
     "type": "module",
     "version": "0.1",
     "private": true,
     "scripts": {
         "start": "bun run packages/cli/src/index.tsx",
         "build": "bun build packages/cli/src/index.tsx --target bun --outdir dist --minify",
-        "build:binary": "bun build packages/cli/src/index.tsx --target=bun --compile --outfile=memo",
+        "build:binary": "bun build packages/cli/src/index.tsx --target=bun --compile --outfile=memo-code-cli",
         "format": "bunx prettier --write .",
         "format:check": "bunx prettier --check .",
         "test": "bun test",
-        "test:core": "bun run --filter @memo/core test",
-        "test:tools": "bun run --filter @memo/tools test",
-        "test:cli": "bun run --filter @memo/cli test",
+        "test:core": "bun run --filter @memo-code/core test",
+        "test:tools": "bun run --filter @memo-code/tools test",
+        "test:cli": "bun run --filter @memo-code/cli test",
         "test:all": "bun run test:core && bun run test:tools && bun run test:cli",
         "ci": "bun run format:check && bun run test:core && bun run test:tools && bun run build",
         "ci:fix": "bun run format && bun run test:core && bun run test:tools && bun run build"

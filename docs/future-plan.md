@@ -1,8 +1,8 @@
-# memo-cli 未来发展规划
+# Memo Code CLI 未来发展规划
 
 ## 1. 项目现状分析
 
-memo-cli 是一个基于 Bun + TypeScript 的 ReAct Agent CLI 工具，具有以下核心特性：
+Memo Code CLI 是一个基于 Bun + TypeScript 的 ReAct Agent CLI 工具，具有以下核心特性：
 
 - **多轮对话**：交互式 REPL 与单轮模式（`--once`）
 - **工具驱动**：内置 bash/read/write/edit/glob/grep/webfetch/time/save_memory/todo 等工具，严格遵循 ReAct 协议
@@ -19,15 +19,15 @@ memo-cli 是一个基于 Bun + TypeScript 的 ReAct Agent CLI 工具，具有以
 
 ## 2. 市场竞品对比
 
-| 产品                         | 类型          | 优势                              | 劣势                              | 与 memo-cli 对比                                      |
-| ---------------------------- | ------------- | --------------------------------- | --------------------------------- | ----------------------------------------------------- |
-| **LangChain CLI**            | 项目脚手架    | 生态丰富，社区活跃                | 不提供交互式代理，功能单一        | memo-cli 专注于交互式代理，工具更丰富                 |
-| **Cursor**                   | AI 代码编辑器 | 强大的代码理解与生成，集成 IDE    | 闭源、商业、专注于代码编辑        | memo-cli 开源、通用性强，可扩展至非代码场景           |
-| **ChatGPT Code Interpreter** | 沙箱代码执行  | 易用，OpenAI 生态                 | 仅限于 Python，功能受限，依赖云端 | memo-cli 本地运行，工具可自定义，支持多语言           |
-| **OpenInterpreter**          | 开源 CLI      | 允许 LLM 在本地运行代码，类似理念 | 侧重于代码执行，工具集较窄        | memo-cli 工具更全面（文件操作、搜索等），架构更模块化 |
-| **MemGPT**                   | 长期记忆代理  | 专注于记忆管理，学术性强          | 应用场景较窄                      | memo-cli 可通过 save_memory 工具扩展记忆，更通用      |
+| 产品                         | 类型          | 优势                              | 劣势                              | 与 Memo Code CLI 对比                                      |
+| ---------------------------- | ------------- | --------------------------------- | --------------------------------- | ---------------------------------------------------------- |
+| **LangChain CLI**            | 项目脚手架    | 生态丰富，社区活跃                | 不提供交互式代理，功能单一        | Memo Code CLI 专注于交互式代理，工具更丰富                 |
+| **Cursor**                   | AI 代码编辑器 | 强大的代码理解与生成，集成 IDE    | 闭源、商业、专注于代码编辑        | Memo Code CLI 开源、通用性强，可扩展至非代码场景           |
+| **ChatGPT Code Interpreter** | 沙箱代码执行  | 易用，OpenAI 生态                 | 仅限于 Python，功能受限，依赖云端 | Memo Code CLI 本地运行，工具可自定义，支持多语言           |
+| **OpenInterpreter**          | 开源 CLI      | 允许 LLM 在本地运行代码，类似理念 | 侧重于代码执行，工具集较窄        | Memo Code CLI 工具更全面（文件操作、搜索等），架构更模块化 |
+| **MemGPT**                   | 长期记忆代理  | 专注于记忆管理，学术性强          | 应用场景较窄                      | Memo Code CLI 可通过 save_memory 工具扩展记忆，更通用      |
 
-**memo-cli 核心优势**：
+**Memo Code CLI 核心优势**：
 
 1. **协议驱动**：严格的 JSON 协议，确保输出可解析
 2. **架构解耦**：Core/Tools/UI 分离，易于扩展新前端（CLI、桌面、Web）
@@ -103,7 +103,7 @@ memo-cli 是一个基于 Bun + TypeScript 的 ReAct Agent CLI 工具，具有以
     - Web/REST API：暴露 HTTP 接口，方便集成到其他系统
 
 2. **集成开发环境**：
-    - 开发 VS Code 扩展，在编辑器内直接调用 memo-cli
+    - 开发 VS Code 扩展，在编辑器内直接调用 Memo Code CLI
     - 支持 JetBrains IDE 插件
 
 3. **社区建设**：
@@ -152,7 +152,7 @@ memo-cli 是一个基于 Bun + TypeScript 的 ReAct Agent CLI 工具，具有以
 
 ## 6. 总结
 
-memo-cli 已具备良好的架构基础与核心功能，通过聚焦开发者需求、强化安全与扩展性、构建生态社区，有望成为本地 AI 代理领域的重要开源项目。建议按照上述路线图逐步推进，同时保持与用户的紧密沟通，持续迭代。
+Memo Code CLI 已具备良好的架构基础与核心功能，通过聚焦开发者需求、强化安全与扩展性、构建生态社区，有望成为本地 AI 代理领域的重要开源项目。建议按照上述路线图逐步推进，同时保持与用户的紧密沟通，持续迭代。
 
 ---
 

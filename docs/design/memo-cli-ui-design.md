@@ -1,4 +1,4 @@
-# memo-cli UI 设计
+# Memo Code CLI UI 设计
 
 ## 1. 目标与范围
 
@@ -7,7 +7,7 @@
 - 强化工具调用与 token 使用可视化，提升调试与可观测性。
 - 不修改 Core/Tools 协议与行为，UI 不侵入业务逻辑。
 
-## 2. 当前能力分析（memo-cli）
+## 2. 当前能力分析（Memo Code CLI）
 
 ### 2.1 Core 运行时与协议
 
@@ -50,7 +50,7 @@
 - 工具调用分组与状态流转（pending/executing/success/error）。
 - alternate buffer 支持，退出时还原终端状态。
 
-## 4. UI 架构方案（memo-cli）
+## 4. UI 架构方案（Memo Code CLI）
 
 ### 4.1 总体流程
 
@@ -92,7 +92,7 @@
 
 ```
 --------------------------------------------------------------+
-| memo-cli  session:<id>  provider:model  mode  stream  time  |
+| Memo Code CLI  session:<id>  provider:model  mode  stream  time  |
 --------------------------------------------------------------+
 | Turn 3                                                       |
 | User: summarize repo                                         |

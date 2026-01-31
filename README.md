@@ -1,4 +1,4 @@
-# memo-cli
+# Memo Code
 
 终端内的 ReAct Agent，基于 Bun + TypeScript。它附带 Session/Turn 状态机、标准 JSON 协议提示、结构化 JSONL 日志、内置工具编排，并默认对接 DeepSeek（OpenAI 兼容接口）。你可以按需接入任意 OpenAI 兼容 Provider 以及 MCP 工具。
 
@@ -27,7 +27,7 @@
 
 ## CLI 使用
 
-memo-cli 支持两种运行模式，根据终端环境自动选择：
+Memo Code CLI 支持两种运行模式，根据终端环境自动选择：
 
 ### 交互式 TUI 模式（默认）
 

@@ -1,6 +1,6 @@
-# memo-cli 的 Token 计数策略
+# Memo Code CLI 的 Token 计数策略
 
-本文说明 memo-cli 如何估算与记录 token，用于提示词预算、超限防护和 usage 对账。
+本文说明 Memo Code CLI 如何估算与记录 token，用于提示词预算、超限防护和 usage 对账。
 
 ## 计数实现
 

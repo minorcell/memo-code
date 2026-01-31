@@ -1,5 +1,5 @@
 {
-    "name": "@memo/tools",
+    "name": "@memo-code/tools",
     "type": "module",
     "module": "src/index.ts",
     "version": "0.1",
