@@ -3,16 +3,27 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { Box, Text, useInput, useStdout } from 'ink'
 import os from 'node:os'
-import {
-    getFileSuggestions,
-    getSessionLogDir,
-    type InputHistoryEntry,
-    type ProviderConfig,
-} from '@memo/core'
+import { getSessionLogDir, type ProviderConfig } from '@memo/core'
+import { getFileSuggestions, type InputHistoryEntry } from '../../suggestions'
 import { SuggestionList, type SuggestionListItem } from '../input/SuggestionList'
 import { SLASH_COMMANDS, type SlashCommand } from '../../slash'
 
 const DOUBLE_ESC_WINDOW_MS = 400
+
+// 终端风格 spinner 字符
+const SPINNER_CHARS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+function useSpinner(active: boolean, interval = 80) {
+    const [frame, setFrame] = useState(0)
+    useEffect(() => {
+        if (!active) return
+        const timer = setInterval(() => {
+            setFrame((f) => (f + 1) % SPINNER_CHARS.length)
+        }, interval)
+        return () => clearInterval(timer)
+    }, [active, interval])
+    return active ? SPINNER_CHARS[frame] : ''
+}
 
 type InputPromptProps = {
     disabled: boolean
@@ -22,11 +33,17 @@ type InputPromptProps = {
     onCancelRun: () => void
     onHistorySelect?: (entry: InputHistoryEntry) => void
     onModelSelect?: (provider: ProviderConfig) => void
+    onSystemMessage?: (title: string, content: string) => void
+    onSetContextLimit?: (limit: number) => void
     history: string[]
     cwd: string
     sessionsDir: string
     currentSessionFile?: string
     providers: ProviderConfig[]
+    configPath: string
+    providerName: string
+    model: string
+    contextLimit: number
 }
 
 type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model'
@@ -63,12 +80,18 @@ export function InputPrompt({
     onClear,
     onCancelRun,
     onModelSelect,
+    onSystemMessage,
+    onSetContextLimit,
     history,
     cwd,
     sessionsDir,
     currentSessionFile,
     onHistorySelect,
     providers,
+    configPath,
+    providerName,
+    model,
+    contextLimit,
 }: InputPromptProps) {
     const [value, setValue] = useState('')
     const [historyIndex, setHistoryIndex] = useState<number | null>(null)
@@ -82,23 +105,9 @@ export function InputPrompt({
     const lastEscTimeRef = useRef(0)
     // Use ref to track input value for synchronous updates during rapid input (paste)
     const valueRef = useRef('')
-    // Blinking cursor state
-    const [showCursor, setShowCursor] = useState(true)
 
     const username = useMemo(() => getUsername(), [])
     const cwdName = useMemo(() => cwd.split('/').pop() || cwd, [cwd])
-
-    // Cursor blink effect
-    useEffect(() => {
-        if (disabled) {
-            setShowCursor(false)
-            return
-        }
-        const interval = setInterval(() => {
-            setShowCursor((prev) => !prev)
-        }, 530) // Blink every 530ms
-        return () => clearInterval(interval)
-    }, [disabled])
 
     // Sync ref with state
     useEffect(() => {
@@ -292,11 +301,46 @@ export function InputPrompt({
                     exitApp: () => {
                         onExit()
                     },
+                    showSystemMessage: (title, content) => {
+                        onSystemMessage?.(title, content)
+                    },
+                    switchModel: (provider) => {
+                        void onModelSelect?.(provider)
+                    },
+                    setContextLimit: (limit) => {
+                        onSetContextLimit?.(limit)
+                    },
+                    loadHistory: (entry) => {
+                        void onHistorySelect?.(entry)
+                    },
+                    data: {
+                        configPath,
+                        providerName,
+                        model,
+                        contextLimit,
+                        providers,
+                    },
                 })
                 return
             }
         },
-        [closeSuggestions, onClear, onExit, onModelSelect, suggestionMode, trigger, value],
+        [
+            closeSuggestions,
+            onClear,
+            onExit,
+            onModelSelect,
+            onSystemMessage,
+            onSetContextLimit,
+            onHistorySelect,
+            suggestionMode,
+            trigger,
+            value,
+            configPath,
+            providerName,
+            model,
+            contextLimit,
+            providers,
+        ],
     )
 
     useInput((input, key) => {
@@ -433,9 +477,9 @@ export function InputPrompt({
         }
     })
 
-    const placeholder = disabled ? 'Running...' : ''
-    const displayText = value || placeholder
-    const cursor = showCursor && !disabled ? '▊' : ' '
+    const displayText = value
+    const cursor = disabled ? ' ' : '▊'
+    const spinnerEmoji = useSpinner(disabled)
 
     // Split text into lines for multi-line display
     const lines = displayText.split('\n')
@@ -464,12 +508,19 @@ export function InputPrompt({
                 </Box>
                 {/* Additional lines (if multi-line input) */}
                 {lines.slice(1).map((line, index) => (
-                    <Box key={`line-${index}`} paddingLeft={username.length + cwdName.length + 2}>
+                    <Box key={`line-${index}`}>
                         <Text color="white">{line}</Text>
                         {/* Show cursor on the last line */}
                         {index === lines.length - 2 && <Text color="cyan">{cursor}</Text>}
                     </Box>
                 ))}
+
+                {/* Running indicator */}
+                {disabled && (
+                    <Box>
+                        <Text color="cyan">{spinnerEmoji}</Text>
+                    </Box>
+                )}
             </Box>
 
             {suggestionMode !== 'none' ? (

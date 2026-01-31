@@ -1,3 +1,6 @@
+import type { ProviderConfig } from '@memo/core'
+import type { InputHistoryEntry } from '../suggestions'
+
 export type SlashCommandContext = {
     /** 更新输入框内容，并重置历史导航状态。 */
     setInputValue: (next: string) => void
@@ -7,6 +10,22 @@ export type SlashCommandContext = {
     clearScreen: () => void
     /** 触发退出逻辑。 */
     exitApp: () => void
+    /** 显示系统消息。 */
+    showSystemMessage: (title: string, content: string) => void
+    /** 切换模型。 */
+    switchModel: (provider: ProviderConfig) => void
+    /** 设置上下文限制。 */
+    setContextLimit: (limit: number) => void
+    /** 加载历史记录。 */
+    loadHistory: (entry: InputHistoryEntry) => void
+    /** 当前状态数据 */
+    data: {
+        configPath: string
+        providerName: string
+        model: string
+        contextLimit: number
+        providers: ProviderConfig[]
+    }
 }
 
 export type SlashCommand = {
