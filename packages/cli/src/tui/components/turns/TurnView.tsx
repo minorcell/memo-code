@@ -51,7 +51,7 @@ export const TurnView = memo(function TurnView({ turn }: TurnViewProps) {
     const shouldRenderFinal = finalText.length > 0
 
     return (
-        <Box flexDirection="column" gap={0}>
+        <Box flexDirection="column">
             {/* User input with border */}
             <UserMessage text={turn.userInput} />
 
