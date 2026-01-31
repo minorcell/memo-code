@@ -1,97 +1,81 @@
 # Memo Code
 
-终端内的 ReAct Agent，基于 Bun + TypeScript。它附带 Session/Turn 状态机、标准 JSON 协议提示、结构化 JSONL 日志、内置工具编排，并默认对接 DeepSeek（OpenAI 兼容接口）。你可以按需接入任意 OpenAI 兼容 Provider 以及 MCP 工具。
-
-**全新 TUI 界面**：提供现代化的终端用户界面，支持实时流式输出、工具调用可视化、token 使用统计和交互式命令。
+本地运行的 AI 编程助手，支持多轮对话、工具调用、并发执行。基于 Bun + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
 
 ## 快速开始
 
-1. **安装依赖**
+### 1. 安装依赖
 
-    ```bash
-    bun install
-    ```
+```bash
+bun install
+```
 
-2. **配置 API Key**
+### 2. 配置 API Key
 
-    ```bash
-    export OPENAI_API_KEY=your_key    # 或 DEEPSEEK_API_KEY
-    ```
+```bash
+export DEEPSEEK_API_KEY=your_key  # 或 OPENAI_API_KEY
+```
 
-3. **首次运行**
+### 3. 启动使用
 
-    ```bash
-    bun start
-    # 将引导填写 provider/model/base_url，并在 ~/.memo/config.toml 保存
-    ```
+```bash
+bun start
+# 首次运行会引导配置 provider/model，并保存到 ~/.memo/config.toml
+```
 
-## CLI 使用
+## 使用方式
 
-Memo Code CLI 支持两种运行模式，根据终端环境自动选择：
+### 交互式模式（默认）
 
-### 交互式 TUI 模式（默认）
-
-在支持 TTY 的终端中，自动启动现代化 TUI 界面：
+在终端中启动 TUI 界面：
 
 ```bash
 bun start
 ```
 
-**TUI 特性**：
+**支持功能**：
 
-- 实时流式输出显示
+- 多轮对话，保持上下文
+- 实时流式输出
 - 工具调用可视化
 - Token 使用统计
-- 交互式 Slash 命令
-- 输入历史和补全
+- 快捷键和命令
 
-### 单轮纯文本模式
+### 单轮模式
 
-使用 `--once` 参数或非 TTY 环境时，输出纯文本结果：
+适合脚本集成：
 
 ```bash
 bun start "你的问题" --once
 ```
 
-**纯文本模式**：
+输出纯文本结果，便于日志记录和后续处理。
 
-- 简洁的文本输出
-- 适合脚本集成
-- 便于日志记录
-- 保持向后兼容
-
-## TUI 快捷键与命令
-
-### 快捷键
+## TUI 快捷键
 
 - **Enter**：提交输入
-- **Shift+Enter**：输入换行
-- **Up/Down**：浏览输入历史
-- **Ctrl+C**：中断当前操作或退出程序
+- **Shift+Enter**：换行
+- **Up/Down**：浏览历史
+- **Ctrl+C**：中断或退出
 - **Ctrl+L**：清屏
 
-### Slash 命令
+## Slash 命令
 
-- `/help`：显示帮助信息和可用命令
-- `/exit`：退出当前会话
-- `/clear`：清除屏幕内容
-- `/tools`：列出所有可用工具（内置 + MCP）
-- `/config`：显示配置文件路径和当前 Provider 信息
-- `/memory`：显示记忆文件位置和摘要（如有）
+- `/help`：显示帮助
+- `/exit`：退出会话
+- `/clear`：清屏
+- `/tools`：列出所有工具
+- `/config`：显示配置
+- `/memory`：显示记忆位置
 
-### 输入特性
+## 配置文件
 
-- **智能补全**：输入时自动提示命令和工具名
-- **历史搜索**：支持输入历史检索
-- **多行输入**：支持 Shift+Enter 输入多行内容
+位置：`~/.memo/config.toml`（可通过 `MEMO_HOME` 环境变量修改）
 
-## 配置详解
-
-`~/.memo/config.toml` 管理 Provider、MCP 与运行选项，`MEMO_HOME` 可以重定向路径。
+### Provider 配置
 
 ```toml
 current_provider = "deepseek"
-max_steps = 100
 stream_output = false
 
 [[providers.deepseek]]
@@ -101,32 +85,132 @@ model = "deepseek-chat"
 base_url = "https://api.deepseek.com"
 ```
 
-可通过多个 `[[providers.<name>]]` 段落配置多个 Provider。
+支持配置多个 Provider，通过 `current_provider` 切换。
 
-MCP 服务器示例：
+### MCP 工具配置
+
+支持本地和远程 MCP 服务器：
 
 ```toml
+# 本地 MCP 服务器
 [mcp_servers.local_tools]
 command = "/path/to/mcp-server"
 args = []
 
-[mcp_servers.bing_cn]
+# 远程 HTTP MCP 服务器
+[mcp_servers.remote]
 type = "streamable_http"
-url = "https://mcp.api-inference.modelscope.net/xxxxxxxx/mcp"
+url = "https://your-mcp-server.com/mcp"
 # headers = { Authorization = "Bearer xxx" }
-# fallback_to_sse = true  # 默认开启
 ```
 
-API Key 优先级：`当前 provider 的 env_api_key` > `OPENAI_API_KEY` > `DEEPSEEK_API_KEY`。缺失时 CLI 会提示交互输入并写入配置。
+## 内置工具
 
-## Session、日志与 Token
+- `bash`：执行 shell 命令
+- `read`：读取文件
+- `write`：写入文件
+- `edit`：编辑文件
+- `glob`：搜索文件（模式匹配）
+- `grep`：搜索内容（正则匹配）
+- `webfetch`：获取网页
+- `time`：获取系统时间
+- `save_memory`：保存长期记忆
+- `todo`：管理任务列表
 
-- **日志路径**：`~/.memo/sessions/<sanitized-cwd>/<yyyy-mm-dd>_<HHMMss>_<id>.jsonl`。
-- **事件类型**：`session_start/turn_start/assistant/action/observation/final/turn_end/session_end`，可回放任意一步。
-- **Token 统计**：Prompt & completion 通过 `tiktoken` 估算，并在 UI 中展示本轮预算。
-- **Max Steps 防护**：默认 100，可在配置文件调整以避免无限工具循环。
+通过 MCP 协议可扩展更多工具。
 
-## 贡献与许可证
+## 会话历史
 
-- 贡献流程参见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-- 采用 MIT 许可证，详见 [LICENSE](LICENSE)。
+所有会话自动保存到 `~/.memo/sessions/`，按工作目录和日期组织：
+
+```
+~/.memo/sessions/
+  ├── workspace-name/
+  │   ├── 2026-02-01_143020_abc123.jsonl
+  │   └── 2026-02-01_150315_def456.jsonl
+  └── another-project/
+      └── 2026-02-01_160000_xyz789.jsonl
+```
+
+JSONL 格式便于分析和调试。
+
+## 性能特性
+
+### 并发工具调用
+
+模型可同时调用多个独立工具，显著提升效率：
+
+```
+场景：读取 3 个文件
+传统：read → wait → read → wait → read → wait (3次往返)
+并发：read + read + read → wait (1次往返，快5倍)
+```
+
+### Tool Use API
+
+使用原生 Tool Use API（OpenAI/DeepSeek/Claude），避免 JSON 解析问题，95%格式稳定性。
+
+不支持 Tool Use 的模型自动降级到 JSON 解析模式。
+
+## 开发
+
+### 本地运行
+
+```bash
+bun start
+# 或
+bun start "prompt" --once
+```
+
+### 构建
+
+```bash
+bun run build         # 生成 dist/index.js
+bun run build:binary  # 生成可执行文件 memo
+```
+
+### 测试
+
+```bash
+bun test              # 全量测试
+bun run test:core     # 测试 core 包
+bun run test:tools    # 测试 tools 包
+```
+
+### 代码格式化
+
+```bash
+bun run format        # 格式化所有文件
+bun run format:check  # 检查格式（CI）
+```
+
+## 项目结构
+
+```
+memo-cli/
+├── packages/
+│   ├── core/       # 核心逻辑：Session、工具路由、配置
+│   ├── tools/      # 内置工具实现
+│   └── cli/        # TUI 界面
+├── docs/           # 技术文档
+└── dist/           # 构建输出
+```
+
+## 技术栈
+
+- **Runtime**: Bun 1.1+
+- **语言**: TypeScript
+- **UI**: React + Ink
+- **Protocol**: MCP (Model Context Protocol)
+- **Token 计数**: tiktoken
+
+## 相关文档
+
+- [Core 架构](./docs/core.md) - 核心实现详解
+- [重构报告](./docs/refactor-complete.md) - Tool Use API 迁移说明
+- [开发指南](./CONTRIBUTING.md) - 贡献指南
+- [项目约定](./AGENTS.md) - 代码规范和开发流程
+
+## License
+
+MIT
