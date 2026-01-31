@@ -128,7 +128,6 @@ export async function withDefaultDeps(
                         {
                             model: provider.model,
                             messages,
-                            temperature: 0.35,
                             stream: true,
                         },
                         { signal: callOptions?.signal },
@@ -147,7 +146,6 @@ export async function withDefaultDeps(
                         {
                             model: provider.model,
                             messages,
-                            temperature: 0.35,
                         },
                         { signal: callOptions?.signal },
                     )
