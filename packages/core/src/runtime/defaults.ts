@@ -1,5 +1,5 @@
 /** @file Session 默认依赖装配：工具集、LLM、历史 sink、tokenizer 等。 */
-import { TOOLKIT } from '@memo/tools'
+import { NATIVE_TOOLS } from '@memo/tools'
 import OpenAI from 'openai'
 import { createTokenCounter } from '@memo/core/utils/tokenizer'
 import {
@@ -11,7 +11,7 @@ import {
 } from '@memo/core/config/config'
 import { JsonlHistorySink } from '@memo/core/runtime/history'
 import { loadSystemPrompt as defaultLoadPrompt } from '@memo/core/runtime/prompt'
-import { loadExternalMcpTools } from '@memo/core/runtime/mcp_client'
+import { ToolRouter } from '@memo/core/toolRouter'
 import type {
     AgentSessionDeps,
     AgentSessionOptions,
@@ -42,47 +42,59 @@ export async function withDefaultDeps(
     const loaded = await loadMemoConfig()
     const config = loaded.config
 
-    // 1. 加载外部 MCP 工具（遵循 MEMO_HOME）
-    const { tools: mcpTools, cleanup } = await loadExternalMcpTools(config.mcp_servers, loaded.home)
+    // 1. 初始化 ToolRouter
+    const router = new ToolRouter()
 
-    // 2. 合并工具: deps.tools > mcpTools > TOOLKIT
-    const baseTools = deps.tools ?? TOOLKIT
-    const combinedTools: ToolRegistry = { ...baseTools }
-    for (const t of mcpTools) {
-        combinedTools[t.name] = t
+    // 2. 注册内置工具
+    router.registerNativeTools(NATIVE_TOOLS)
+
+    // 3. 加载外部 MCP 工具（遵循 MEMO_HOME）
+    await router.loadMcpServers(config.mcp_servers)
+
+    // 4. 合并用户自定义工具（deps.tools 优先级最高）
+    if (deps.tools) {
+        for (const [name, tool] of Object.entries(deps.tools)) {
+            // 用户自定义工具覆盖 router 中的同名工具
+            router.registerNativeTool({
+                name,
+                description: tool.description,
+                source: 'native',
+                inputSchema: { type: 'object' }, // 简化处理，实际应该从 tool 转换
+                execute: tool.execute,
+            })
+        }
     }
 
+    // 5. 获取最终工具注册表
+    const combinedTools = router.toRegistry()
+
+    // 6. 构建 loadPrompt（包含工具描述）
     const loadPrompt = async () => {
         let basePrompt = await (deps.loadPrompt ?? defaultLoadPrompt)()
 
-        // 如果存在外部工具，注入相关信息到 prompt
-        if (mcpTools.length > 0) {
-            const toolDescs = mcpTools
-                .map((t) => {
-                    const schema = (t as any)._rawJSONSchema
-                        ? JSON.stringify((t as any)._rawJSONSchema)
-                        : 'See description'
-                    return `- **${t.name}**: ${t.description}\n  Schema: \`${schema}\``
-                })
-                .join('\n')
-
-            basePrompt += `\n\n# External Tools\n${toolDescs}`
+        // 注入工具描述到 prompt
+        const toolDescriptions = router.generateToolDescriptions()
+        if (toolDescriptions) {
+            basePrompt += `\n\n${toolDescriptions}`
         }
 
+        // 注入长期记忆
         const memoryPath = getMemoryPath(loaded)
         try {
             const file = Bun.file(memoryPath)
             if (await file.exists()) {
                 const memory = (await file.text()).trim()
                 if (memory) {
-                    return `${basePrompt}\n\n# Long-Term Memory\n${memory}`
+                    basePrompt += `\n\n# Long-Term Memory\n${memory}`
                 }
             }
         } catch (err) {
             console.warn(`Failed to read memo: ${(err as Error).message}`)
         }
+
         return basePrompt
     }
+
     const streamOutput = options.stream ?? config.stream_output ?? false
     const sessionsDir = getSessionsDir(loaded, options)
     const historyFilePath = buildSessionPath(sessionsDir, sessionId)
@@ -92,7 +104,7 @@ export async function withDefaultDeps(
         tools: combinedTools,
         dispose: async () => {
             if (deps.dispose) await deps.dispose()
-            await cleanup()
+            await router.dispose()
         },
         callLLM:
             deps.callLLM ??

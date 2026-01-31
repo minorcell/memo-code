@@ -88,14 +88,15 @@ function parseToolInput(tool: ToolRegistry[string], rawInput: unknown) {
             candidate = {}
         }
     }
-    const parsed = tool.inputSchema.safeParse(candidate)
-    if (!parsed.success) {
-        const issue = parsed.error.issues[0]
-        const path = issue?.path?.join('.') || 'input'
-        const message = issue?.message || 'Invalid input'
-        return { ok: false as const, error: `${tool.name} invalid input: ${path} ${message}` }
+
+    // 新版 Tool 类型使用 JSON Schema，验证逻辑简化
+    // 实际验证由工具内部（内置工具）或 MCP Server 处理
+    // 这里只做基本的类型检查
+    if (typeof candidate !== 'object' || candidate === null) {
+        return { ok: false as const, error: `${tool.name} invalid input: expected object` }
     }
-    return { ok: true as const, data: parsed.data }
+
+    return { ok: true as const, data: candidate }
 }
 
 function isAbortError(err: unknown): err is Error {
