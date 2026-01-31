@@ -355,6 +355,8 @@ class AgentSessionImpl implements AgentSession {
                           tool: parsed.action.tool,
                           input: parsed.action.input,
                       })
+                    : parsed.final
+                    ? JSON.stringify({ final: parsed.final })
                     : assistantText
                 this.history.push({ role: 'assistant', content: historyContent })
 
@@ -385,29 +387,6 @@ class AgentSessionImpl implements AgentSession {
                     role: 'assistant',
                     meta: { tokens: stepUsage },
                 })
-
-                // 检查是否是最终回复（end_turn 或有 final 字段）
-                if (stopReason === 'end_turn' || parsed.final) {
-                    finalText = parsed.final || assistantText
-                    await this.emitEvent('final', {
-                        turn,
-                        step,
-                        content: finalText,
-                        role: 'assistant',
-                        meta: { tokens: stepUsage },
-                    })
-                    await runHook(this.hooks, 'onFinal', {
-                        sessionId: this.id,
-                        turn,
-                        step,
-                        finalText,
-                        status,
-                        tokenUsage: stepUsage,
-                        turnUsage: { ...turnUsage },
-                        steps,
-                    })
-                    break
-                }
 
                 // 处理工具调用（支持并发执行多个工具）
                 if (toolUseBlocks.length > 1) {
@@ -583,7 +562,32 @@ class AgentSessionImpl implements AgentSession {
                     continue
                 }
 
-                // 无 action/final，跳出并兜底
+                // 检查是否是最终回复（end_turn 或有 final 字段）
+                if (stopReason === 'end_turn' || parsed.final) {
+                    finalText = parsed.final || assistantText
+                    if (parsed.final) {
+                        parsed.final = finalText
+                    }
+                    await this.emitEvent('final', {
+                        turn,
+                        step,
+                        content: finalText,
+                        role: 'assistant',
+                        meta: { tokens: stepUsage },
+                    })
+                    await runHook(this.hooks, 'onFinal', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        finalText,
+                        status,
+                        tokenUsage: stepUsage,
+                        turnUsage: { ...turnUsage },
+                        steps,
+                    })
+                    break
+                }
+
                 break
             }
 

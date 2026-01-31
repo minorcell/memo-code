@@ -90,6 +90,12 @@ assistant: [Makes ONE message with TWO Glob tool calls in parallel]
 - Use Task tool for open-ended searches requiring multiple rounds
 - Use Bash only for actual shell commands and operations
 
+## Tool JSON Formatting (CRITICAL)
+
+- Wrap every tool call payload in a ```json fenced block.
+- Payload must be valid JSON; no stray newlines or unescaped quotes inside strings.
+- For shell commands use a single-line string; if you need newlines, encode them as `\\n`, not raw line breaks.
+
 ---
 
 # Task Management (Todo Tool)

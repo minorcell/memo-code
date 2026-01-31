@@ -79,4 +79,35 @@ describe('session hooks & middleware', () => {
             await session.close()
         }
     })
+
+    test('executes action even when message looks like final text', async () => {
+        const outputs = [
+            '<think>demo</think>\n\n{"tool":"echo","input":{"text":"hi"}}',
+            '{"final":"done"}',
+        ]
+        const hookLog: string[] = []
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => ({
+                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
+                }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                hooks: {
+                    onAction: ({ action }) => hookLog.push(`action:${action.tool}`),
+                    onFinal: ({ finalText }) => hookLog.push(`final:${finalText}`),
+                },
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('hi')
+            assert.strictEqual(result.finalText, 'done')
+            assert.deepStrictEqual(hookLog, ['action:echo', 'final:done'])
+        } finally {
+            await session.close()
+        }
+    })
+
 })

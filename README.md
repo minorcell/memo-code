@@ -113,7 +113,6 @@ url = "https://your-mcp-server.com/mcp"
 - `glob`：搜索文件（模式匹配）
 - `grep`：搜索内容（正则匹配）
 - `webfetch`：获取网页
-- `time`：获取系统时间
 - `save_memory`：保存长期记忆
 - `todo`：管理任务列表
 
