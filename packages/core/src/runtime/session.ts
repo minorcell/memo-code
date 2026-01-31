@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto'
 import { createHistoryEvent } from '@memo/core/runtime/history'
 import { withDefaultDeps } from '@memo/core/runtime/defaults'
-import { parseAssistant } from '@memo/core/utils/utils'
+import { buildThinking, parseAssistant } from '@memo/core/utils/utils'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 import type {
     ChatMessage,
@@ -331,12 +331,13 @@ class AgentSessionImpl implements AgentSession {
                     // 如果有多个工具，只取第一个（保持向后兼容）
                     const firstTool = toolUseBlocks[0]
                     if (firstTool) {
+                        const thinking = assistantText ? buildThinking([assistantText]) : undefined
                         parsed = {
                             action: {
                                 tool: firstTool.name,
                                 input: firstTool.input,
                             },
-                            thinking: assistantText || undefined,
+                            thinking,
                         }
                     } else {
                         parsed = {}
