@@ -10,6 +10,7 @@
         "openai": "^6.10.0",
         "react-devtools-core": "^7.0.1",
         "toml": "^3.0.0",
+        "zod-to-json-schema": "^3.25.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -20,10 +21,10 @@
       },
     },
     "packages/cli": {
-      "name": "@memo/cli",
+      "name": "@memo-code/cli",
       "dependencies": {
-        "@memo/core": "workspace:*",
-        "@memo/tools": "workspace:*",
+        "@memo-code/core": "workspace:*",
+        "@memo-code/tools": "workspace:*",
         "ignore": "^7.0.5",
         "ink": "^5.0.0",
         "marked": "^17.0.1",
@@ -36,13 +37,13 @@
       },
     },
     "packages/core": {
-      "name": "@memo/core",
+      "name": "@memo-code/core",
       "dependencies": {
         "zod": "^4.1.13",
       },
     },
     "packages/tools": {
-      "name": "@memo/tools",
+      "name": "@memo-code/tools",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.24.3",
         "zod": "^4.1.13",
@@ -54,11 +55,11 @@
 
     "@dqbd/tiktoken": ["@dqbd/tiktoken@1.0.22", "https://registry.npmmirror.com/@dqbd/tiktoken/-/tiktoken-1.0.22.tgz", {}, "sha512-RYhO8xeHkMNX5Ixqf4M1Ve3siCYJY/dI0yLnlX4M4oIEDOvjMIQ+E+3OUpAaZcWTaMtQJzGcDAghYfllpx3i/w=="],
 
-    "@memo/cli": ["@memo/cli@workspace:packages/cli"],
+    "@memo-code/cli": ["@memo-code/cli@workspace:packages/cli"],
 
-    "@memo/core": ["@memo/core@workspace:packages/core"],
+    "@memo-code/core": ["@memo-code/core@workspace:packages/core"],
 
-    "@memo/tools": ["@memo/tools@workspace:packages/tools"],
+    "@memo-code/tools": ["@memo-code/tools@workspace:packages/tools"],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.24.3", "https://registry.npmmirror.com/@modelcontextprotocol/sdk/-/sdk-1.24.3.tgz", { "dependencies": { "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "jose": "^6.1.1", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.0" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-YgSHW29fuzKKAHTGe9zjNoo+yF8KaQPzDC2W9Pv41E7/57IfY+AMGJ/aDFlgTLcVVELoggKE4syABCE75u3NCw=="],
 
@@ -338,7 +339,9 @@
 
     "zod": ["zod@4.1.13", "https://registry.npmmirror.com/zod/-/zod-4.1.13.tgz", {}, "sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig=="],
 
-    "zod-to-json-schema": ["zod-to-json-schema@3.25.0", "https://registry.npmmirror.com/zod-to-json-schema/-/zod-to-json-schema-3.25.0.tgz", { "peerDependencies": { "zod": "^3.25 || ^4" } }, "sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ=="],
+    "zod-to-json-schema": ["zod-to-json-schema@3.25.1", "https://registry.npmmirror.com/zod-to-json-schema/-/zod-to-json-schema-3.25.1.tgz", { "peerDependencies": { "zod": "^3.25 || ^4" } }, "sha512-pM/SU9d3YAggzi6MtR4h7ruuQlqKtad8e9S0fmxcMi+ueAK5Korys/aWcV9LIIHTVbj01NdzxcnXSN+O74ZIVA=="],
+
+    "@modelcontextprotocol/sdk/zod-to-json-schema": ["zod-to-json-schema@3.25.0", "https://registry.npmmirror.com/zod-to-json-schema/-/zod-to-json-schema-3.25.0.tgz", { "peerDependencies": { "zod": "^3.25 || ^4" } }, "sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ=="],
 
     "cli-truncate/slice-ansi": ["slice-ansi@5.0.0", "https://registry.npmmirror.com/slice-ansi/-/slice-ansi-5.0.0.tgz", { "dependencies": { "ansi-styles": "^6.0.0", "is-fullwidth-code-point": "^4.0.0" } }, "sha512-FC+lgizVPfie0kkhqUScwRu1O/lF6NOgJmlCgK+/LYxDCTk8sGelYaHDhFcDN+Sn3Cv+3VSa4Byeo+IMCzpMgQ=="],
 
