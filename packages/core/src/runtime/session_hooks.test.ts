@@ -109,5 +109,4 @@ describe('session hooks & middleware', () => {
             await session.close()
         }
     })
-
 })
