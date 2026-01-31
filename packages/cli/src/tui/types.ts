@@ -9,6 +9,10 @@ export type StepView = {
     action?: { tool: string; input: unknown }
     observation?: string
     toolStatus?: ToolStatus
+    /** 并发调用标记：是否有多个工具同时执行 */
+    isParallel?: boolean
+    /** 并发调用的工具列表 */
+    parallelTools?: string[]
 }
 
 export type TurnView = {
