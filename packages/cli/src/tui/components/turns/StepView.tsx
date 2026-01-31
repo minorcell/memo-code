@@ -11,7 +11,7 @@ type StepViewProps = {
 // Extract the most important parameter to display
 function getMainParam(toolInput: unknown): string | undefined {
     if (!toolInput) return undefined
-    
+
     // Handle string input (e.g., raw command)
     if (typeof toolInput === 'string') {
         if (toolInput.length > 50) {
@@ -19,10 +19,10 @@ function getMainParam(toolInput: unknown): string | undefined {
         }
         return toolInput
     }
-    
+
     // Must be an object to proceed
     if (typeof toolInput !== 'object' || Array.isArray(toolInput)) return undefined
-    
+
     const input = toolInput as Record<string, any>
 
     // Priority order for common parameter names

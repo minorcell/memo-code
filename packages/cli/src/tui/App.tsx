@@ -338,6 +338,38 @@ export function App({
                 )
                 return
             }
+            if (result.kind === 'init_agents_md') {
+                appendSystemMessage(
+                    'Init',
+                    'Analyzing project structure and generating AGENTS.md...',
+                )
+                // Trigger the agent to generate AGENTS.md
+                const initPrompt = `Please analyze the current project and create an AGENTS.md file at the project root.
+
+The AGENTS.md should include:
+1. Project name and brief description
+2. Directory structure overview
+3. Key technologies and stack
+4. Coding conventions and style guidelines
+5. Build/test/development commands
+6. Any project-specific notes for AI assistants
+
+Steps:
+1. First explore the project structure using glob and bash tools
+2. Read key configuration files (package.json, tsconfig.json, etc.)
+3. Understand the tech stack and conventions
+4. Create the AGENTS.md file using the write tool
+
+Make the AGENTS.md concise but informative, following best practices for AI agent guidelines.`
+                setInputHistory((prev) => [...prev, '/init'])
+                setBusy(true)
+                try {
+                    await session.runTurn(initPrompt)
+                } catch (err) {
+                    setBusy(false)
+                }
+                return
+            }
             appendSystemMessage(result.title, result.content)
         },
         [
