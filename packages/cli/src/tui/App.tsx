@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile } from 'node:fs/promises'
+import { basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Box, useApp, Text } from 'ink'
 import {
@@ -213,12 +214,13 @@ export function App({
         if (sessionRef.current) {
             await sessionRef.current.close()
         }
-        setExitMessage('Bye!')
+        const savedPath = sessionLogPath ? `\nSession saved: ${basename(sessionLogPath)}` : ''
+        setExitMessage(`Bye!${savedPath}`)
         // Give time for the message to render
         setTimeout(() => {
             exit()
-        }, 300)
-    }, [exit])
+        }, 600)
+    }, [exit, sessionLogPath])
 
     const handleClear = useCallback(() => {
         setTurns([])
@@ -320,7 +322,7 @@ export function App({
                 await handleExit()
                 return
             }
-            if (result.kind === 'clear') {
+            if (result.kind === 'new') {
                 handleClear()
                 return
             }
@@ -387,9 +389,14 @@ export function App({
 
     // Show exit message
     if (exitMessage) {
+        const lines = exitMessage.split('\n')
         return (
-            <Box>
-                <Text color="green">{exitMessage}</Text>
+            <Box flexDirection="column">
+                {lines.map((line, index) => (
+                    <Text key={index} color="green">
+                        {line}
+                    </Text>
+                ))}
             </Box>
         )
     }
@@ -414,11 +421,23 @@ export function App({
                 onCancelRun={handleCancelRun}
                 onHistorySelect={handleHistorySelect}
                 onModelSelect={handleModelSelect}
+                onSystemMessage={appendSystemMessage}
+                onSetContextLimit={(limit) => {
+                    setContextLimit(limit)
+                    appendSystemMessage(
+                        'Context length',
+                        `已设置上下文上限为 ${(limit / 1000).toFixed(0)}k tokens`,
+                    )
+                }}
                 history={inputHistory}
                 cwd={cwd}
                 sessionsDir={sessionsDir}
                 currentSessionFile={sessionLogPath ?? undefined}
                 providers={providers}
+                configPath={configPath}
+                providerName={currentProvider}
+                model={currentModel}
+                contextLimit={contextLimit}
             />
             <TokenBar contextPercent={contextPercent} />
         </Box>
@@ -478,6 +497,30 @@ function parseHistoryLog(raw: string): {
                     currentTurn.steps = [...currentTurn.steps, step]
                     currentTurn.finalText = assistantText
                 }
+            }
+            continue
+        }
+        if (event.type === 'action' && currentTurn) {
+            const meta = event.meta
+            if (meta && typeof meta === 'object') {
+                const tool = typeof meta.tool === 'string' ? meta.tool : ''
+                const input = meta.input
+                const thinking = typeof meta.thinking === 'string' ? meta.thinking : ''
+                const lastStep = currentTurn.steps[currentTurn.steps.length - 1]
+                if (lastStep) {
+                    lastStep.action = { tool, input }
+                    if (thinking) {
+                        lastStep.thinking = thinking
+                    }
+                }
+            }
+            continue
+        }
+        if (event.type === 'observation' && currentTurn) {
+            const content = typeof event.content === 'string' ? event.content : ''
+            const lastStep = currentTurn.steps[currentTurn.steps.length - 1]
+            if (lastStep) {
+                lastStep.observation = content
             }
             continue
         }

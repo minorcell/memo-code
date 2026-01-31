@@ -11,7 +11,7 @@ export type SlashResolveContext = {
 
 export type SlashCommandResult =
     | { kind: 'exit' }
-    | { kind: 'clear' }
+    | { kind: 'new' }
     | { kind: 'message'; title: string; content: string }
     | { kind: 'switch_model'; provider: ProviderConfig }
     | { kind: 'set_context_limit'; limit: number }
@@ -19,7 +19,7 @@ export type SlashCommandResult =
 const HELP_TEXT = `Available commands:
   /help       Show help and shortcuts
   /exit       Exit the session
-  /clear      Clear the screen
+  /new        Start a new session
   /models     Pick a model from config
   /history    Show session history
   /context    Show or set context length (e.g. /context 120k)
@@ -28,7 +28,7 @@ Shortcuts:
   Enter       Send message
   Shift+Enter New line in input
   Up/Down     Browse input history
-  Ctrl+L      Clear screen
+  Ctrl+L      Start a new session
   Ctrl+C      Exit
   Ctrl+X      Toggle mode
   Ctrl+/      Show help`
@@ -49,8 +49,8 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
     switch (command) {
         case 'exit':
             return { kind: 'exit' }
-        case 'clear':
-            return { kind: 'clear' }
+        case 'new':
+            return { kind: 'new' }
         case 'help':
             return {
                 kind: 'message',
