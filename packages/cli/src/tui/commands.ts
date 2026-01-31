@@ -1,10 +1,10 @@
-import type { ProviderConfig } from '@memo/core/config/config'
+import type { ProviderConfig, MCPServerConfig } from '@memo/core/config/config'
 
 export type SlashResolveContext = {
     configPath: string
     providerName: string
     model: string
-    mcpServerNames: string[]
+    mcpServers: Record<string, MCPServerConfig>
     providers: ProviderConfig[]
     contextLimit: number
 }
@@ -24,6 +24,7 @@ const HELP_TEXT = `Available commands:
   /models     Pick a model from config
   /history    Show session history
   /context    Show or set context length (e.g. /context 120k)
+  /mcp        Show configured MCP servers
   /init       Generate AGENTS.md for current project
 
 Shortcuts:

@@ -1,16 +1,16 @@
 /** @file Session Hook & Middleware 行为测试。 */
 import assert from 'node:assert'
 import { describe, test } from 'bun:test'
-import { z } from 'zod'
 import { createAgentSession, createTokenCounter } from '@memo/core'
-import type { McpTool } from '@memo/tools/tools/types'
+import type { Tool } from '@memo/core/toolRouter'
 
-const echoTool: McpTool<{ text: string }> = {
+const echoTool: Tool = {
     name: 'echo',
     description: 'echo input',
-    inputSchema: z.object({ text: z.string() }),
-    execute: async ({ text }) => ({
-        content: [{ type: 'text', text: `echo:${text}` }],
+    source: 'native',
+    inputSchema: { type: 'object', properties: { text: { type: 'string' } } },
+    execute: async ({ text }: { text: string }) => ({
+        content: [{ type: 'text' as const, text: `echo:${text}` }],
     }),
 }
 

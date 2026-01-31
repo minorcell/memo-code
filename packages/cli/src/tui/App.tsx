@@ -11,9 +11,10 @@ import {
     type AgentSessionDeps,
     type AgentSessionOptions,
     type ChatMessage,
-    type InputHistoryEntry,
     type ProviderConfig,
+    type MCPServerConfig,
 } from '@memo/core'
+import type { InputHistoryEntry } from './suggestions'
 import type { StepView, SystemMessage, TurnView } from './types'
 import { TokenBar } from './components/layout/TokenBar'
 import { MainContent } from './components/layout/MainContent'
@@ -26,7 +27,7 @@ export type AppProps = {
     providerName: string
     model: string
     configPath: string
-    mcpServerNames: string[]
+    mcpServers: Record<string, MCPServerConfig>
     cwd: string
     sessionsDir: string
     providers: ProviderConfig[]
@@ -41,7 +42,7 @@ export function App({
     providerName,
     model,
     configPath,
-    mcpServerNames,
+    mcpServers,
     cwd,
     sessionsDir,
     providers,
@@ -314,7 +315,7 @@ export function App({
                 configPath,
                 providerName: currentProvider,
                 model: currentModel,
-                mcpServerNames,
+                mcpServers,
                 providers,
                 contextLimit,
             })
@@ -362,6 +363,10 @@ Steps:
 
 Make the AGENTS.md concise but informative, following best practices for AI agent guidelines.`
                 setInputHistory((prev) => [...prev, '/init'])
+                if (!session) {
+                    appendSystemMessage('Error', 'Session not initialized')
+                    return
+                }
                 setBusy(true)
                 try {
                     await session.runTurn(initPrompt)
@@ -378,7 +383,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
             handleClear,
             handleExit,
             handleModelSelect,
-            mcpServerNames,
+            mcpServers,
             currentModel,
             currentProvider,
             contextLimit,
@@ -442,7 +447,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                     providerName: currentProvider,
                     model: currentModel,
                     cwd,
-                    sessionId: sessionOptionsState.sessionId,
+                    sessionId: sessionOptionsState.sessionId ?? 'unknown',
                 }}
             />
             <InputPrompt
@@ -470,6 +475,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 providerName={currentProvider}
                 model={currentModel}
                 contextLimit={contextLimit}
+                mcpServers={mcpServers}
             />
             <TokenBar contextPercent={contextPercent} />
         </Box>
