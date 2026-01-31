@@ -9,9 +9,12 @@ const echoTool: Tool = {
     description: 'echo input',
     source: 'native',
     inputSchema: { type: 'object', properties: { text: { type: 'string' } } },
-    execute: async ({ text }: { text: string }) => ({
-        content: [{ type: 'text' as const, text: `echo:${text}` }],
-    }),
+    execute: async (input: unknown) => {
+        const { text } = input as { text: string }
+        return {
+            content: [{ type: 'text' as const, text: `echo:${text}` }],
+        }
+    },
 }
 
 describe('session hooks & middleware', () => {
@@ -57,7 +60,7 @@ describe('session hooks & middleware', () => {
                     },
                 ],
             },
-            { maxSteps: 4 },
+            {},
         )
         try {
             const result = await session.runTurn('question')

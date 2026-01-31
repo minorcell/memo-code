@@ -20,6 +20,8 @@ import type {
     ToolRegistry,
     TurnResult,
     TurnStatus,
+    TextBlock,
+    ToolUseBlock,
 } from '@memo/core/types'
 import {
     buildHookRunners,
@@ -45,14 +47,48 @@ function accumulateUsage(target: TokenUsage, delta?: Partial<TokenUsage>) {
 }
 
 function normalizeLLMResponse(raw: LLMResponse): {
-    content: string
+    textContent: string
+    toolUseBlocks: Array<{ id: string; name: string; input: unknown }>
+    stopReason?: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
     usage?: Partial<TokenUsage>
     streamed?: boolean
 } {
+    // 处理传统字符串响应
     if (typeof raw === 'string') {
-        return { content: raw }
+        return { textContent: raw, toolUseBlocks: [] }
     }
-    return { content: raw.content, usage: raw.usage, streamed: raw.streamed }
+
+    // 处理传统对象响应（content 是字符串）
+    if ('content' in raw && typeof raw.content === 'string') {
+        return {
+            textContent: raw.content,
+            toolUseBlocks: [],
+            usage: 'usage' in raw ? raw.usage : undefined,
+            streamed: 'streamed' in raw ? raw.streamed : undefined,
+        }
+    }
+
+    // 处理 Tool Use API 响应（content 是数组）
+    if ('content' in raw && Array.isArray(raw.content)) {
+        const textBlocks = raw.content.filter((block): block is TextBlock => block.type === 'text')
+        const toolBlocks = raw.content.filter(
+            (block): block is ToolUseBlock => block.type === 'tool_use',
+        )
+
+        return {
+            textContent: textBlocks.map((b) => b.text).join('\n'),
+            toolUseBlocks: toolBlocks.map((b) => ({
+                id: b.id,
+                name: b.name,
+                input: b.input,
+            })),
+            stopReason: 'stop_reason' in raw ? raw.stop_reason : undefined,
+            usage: 'usage' in raw ? raw.usage : undefined,
+        }
+    }
+
+    // 降级处理
+    return { textContent: '', toolUseBlocks: [] }
 }
 
 async function emitEventToSinks(event: HistoryEvent, sinks: HistorySink[]) {
@@ -115,7 +151,6 @@ class AgentSessionImpl implements AgentSession {
     private sinks: HistorySink[]
     private sessionUsage: TokenUsage = emptyUsage()
     private startedAt = Date.now()
-    private maxSteps: number
     private hooks: HookRunnerMap
     private closed = false
     private currentAbortController: AbortController | null = null
@@ -129,7 +164,6 @@ class AgentSessionImpl implements AgentSession {
         private options: AgentSessionOptions,
         systemPrompt: string,
         tokenCounter: TokenCounter,
-        maxSteps: number,
         historyFilePath?: string,
     ) {
         this.id = options.sessionId || randomUUID()
@@ -137,7 +171,6 @@ class AgentSessionImpl implements AgentSession {
         this.history = [{ role: 'system', content: systemPrompt }]
         this.tokenCounter = tokenCounter
         this.sinks = deps.historySinks ?? []
-        this.maxSteps = maxSteps
         this.hooks = buildHookRunners(deps)
         this.historyFilePath = historyFilePath
     }
@@ -187,8 +220,8 @@ class AgentSessionImpl implements AgentSession {
             let status: TurnStatus = 'ok'
             let errorMessage: string | undefined
 
-            // ReAct 主循环，受 MAX_STEPS 保护。
-            for (let step = 0; step < this.maxSteps; step++) {
+            // ReAct 主循环
+            for (let step = 0; ; step++) {
                 const estimatedPrompt = this.tokenCounter.countMessages(this.history)
                 if (
                     this.options.maxPromptTokens &&
@@ -227,8 +260,10 @@ class AgentSessionImpl implements AgentSession {
                 }
 
                 let assistantText = ''
+                let toolUseBlocks: Array<{ id: string; name: string; input: unknown }> = []
                 let usageFromLLM: Partial<TokenUsage> | undefined
                 let streamed = false
+                let stopReason: string | undefined
                 try {
                     const llmResult = await this.deps.callLLM(
                         this.history,
@@ -236,7 +271,9 @@ class AgentSessionImpl implements AgentSession {
                         { signal: abortController.signal },
                     )
                     const normalized = normalizeLLMResponse(llmResult)
-                    assistantText = normalized.content
+                    assistantText = normalized.textContent
+                    toolUseBlocks = normalized.toolUseBlocks
+                    stopReason = normalized.stopReason
                     usageFromLLM = normalized.usage
                     streamed = Boolean(normalized.streamed)
                 } catch (err) {
@@ -287,7 +324,31 @@ class AgentSessionImpl implements AgentSession {
                     this.deps.onAssistantStep?.(assistantText, step)
                 }
 
-                const parsed: ParsedAssistant = parseAssistant(assistantText)
+                // 优先使用 Tool Use API 的结果，降级到 JSON 解析
+                let parsed: ParsedAssistant
+                if (toolUseBlocks.length > 0) {
+                    // Tool Use API 模式：使用结构化的工具调用
+                    // 如果有多个工具，只取第一个（保持向后兼容）
+                    const firstTool = toolUseBlocks[0]
+                    if (firstTool) {
+                        parsed = {
+                            action: {
+                                tool: firstTool.name,
+                                input: firstTool.input,
+                            },
+                            thinking: assistantText || undefined,
+                        }
+                    } else {
+                        parsed = {}
+                    }
+                } else if (assistantText) {
+                    // 降级到 JSON 解析模式（兼容不支持 Tool Use 的模型）
+                    parsed = parseAssistant(assistantText)
+                } else {
+                    // 没有内容，视为空响应
+                    parsed = {}
+                }
+
                 const historyContent = parsed.action
                     ? JSON.stringify({
                           tool: parsed.action.tool,
@@ -324,12 +385,13 @@ class AgentSessionImpl implements AgentSession {
                     meta: { tokens: stepUsage },
                 })
 
-                if (parsed.final) {
-                    finalText = parsed.final
+                // 检查是否是最终回复（end_turn 或有 final 字段）
+                if (stopReason === 'end_turn' || parsed.final) {
+                    finalText = parsed.final || assistantText
                     await this.emitEvent('final', {
                         turn,
                         step,
-                        content: parsed.final,
+                        content: finalText,
                         role: 'assistant',
                         meta: { tokens: stepUsage },
                     })
@@ -346,6 +408,118 @@ class AgentSessionImpl implements AgentSession {
                     break
                 }
 
+                // 处理工具调用（支持并发执行多个工具）
+                if (toolUseBlocks.length > 1) {
+                    // Tool Use API 模式：并发执行所有工具
+                    const toolResults = await Promise.allSettled(
+                        toolUseBlocks.map(async (toolBlock) => {
+                            const tool = this.deps.tools[toolBlock.name]
+                            if (!tool) {
+                                return {
+                                    id: toolBlock.id,
+                                    tool: toolBlock.name,
+                                    observation: `Unknown tool: ${toolBlock.name}`,
+                                }
+                            }
+
+                            try {
+                                const parsedInput = parseToolInput(tool, toolBlock.input)
+                                if (!parsedInput.ok) {
+                                    return {
+                                        id: toolBlock.id,
+                                        tool: toolBlock.name,
+                                        observation: parsedInput.error,
+                                    }
+                                }
+
+                                const result = await tool.execute(parsedInput.data)
+                                const observation =
+                                    flattenCallToolResult(result) || '(no tool output)'
+                                return {
+                                    id: toolBlock.id,
+                                    tool: toolBlock.name,
+                                    observation,
+                                }
+                            } catch (err) {
+                                return {
+                                    id: toolBlock.id,
+                                    tool: toolBlock.name,
+                                    observation: `Tool execution failed: ${(err as Error).message}`,
+                                }
+                            }
+                        }),
+                    )
+
+                    // 触发 action hooks（并发调用时，为第一个工具调用 onAction）
+                    await this.emitEvent('action', {
+                        turn,
+                        step,
+                        meta: {
+                            tools: toolUseBlocks.map((b) => b.name),
+                            parallel: true,
+                            thinking: parsed.thinking,
+                            // 保存所有工具的完整信息
+                            toolBlocks: toolUseBlocks.map((b) => ({
+                                name: b.name,
+                                input: b.input,
+                            })),
+                        },
+                    })
+                    // 为了 TUI 兼容性，触发第一个工具的 onAction hook
+                    const firstTool = toolUseBlocks[0]
+                    if (firstTool) {
+                        await runHook(this.hooks, 'onAction', {
+                            sessionId: this.id,
+                            turn,
+                            step,
+                            action: {
+                                tool: firstTool.name,
+                                input: firstTool.input,
+                            },
+                            thinking: parsed.thinking,
+                            history: snapshotHistory(this.history),
+                        })
+                    }
+
+                    // 汇总所有观察结果
+                    const observations: string[] = []
+                    for (const [idx, result] of toolResults.entries()) {
+                        if (result.status === 'fulfilled') {
+                            const { tool, observation } = result.value
+                            observations.push(`[${tool}]: ${observation}`)
+                            await this.emitEvent('observation', {
+                                turn,
+                                step,
+                                content: observation,
+                                meta: { tool, index: idx },
+                            })
+                        } else {
+                            observations.push(`[error]: ${result.reason}`)
+                        }
+                    }
+
+                    const combinedObservation = observations.join('\n\n')
+                    this.history.push({
+                        role: 'user',
+                        content: JSON.stringify({ observation: combinedObservation }),
+                    })
+                    const lastStep = steps[steps.length - 1]
+                    if (lastStep) {
+                        lastStep.observation = combinedObservation
+                    }
+                    // 触发 observation hook（使用合并后的结果）
+                    await runHook(this.hooks, 'onObservation', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        tool: toolUseBlocks.map((b) => b.name).join(', '),
+                        observation: combinedObservation,
+                        history: snapshotHistory(this.history),
+                    })
+                    continue
+                }
+
+                // 单个工具调用（向后兼容模式）
                 if (parsed.action) {
                     await this.emitEvent('action', {
                         turn,
@@ -414,7 +588,7 @@ class AgentSessionImpl implements AgentSession {
 
             if (!finalText && status !== 'cancelled') {
                 if (status === 'ok') {
-                    status = steps.length >= this.maxSteps ? 'max_steps' : 'error'
+                    status = 'error'
                 }
                 finalText = 'Unable to produce a final answer. Please retry or adjust the request.'
                 errorMessage = finalText
@@ -524,7 +698,6 @@ export async function createAgentSession(
         { ...options, sessionId, mode: options.mode ?? DEFAULT_SESSION_MODE },
         systemPrompt,
         resolved.tokenCounter,
-        resolved.maxSteps,
         resolved.historyFilePath,
     )
     await session.init()
