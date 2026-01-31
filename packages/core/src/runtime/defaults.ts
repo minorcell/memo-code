@@ -21,6 +21,16 @@ import type {
     ToolRegistry,
 } from '@memo/core/types'
 
+export function parseToolArguments(raw: string):
+    | { ok: true; data: unknown }
+    | { ok: false; raw: string; error: string } {
+    try {
+        return { ok: true, data: JSON.parse(raw) }
+    } catch (err) {
+        return { ok: false, raw, error: (err as Error).message }
+    }
+}
+
 /**
  * 根据缺省策略补全依赖项（工具、callLLM、prompt、history sinks、tokenizer）。
  * 调用方可仅提供回调/覆盖项，其余使用默认实现。
@@ -186,18 +196,27 @@ export async function withDefaultDeps(
                         // 添加工具调用
                         for (const toolCall of message.tool_calls) {
                             if (toolCall.type === 'function') {
-                                content.push({
-                                    type: 'tool_use',
-                                    id: toolCall.id,
-                                    name: toolCall.function.name,
-                                    input: JSON.parse(toolCall.function.arguments),
-                                })
+                                const parsedArgs = parseToolArguments(toolCall.function.arguments)
+                                if (parsedArgs.ok) {
+                                    content.push({
+                                        type: 'tool_use',
+                                        id: toolCall.id,
+                                        name: toolCall.function.name,
+                                        input: parsedArgs.data,
+                                    })
+                                } else {
+                                    content.push({
+                                        type: 'text',
+                                        text: `[tool_use parse error] ${parsedArgs.error}; raw: ${parsedArgs.raw}`,
+                                    })
+                                }
                             }
                         }
 
+                        const hasToolUse = content.some((c) => c.type === 'tool_use')
                         return {
                             content,
-                            stop_reason: 'tool_use',
+                            stop_reason: hasToolUse ? 'tool_use' : 'end_turn',
                             usage: {
                                 prompt: data.usage?.prompt_tokens ?? undefined,
                                 completion: data.usage?.completion_tokens ?? undefined,
