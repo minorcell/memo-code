@@ -3,8 +3,7 @@ import { buildThinking, parseAssistant } from '@memo/core/utils/utils'
 
 describe('parseAssistant thinking extraction', () => {
     test('strips <think> tags and keeps inner text', () => {
-        const message =
-            '<think>plan steps here</think>\n{"tool":"bash","input":{"command":"ls"}}'
+        const message = '<think>plan steps here</think>\n{"tool":"bash","input":{"command":"ls"}}'
         const parsed = parseAssistant(message)
 
         expect(parsed.action?.tool).toBe('bash')
