@@ -123,8 +123,8 @@ async function runPlainMode(parsed: ParsedArgs) {
                     console.log(`[input] ${JSON.stringify(action.input)}`)
                 }
             },
-            onObservation: ({ tool, observation }) => {
-                console.log(`\n[tool-result] ${tool}\n${observation}`)
+            onObservation: () => {
+                // 不显示结果，只显示工具调用参数
             },
         },
     }

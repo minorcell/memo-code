@@ -16,6 +16,7 @@ export type SlashCommandResult =
     | { kind: 'switch_model'; provider: ProviderConfig }
     | { kind: 'set_context_limit'; limit: number }
     | { kind: 'init_agents_md' }
+    | { kind: 'shell_command'; command: string }
 
 const HELP_TEXT = `Available commands:
   /help       Show help and shortcuts
@@ -23,10 +24,11 @@ const HELP_TEXT = `Available commands:
   exit        Exit the session (no slash)
   /new        Start a new session
   /models     Pick a model from config
-  /history    Show session history
+  /resume     Resume session history
   /context    Show or set context length (e.g. /context 120k)
   /mcp        Show configured MCP servers
   /init       Generate AGENTS.md for current project
+  $           Execute shell command (e.g. $ git status)
 
 Shortcuts:
   Enter       Send message
@@ -39,7 +41,8 @@ Shortcuts:
   Ctrl+/      Show help`
 
 export function resolveSlashCommand(raw: string, context: SlashResolveContext): SlashCommandResult {
-    const [command, ...rest] = raw.trim().slice(1).split(/\s+/)
+    const [commandRaw, ...rest] = raw.trim().slice(1).split(/\s+/)
+    const command = (commandRaw ?? '').toLowerCase()
     const CONTEXT_CHOICES = [80000, 120000, 150000, 200000] as const
 
     const parseContextLimit = (input: string | undefined): number | null => {
@@ -68,11 +71,11 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
                 title: 'Config',
                 content: `Config file: ${context.configPath}\nCurrent provider: ${context.providerName}\nCurrent model: ${context.model}`,
             }
-        case 'history':
+        case 'resume':
             return {
                 kind: 'message',
-                title: 'History',
-                content: 'Type "history" to filter and select from session history.',
+                title: 'Resume',
+                content: 'Type "resume" to filter and select from session history.',
             }
         case 'context': {
             const candidate = parseContextLimit(rest[0])
@@ -95,7 +98,18 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
         }
         case 'init':
             return { kind: 'init_agents_md' }
-        case 'models': {
+        case '$': {
+            const command = rest.join(' ').trim()
+            if (!command) {
+                return {
+                    kind: 'message',
+                    title: 'Shell Command',
+                    content: 'Usage: $ <command> (e.g. $ git status)',
+                }
+            }
+            return { kind: 'shell_command', command }
+        }
+        case 'models':
             if (!context.providers.length) {
                 return {
                     kind: 'message',
@@ -120,7 +134,6 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
                 title: 'Models',
                 content: `${hint}Available models:\n${lines.join('\n')}`,
             }
-        }
         default:
             return {
                 kind: 'message',
