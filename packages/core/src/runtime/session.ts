@@ -153,6 +153,7 @@ class AgentSessionImpl implements AgentSession {
     private startedAt = Date.now()
     private hooks: HookRunnerMap
     private closed = false
+    private sessionStartEmitted = false
     private currentAbortController: AbortController | null = null
     private cancelling = false
 
@@ -175,16 +176,9 @@ class AgentSessionImpl implements AgentSession {
         this.historyFilePath = historyFilePath
     }
 
-    /** 写入 Session 启动事件，记录配置与 token 限制。 */
+    /** 初始化：延迟写入 session_start，避免空会话落盘。 */
     async init() {
-        await this.emitEvent('session_start', {
-            meta: {
-                mode: this.mode,
-                tokenizer: this.tokenCounter.model,
-                warnPromptTokens: this.options.warnPromptTokens,
-                maxPromptTokens: this.options.maxPromptTokens,
-            },
-        })
+        // 留空，等第一次 runTurn 时再写 session_start 事件
     }
 
     /** 执行一次 Turn：接受用户输入，走 ReAct 循环，返回最终结果与步骤轨迹。 */
@@ -197,6 +191,18 @@ class AgentSessionImpl implements AgentSession {
         const steps: AgentStepTrace[] = []
         const turnUsage = emptyUsage()
         const turnStartedAt = Date.now()
+
+        if (!this.sessionStartEmitted) {
+            await this.emitEvent('session_start', {
+                meta: {
+                    mode: this.mode,
+                    tokenizer: this.tokenCounter.model,
+                    warnPromptTokens: this.options.warnPromptTokens,
+                    maxPromptTokens: this.options.maxPromptTokens,
+                },
+            })
+            this.sessionStartEmitted = true
+        }
 
         // 写入用户消息
         this.history.push({ role: 'user', content: input })
