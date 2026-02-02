@@ -2,10 +2,10 @@
     "name": "@memo-code/cli",
     "type": "module",
     "module": "src/index.tsx",
-    "version": "0.1",
+    "version": "0.1.0",
     "private": true,
     "scripts": {
-        "test": "bun test"
+        "test": "vitest run"
     },
     "dependencies": {
         "@memo-code/core": "workspace:*",

@@ -1,38 +1,60 @@
 {
-    "name": "memo-code",
+    "name": "@memo-code/memo",
+    "version": "0.1.0",
+    "private": false,
     "type": "module",
-    "version": "0.1",
-    "private": true,
-    "scripts": {
-        "start": "bun run packages/cli/src/index.tsx",
-        "build": "bun build packages/cli/src/index.tsx --target bun --outdir dist --minify",
-        "build:binary": "bun build packages/cli/src/index.tsx --target=bun --compile --outfile=memo-code-cli",
-        "format": "bunx prettier --write .",
-        "format:check": "bunx prettier --check .",
-        "test": "bun test",
-        "test:core": "bun run --filter @memo-code/core test",
-        "test:tools": "bun run --filter @memo-code/tools test",
-        "test:cli": "bun run --filter @memo-code/cli test",
-        "test:all": "bun run test:core && bun run test:tools && bun run test:cli",
-        "ci": "bun run format:check && bun run test:core && bun run test:tools && bun run build",
-        "ci:fix": "bun run format && bun run test:core && bun run test:tools && bun run build"
+    "description": "AI programming assistant with multi-turn conversations, tool calling, and concurrent execution",
+    "bin": {
+        "memo": "./dist/index.js"
     },
-    "workspaces": [
-        "packages/*"
+    "files": [
+        "dist/index.js",
+        "dist/prompt.md",
+        "README.md",
+        "LICENSE"
     ],
-    "devDependencies": {
-        "@types/bun": "latest",
-        "prettier": "^3.3.3"
+    "engines": {
+        "node": ">=18.0.0"
     },
-    "peerDependencies": {
-        "typescript": "^5"
+    "scripts": {
+        "start": "tsx packages/cli/src/index.tsx",
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "test": "vitest run",
+        "test:core": "vitest run packages/core",
+        "test:tools": "vitest run packages/tools",
+        "test:cli": "vitest run packages/cli",
+        "ci": "pnpm run format:check && pnpm run test:core && pnpm run test:tools && pnpm run build",
+        "prepublishOnly": "pnpm run build && chmod +x dist/index.js",
+        "release:patch": "npm version patch && npm publish",
+        "release:minor": "npm version minor && npm publish",
+        "release:major": "npm version major && npm publish"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.2",
+        "@types/react": "^18.2.79",
+        "prettier": "^3.3.3",
+        "tsup": "^8.3.5",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.2",
+        "vite-tsconfig-paths": "^6.0.5",
+        "vitest": "^2.1.8"
     },
     "dependencies": {
         "@dqbd/tiktoken": "^1.0.22",
         "@modelcontextprotocol/sdk": "^1.24.3",
+        "fast-glob": "^3.3.3",
+        "ink": "^5.0.0",
+        "jsonrepair": "^3.13.2",
+        "marked": "^17.0.1",
         "openai": "^6.10.0",
-        "react-devtools-core": "^7.0.1",
+        "react": "^18.2.0",
+        "react-reconciler": "^0.29.0",
+        "string-width": "^7.2.0",
         "toml": "^3.0.0",
+        "zod": "^4.3.6",
         "zod-to-json-schema": "^3.25.1"
     }
 }

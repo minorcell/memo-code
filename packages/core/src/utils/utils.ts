@@ -1,5 +1,19 @@
 /** @file Runtime 公用的解析辅助函数集合。 */
+import { jsonrepair } from 'jsonrepair'
 import type { ParsedAssistant } from '@memo/core/types'
+
+function tryParseJSON(text: string): unknown | null {
+    try {
+        return JSON.parse(text)
+    } catch {
+        try {
+            const repaired = jsonrepair(text)
+            return JSON.parse(repaired)
+        } catch {
+            return null
+        }
+    }
+}
 
 /**
  * 从文本中提取所有 JSON 对象
@@ -17,7 +31,8 @@ function extractJSONObjects(
         const json = match[1] || ''
         if (!json || seen.has(json)) continue
         try {
-            const obj = JSON.parse(json)
+            const obj = tryParseJSON(json)
+            if (obj === null) continue
             results.push({ json, start: match.index, end: match.index + match[0].length, obj })
             seen.add(json)
         } catch {
@@ -34,7 +49,8 @@ function extractJSONObjects(
         // 确保这看起来像是个完整的对象
         if (!json.includes('"tool"') && !json.includes('"final"')) continue
         try {
-            const obj = JSON.parse(json)
+            const obj = tryParseJSON(json)
+            if (obj === null) continue
             results.push({ json, start: match.index, end: match.index + json.length, obj })
             seen.add(json)
         } catch {
@@ -140,18 +156,14 @@ export function parseAssistant(content: string): ParsedAssistant {
     // 尝试整个文本作为 JSON（兼容性处理）
     const trimmed = content.trim()
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        try {
-            const obj = JSON.parse(trimmed)
-            if (isValidAction(obj)) {
-                parsed.action = { tool: obj.tool, input: obj.input }
-                return parsed
-            }
-            if (isValidFinal(obj)) {
-                parsed.final = obj.final
-                return parsed
-            }
-        } catch {
-            // ignore
+        const obj = tryParseJSON(trimmed)
+        if (obj && isValidAction(obj)) {
+            parsed.action = { tool: obj.tool, input: obj.input }
+            return parsed
+        }
+        if (obj && isValidFinal(obj)) {
+            parsed.final = obj.final
+            return parsed
         }
     }
 

@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import { z } from 'zod'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
@@ -5,6 +6,12 @@ import { textResult } from '@memo/tools/tools/mcp'
 const BASH_INPUT_SCHEMA = z
     .object({
         command: z.string().min(1, 'command 不能为空'),
+        timeout: z
+            .number()
+            .int('timeout 必须是整数毫秒')
+            .positive('timeout 必须大于 0')
+            .max(60 * 60 * 1000, 'timeout 不能超过 1 小时')
+            .optional(),
     })
     .strict()
 
@@ -18,22 +25,52 @@ export const bashTool: McpTool<BashInput> = {
     name: 'bash',
     description: '在 shell 中执行命令，返回 exit/stdout/stderr',
     inputSchema: BASH_INPUT_SCHEMA,
-    execute: async ({ command }) => {
+    execute: async ({ command, timeout }) => {
         const cmd = command.trim()
         if (!cmd) return textResult('bash 需要要执行的命令', true)
 
         try {
-            const proc = Bun.spawn(['bash', '-lc', cmd], {
-                stdout: 'pipe',
-                stderr: 'pipe',
+            const proc = spawn('bash', ['-lc', cmd], {
                 env: process.env,
+                stdio: ['ignore', 'pipe', 'pipe'],
             })
 
-            const [stdout, stderr] = await Promise.all([
-                new Response(proc.stdout).text(),
-                new Response(proc.stderr).text(),
-            ])
-            const exitCode = await proc.exited
+            const collectStream = (stream: NodeJS.ReadableStream | null) =>
+                new Promise<string>((resolve) => {
+                    if (!stream) return resolve('')
+                    const chunks: string[] = []
+                    stream.setEncoding('utf8')
+                    stream.on('data', (chunk) => chunks.push(chunk))
+                    stream.on('error', () => resolve(''))
+                    stream.on('end', () => resolve(chunks.join('')))
+                })
+
+            const stdoutPromise = collectStream(proc.stdout)
+            const stderrPromise = collectStream(proc.stderr)
+
+            let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+            const exitPromise = new Promise<number>((resolve, reject) => {
+                proc.on('error', (error) => reject(error))
+                proc.on('close', (code) => resolve(typeof code === 'number' ? code : -1))
+            })
+            const timeoutPromise =
+                timeout && timeout > 0
+                    ? new Promise<never>((_, reject) => {
+                          timeoutId = setTimeout(() => {
+                              proc.kill()
+                              reject(new Error(`bash 超时 ${timeout}ms，已终止进程`))
+                          }, timeout)
+                      })
+                    : null
+
+            const exitCode = timeoutPromise
+                ? await Promise.race([exitPromise, timeoutPromise])
+                : await exitPromise
+
+            if (timeoutId) clearTimeout(timeoutId)
+
+            const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise])
 
             return textResult(`exit=${exitCode} stdout="${stdout}" stderr="${stderr}"`)
         } catch (err) {

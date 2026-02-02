@@ -4,21 +4,21 @@
 
 ## 快速开始 / Getting Started
 
-- 先安装 [Bun](https://bun.sh/) (>=1.1)；部分工具/测试依赖 [ripgrep](https://github.com/BurntSushi/ripgrep)（命令 `rg`）。
-- 安装依赖：`bun install`
-- 运行 CLI：`bun start "你的问题" --once` 或交互式 `bun start`
-- 构建产物：`bun build`
+- 先安装 [Node.js](https://nodejs.org/) (>=18) 和 [pnpm](https://pnpm.io/)；部分工具/测试依赖 [ripgrep](https://github.com/BurntSushi/ripgrep)（命令 `rg`）。
+- 安装依赖：`pnpm install`
+- 运行 CLI：`pnpm start "你的问题" --once` 或交互式 `pnpm start`
+- 构建产物：`pnpm run build`
 
 ## 代码风格 / Code Style
 
 - 采用 TypeScript + ESM；保持现有的目录与模块边界（Core/Tools/UI）。
-- 提交前请运行格式化：`bun run format`；CI 将使用 `bun run format:check`。
+- 提交前请运行格式化：`pnpm run format`；CI 将使用 `pnpm run format:check`。
 - 变更公共接口或行为时同步更新文档（如 `README.md`、`docs/`）。
 
 ## 测试 / Testing
 
-- 全量测试：`bun test`
-- 定位单测：`bun test packages/tools/src/tools/bash.test.ts`
+- 全量测试：`pnpm test`
+- 定位单测：`pnpm test packages/tools/src/tools/bash.test.ts`
 - 如果引入新功能，请补充或更新相关测试，确保本地通过后再提交。
 
 ## Issue & PR

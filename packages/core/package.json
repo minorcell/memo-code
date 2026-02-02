@@ -2,12 +2,15 @@
     "name": "@memo-code/core",
     "type": "module",
     "module": "src/index.ts",
-    "version": "0.1",
+    "version": "0.1.0",
     "private": true,
     "scripts": {
-        "test": "bun test"
+        "test": "vitest run"
     },
     "dependencies": {
         "zod": "^4.3.6"
+    },
+    "devDependencies": {
+        "vitest": "^2.1.8"
     }
 }
