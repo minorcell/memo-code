@@ -15,6 +15,7 @@ type InputPromptProps = {
     onSubmit: (value: string) => void
     onExit: () => void
     onClear: () => void
+    onNewSession?: () => void
     onCancelRun: () => void
     onHistorySelect?: (entry: InputHistoryEntry) => void
     onModelSelect?: (provider: ProviderConfig) => void
@@ -32,7 +33,7 @@ type InputPromptProps = {
     mcpServers: Record<string, MCPServerConfig>
 }
 
-type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model'
+type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model' | 'context'
 
 type SuggestionItem = SuggestionListItem & {
     value: string
@@ -41,6 +42,7 @@ type SuggestionItem = SuggestionListItem & {
         slashCommand?: SlashCommand
         historyEntry?: InputHistoryEntry
         provider?: ProviderConfig
+        contextValue?: number
     }
 }
 
@@ -48,7 +50,13 @@ type FileTrigger = { type: 'file'; query: string; tokenStart: number }
 type HistoryTrigger = { type: 'history'; keyword: string }
 type SlashTrigger = { type: 'slash'; keyword: string }
 type ModelsTrigger = { type: 'models'; keyword: string }
-type SuggestionTrigger = FileTrigger | HistoryTrigger | SlashTrigger | ModelsTrigger
+type ContextTrigger = { type: 'context' }
+type SuggestionTrigger =
+    | FileTrigger
+    | HistoryTrigger
+    | SlashTrigger
+    | ModelsTrigger
+    | ContextTrigger
 
 function getUsername(): string {
     try {
@@ -64,6 +72,7 @@ export function InputPrompt({
     onSubmit,
     onExit,
     onClear,
+    onNewSession,
     onCancelRun,
     onModelSelect,
     onSystemMessage,
@@ -199,6 +208,23 @@ export function InputPrompt({
                     )
                     return
                 }
+                if (trigger.type === 'context') {
+                    const choices = [80000, 120000, 150000, 200000]
+                    const mapped = choices.map((limit) => ({
+                        id: `${limit}`,
+                        title: `${(limit / 1000).toFixed(0)}k tokens`,
+                        subtitle: limit === contextLimit ? 'Current' : undefined,
+                        kind: 'context' as const,
+                        value: `/context ${(limit / 1000).toFixed(0)}k`,
+                        meta: { contextValue: limit },
+                    }))
+                    setSuggestionMode('context')
+                    setSuggestionItems(mapped)
+                    setActiveIndex((prev) =>
+                        mapped.length ? Math.min(prev, mapped.length - 1) : 0,
+                    )
+                    return
+                }
                 if (trigger.type === 'slash') {
                     const keyword = trigger.keyword.toLowerCase()
                     const filtered = keyword
@@ -234,7 +260,7 @@ export function InputPrompt({
         return () => {
             cancelled = true
         }
-    }, [trigger, cwd, sessionsDir, currentSessionFile, providers])
+    }, [trigger, cwd, sessionsDir, currentSessionFile, providers, contextLimit])
 
     const applySuggestion = useCallback(
         (item?: SuggestionItem) => {
@@ -285,6 +311,9 @@ export function InputPrompt({
                     clearScreen: () => {
                         onClear()
                     },
+                    newSession: () => {
+                        onNewSession?.()
+                    },
                     exitApp: () => {
                         onExit()
                     },
@@ -309,6 +338,20 @@ export function InputPrompt({
                         mcpServers,
                     },
                 })
+                return
+            }
+            if (suggestionMode === 'context' && item.meta?.contextValue) {
+                const limit = item.meta.contextValue
+                onSetContextLimit?.(limit)
+                onSystemMessage?.(
+                    'Context',
+                    `已设置上下文上限为 ${(limit / 1000).toFixed(0)}k tokens`,
+                )
+                valueRef.current = ''
+                setValue('')
+                setHistoryIndex(null)
+                setDraft('')
+                closeSuggestions()
                 return
             }
         },
@@ -344,6 +387,7 @@ export function InputPrompt({
             setDraft('')
             closeSuggestions()
             onClear()
+            onNewSession?.()
             return
         }
 
@@ -622,6 +666,8 @@ function formatSessionFileName(filePath: string) {
 }
 
 function detectSuggestionTrigger(value: string): SuggestionTrigger | null {
+    const contextTrigger = detectContextTrigger(value)
+    if (contextTrigger) return contextTrigger
     const modelsTrigger = detectModelsTrigger(value)
     if (modelsTrigger) return modelsTrigger
     const slashTrigger = detectSlashTrigger(value)
@@ -657,10 +703,10 @@ function detectHistoryTrigger(value: string): HistoryTrigger | null {
     if (normalized.startsWith('/')) {
         normalized = normalized.slice(1)
     }
-    if (!normalized.toLowerCase().startsWith('history')) return null
+    if (!normalized.toLowerCase().startsWith('resume')) return null
     const hasOtherPrefix = value.slice(0, prefixLength).trim().length > 0
     if (hasOtherPrefix) return null
-    const rest = normalized.slice('history'.length)
+    const rest = normalized.slice('resume'.length)
     if (rest && !rest.startsWith(' ')) return null
     return {
         type: 'history',
@@ -674,6 +720,14 @@ function detectModelsTrigger(value: string): ModelsTrigger | null {
     const rest = trimmedStart.slice('/models'.length)
     if (rest && !rest.startsWith(' ')) return null
     return { type: 'models', keyword: rest.trim() }
+}
+
+function detectContextTrigger(value: string): ContextTrigger | null {
+    const trimmedStart = value.trimStart()
+    if (!trimmedStart.startsWith('/context')) return null
+    const rest = trimmedStart.slice('/context'.length)
+    if (rest && !rest.startsWith(' ')) return null
+    return { type: 'context' }
 }
 
 function detectSlashTrigger(value: string): SlashTrigger | null {

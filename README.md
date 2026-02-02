@@ -1,13 +1,17 @@
 # Memo Code
 
-本地运行的 AI 编程助手，支持多轮对话、工具调用、并发执行。基于 Bun + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
+本地运行的 AI 编程助手，支持多轮对话、工具调用、并发。基于 Node.js + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
 
 ## 快速开始
 
-### 1. 安装依赖
+### 1. 安装
 
 ```bash
-bun install
+npm install -g @memo-code/memo
+# 或
+pnpm add -g @memo-code/memo
+# 或
+yarn global add @memo-code/memo
 ```
 
 ### 2. 配置 API Key
@@ -19,54 +23,14 @@ export DEEPSEEK_API_KEY=your_key  # 或 OPENAI_API_KEY
 ### 3. 启动使用
 
 ```bash
-bun start
-# 首次运行会引导配置 provider/model，并保存到 ~/.memo/config.toml
+memo
+# 首次运行会引导配置 provider/model，并（保存到 ~/.memo/config.toml）
 ```
 
 ## 使用方式
 
-### 交互式模式（默认）
-
-在终端中启动 TUI 界面：
-
-```bash
-bun start
-```
-
-**支持功能**：
-
-- 多轮对话，保持上下文
-- 实时流式输出
-- 工具调用可视化
-- Token 使用统计
-- 快捷键和命令
-
-### 单轮模式
-
-适合脚本集成：
-
-```bash
-bun start "你的问题" --once
-```
-
-输出纯文本结果，便于日志记录和后续处理。
-
-## TUI 快捷键
-
-- **Enter**：提交输入
-- **Shift+Enter**：换行
-- **Up/Down**：浏览历史
-- **Ctrl+C**：中断或退出
-- **Ctrl+L**：清屏
-
-## Slash 命令
-
-- `/help`：显示帮助
-- `/exit`：退出会话
-- `/clear`：清屏
-- `/tools`：列出所有工具
-- `/config`：显示配置
-- `/memory`：显示记忆位置
+- 交互式：`memo`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
+- 单轮：`memo "你的问题" --once`（纯文本输出，适合脚本）。
 
 ## 配置文件
 
@@ -133,54 +97,36 @@ url = "https://your-mcp-server.com/mcp"
 
 JSONL 格式便于分析和调试。
 
-## 性能特性
-
-### 并发工具调用
-
-模型可同时调用多个独立工具，显著提升效率：
-
-```
-场景：读取 3 个文件
-传统：read → wait → read → wait → read → wait (3次往返)
-并发：read + read + read → wait (1次往返，快5倍)
-```
-
-### Tool Use API
-
-使用原生 Tool Use API（OpenAI/DeepSeek/Claude），避免 JSON 解析问题，95%格式稳定性。
-
-不支持 Tool Use 的模型自动降级到 JSON 解析模式。
-
 ## 开发
 
 ### 本地运行
 
 ```bash
-bun start
+pnpm install
+pnpm start
 # 或
-bun start "prompt" --once
+pnpm start "prompt" --once
 ```
 
 ### 构建
 
 ```bash
-bun run build         # 生成 dist/index.js
-bun run build:binary  # 生成可执行文件 memo
+pnpm run build  # 生成 dist/index.js
 ```
 
 ### 测试
 
 ```bash
-bun test              # 全量测试
-bun run test:core     # 测试 core 包
-bun run test:tools    # 测试 tools 包
+pnpm test              # 全量测试
+pnpm test packages/core     # 测试 core 包
+pnpm test packages/tools    # 测试 tools 包
 ```
 
 ### 代码格式化
 
 ```bash
-bun run format        # 格式化所有文件
-bun run format:check  # 检查格式（CI）
+npm run format        # 格式化所有文件
+npm run format:check  # 检查格式（CI）
 ```
 
 ## 项目结构
@@ -195,9 +141,20 @@ memo-cli/
 └── dist/           # 构建输出
 ```
 
+## CLI 快捷键与命令
+
+- `/help`：显示帮助与快捷键说明。
+- `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
+- `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
+- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`），不再经模型代理。
+- `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
+- 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。
+
+> 仅当会话包含用户消息时才写入 `sessions/` JSONL 日志，避免空会话文件。
+
 ## 技术栈
 
-- **Runtime**: Bun 1.1+
+- **Runtime**: Node.js 18+
 - **语言**: TypeScript
 - **UI**: React + Ink
 - **Protocol**: MCP (Model Context Protocol)

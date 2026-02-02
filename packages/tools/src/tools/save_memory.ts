@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, access } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { z } from 'zod'
@@ -58,8 +58,14 @@ export const saveMemoryTool: McpTool<SaveMemoryInput> = {
             const header = '## Memo Added Memories'
 
             try {
-                const file = Bun.file(memoryPath)
-                const existing = (await file.exists()) ? await file.text() : ''
+                const existing = await (async () => {
+                    try {
+                        await access(memoryPath)
+                        return await readFile(memoryPath, 'utf-8')
+                    } catch {
+                        return ''
+                    }
+                })()
                 const [, body = ''] = existing.split(header)
                 const existingLines = body
                     .split(/\r?\n/)
@@ -69,7 +75,7 @@ export const saveMemoryTool: McpTool<SaveMemoryInput> = {
                 existingLines.push(fact)
                 const pruned = existingLines.slice(Math.max(0, existingLines.length - 50))
                 const finalContent = formatContent(header, pruned)
-                await Bun.write(memoryPath, finalContent)
+                await writeFile(memoryPath, finalContent, 'utf-8')
             } catch (err) {
                 console.warn(`Memory maintenance failed: ${(err as Error).message}`)
             }

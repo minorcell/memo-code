@@ -1,8 +1,8 @@
 import assert from 'node:assert'
+import { mkdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { describe, test, beforeAll, afterAll } from 'bun:test'
-import { $ } from 'bun'
+import { afterAll, beforeAll, describe, test } from 'vitest'
 import { saveMemoryTool } from '@memo/tools/tools/save_memory'
 
 let tempHome: string
@@ -10,20 +10,20 @@ let prevMemoHome: string | undefined
 
 async function makeTempDir(prefix: string) {
     const dir = join(tmpdir(), `${prefix}-${crypto.randomUUID()}`)
-    await $`mkdir -p ${dir}`
+    await mkdir(dir, { recursive: true })
     return dir
 }
 
 async function removeDir(dir: string) {
-    await $`rm -rf ${dir}`
+    await rm(dir, { recursive: true, force: true })
 }
 
 async function readText(path: string) {
-    const file = Bun.file(path)
-    if (await file.exists()) {
-        return file.text()
+    try {
+        return await readFile(path, 'utf8')
+    } catch {
+        return ''
     }
-    return ''
 }
 
 beforeAll(async () => {
