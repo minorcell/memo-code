@@ -12,6 +12,8 @@ npm install -g @memo-code/memo
 pnpm add -g @memo-code/memo
 # 或
 yarn global add @memo-code/memo
+# 或
+bun add -g @memo-code/memo
 ```
 
 ### 2. 配置 API Key
@@ -146,7 +148,7 @@ memo-cli/
 - `/help`：显示帮助与快捷键说明。
 - `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
 - `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
-- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`），不再经模型代理。
+- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`）。
 - `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
 - 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。
 
