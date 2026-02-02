@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { exec } from 'node:child_process'
@@ -220,7 +220,17 @@ export function App({
         if (sessionRef.current) {
             await sessionRef.current.close()
         }
-        const savedPath = sessionLogPath ? `\nSession saved: ${basename(sessionLogPath)}` : ''
+        let savedPath = ''
+        if (sessionLogPath) {
+            try {
+                const info = await stat(sessionLogPath)
+                if (info.size > 0) {
+                    savedPath = `\nSession saved: ${basename(sessionLogPath)}`
+                }
+            } catch {
+                // 文件不存在或无法读取时忽略
+            }
+        }
         setExitMessage(`Bye!${savedPath}`)
         // Give time for the message to render
         setTimeout(() => {
