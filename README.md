@@ -25,48 +25,8 @@ bun start
 
 ## 使用方式
 
-### 交互式模式（默认）
-
-在终端中启动 TUI 界面：
-
-```bash
-bun start
-```
-
-**支持功能**：
-
-- 多轮对话，保持上下文
-- 实时流式输出
-- 工具调用可视化
-- Token 使用统计
-- 快捷键和命令
-
-### 单轮模式
-
-适合脚本集成：
-
-```bash
-bun start "你的问题" --once
-```
-
-输出纯文本结果，便于日志记录和后续处理。
-
-## TUI 快捷键
-
-- **Enter**：提交输入
-- **Shift+Enter**：换行
-- **Up/Down**：浏览历史
-- **Ctrl+C**：中断或退出
-- **Ctrl+L**：清屏
-
-## Slash 命令
-
-- `/help`：显示帮助
-- `/exit`：退出会话
-- `/clear`：清屏
-- `/tools`：列出所有工具
-- `/config`：显示配置
-- `/memory`：显示记忆位置
+- 交互式：`bun start`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
+- 单轮：`bun start "你的问题" --once`（纯文本输出，适合脚本）。
 
 ## 配置文件
 
@@ -133,24 +93,6 @@ url = "https://your-mcp-server.com/mcp"
 
 JSONL 格式便于分析和调试。
 
-## 性能特性
-
-### 并发工具调用
-
-模型可同时调用多个独立工具，显著提升效率：
-
-```
-场景：读取 3 个文件
-传统：read → wait → read → wait → read → wait (3次往返)
-并发：read + read + read → wait (1次往返，快5倍)
-```
-
-### Tool Use API
-
-使用原生 Tool Use API（OpenAI/DeepSeek/Claude），避免 JSON 解析问题，95%格式稳定性。
-
-不支持 Tool Use 的模型自动降级到 JSON 解析模式。
-
 ## 开发
 
 ### 本地运行
@@ -194,6 +136,17 @@ memo-cli/
 ├── docs/           # 技术文档
 └── dist/           # 构建输出
 ```
+
+## CLI 快捷键与命令
+
+- `/help`：显示帮助与快捷键说明。
+- `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
+- `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
+- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`），不再经模型代理。
+- `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
+- 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。
+
+> 仅当会话包含用户消息时才写入 `sessions/` JSONL 日志，避免空会话文件。
 
 ## 技术栈
 
