@@ -1,7 +1,7 @@
 /** @file 长期记忆注入系统提示词的回归测试。 */
 import assert from 'node:assert'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { tmpdir, userInfo } from 'node:os'
 import { describe, test, beforeAll, afterAll } from 'bun:test'
 import { $ } from 'bun'
 import { createAgentSession, createTokenCounter } from '@memo/core'
@@ -57,6 +57,33 @@ describe('memory injection', () => {
                 systemPrompt.includes('用户偏好：中文回答'),
                 'memory content should be injected',
             )
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('injects runtime context into system prompt', async () => {
+        const session = await createAgentSession(
+            {
+                callLLM: async () => ({ content: JSON.stringify({ final: 'ok' }) }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+            },
+            { mode: 'once' },
+        )
+        try {
+            const systemPrompt = session.history[0]?.content ?? ''
+            assert.ok(systemPrompt.includes(process.cwd()), 'system prompt should include pwd')
+            assert.ok(
+                systemPrompt.includes(userInfo().username),
+                'system prompt should include username',
+            )
+            assert.match(
+                systemPrompt,
+                /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:/,
+                'system prompt should include ISO date',
+            )
+            assert.ok(!systemPrompt.includes('{{date}}'), 'template variables should be rendered')
         } finally {
             await session.close()
         }
