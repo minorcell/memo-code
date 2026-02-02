@@ -102,16 +102,16 @@ JSONL 格式便于分析和调试。
 ### 本地运行
 
 ```bash
-npm install
-npm start
+pnpm install
+pnpm start
 # 或
-npm start "prompt" --once
+pnpm start "prompt" --once
 ```
 
 ### 构建
 
 ```bash
-npm run build  # 生成 dist/index.js
+pnpm run build  # 生成 dist/index.js
 ```
 
 ### 测试

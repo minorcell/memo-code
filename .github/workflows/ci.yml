@@ -85,3 +85,31 @@ jobs:
                   name: ${{ matrix.artifact }}
                   path: dist/index.js
                   retention-days: 7
+
+    # 自动发布到 npm
+    publish:
+        name: Publish to npm
+        if: startsWith(github.ref, 'refs/tags/')
+        needs: [test, build]
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v2
+              with:
+                  version: 9
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'pnpm'
+                  registry-url: 'https://registry.npmjs.org/'
+
+            - name: Install ripgrep
+              run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+            - run: pnpm install
+            - run: pnpm run build
+
+            - name: Publish to npm
+              run: npm publish
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

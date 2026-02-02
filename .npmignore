@@ -1,0 +1,35 @@
+# 源代码
+packages/
+scripts/
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+
+# 测试
+*.test.ts
+*.spec.ts
+
+# 开发配置
+.github/
+.vscode/
+.claude/
+.tmp/
+
+# 文档（README.md 和 LICENSE 已在 files 中显式包含）
+docs/
+CONTRIBUTING.md
+AGENTS.md
+CLAUDE.md
+
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 构建输出（只保留 dist/index.js，排除 sourcemap）
+dist/*.map
+
+# 其他
+.gitignore
+.prettierrc
+.prettierignore
+*.log

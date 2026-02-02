@@ -8,7 +8,8 @@
         "memo": "./dist/index.js"
     },
     "files": [
-        "dist",
+        "dist/index.js",
+        "dist/prompt.md",
         "README.md",
         "LICENSE"
     ],
@@ -25,7 +26,11 @@
         "test:core": "vitest run packages/core",
         "test:tools": "vitest run packages/tools",
         "test:cli": "vitest run packages/cli",
-        "ci": "pnpm run format:check && pnpm run test:core && pnpm run test:tools && pnpm run build"
+        "ci": "pnpm run format:check && pnpm run test:core && pnpm run test:tools && pnpm run build",
+        "prepublishOnly": "pnpm run build && chmod +x dist/index.js",
+        "release:patch": "npm version patch && npm publish",
+        "release:minor": "npm version minor && npm publish",
+        "release:major": "npm version major && npm publish"
     },
     "devDependencies": {
         "@types/node": "^22.10.2",
