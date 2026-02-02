@@ -3,6 +3,7 @@ import type { SlashCommand } from './types'
 const HELP_TEXT = `Available commands:
   /help       Show help and shortcuts
   /exit       Exit the session
+  exit        Exit the session (no slash)
   /new        Start a new session
   /models     Pick a model from config
   /history    Show session history
@@ -17,6 +18,7 @@ Shortcuts:
   Tab         Accept suggestion
   Ctrl+L      Start a new session
   Ctrl+C      Exit
+  exit        Type in input to exit
   Esc Esc     Cancel / Clear input`
 
 export const helpCommand: SlashCommand = {
