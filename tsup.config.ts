@@ -1,4 +1,6 @@
 import { defineConfig } from 'tsup'
+import { copyFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 export default defineConfig({
     entry: ['packages/cli/src/index.tsx'],
@@ -17,5 +19,10 @@ export default defineConfig({
     },
     banner: {
         js: '#!/usr/bin/env node',
+    },
+    async onSuccess() {
+        // 复制 prompt.md 到 dist 目录
+        copyFileSync(join('packages/core/src/runtime/prompt.md'), join('dist/prompt.md'))
+        console.log('✓ Copied prompt.md to dist/')
     },
 })
