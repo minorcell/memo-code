@@ -654,18 +654,21 @@ class AgentSessionImpl implements AgentSession {
     async close() {
         if (this.closed) return
         this.closed = true
-        await this.emitEvent('session_end', {
-            meta: {
-                durationMs: Date.now() - this.startedAt,
-                tokens: this.sessionUsage,
-            },
-        })
-        for (const sink of this.sinks) {
-            if (sink.flush) {
-                try {
-                    await sink.flush()
-                } catch (err) {
-                    console.error(`History flush failed: ${(err as Error).message}`)
+        const hasContent = this.sessionStartEmitted || this.turnIndex >= 0
+        if (hasContent) {
+            await this.emitEvent('session_end', {
+                meta: {
+                    durationMs: Date.now() - this.startedAt,
+                    tokens: this.sessionUsage,
+                },
+            })
+            for (const sink of this.sinks) {
+                if (sink.flush) {
+                    try {
+                        await sink.flush()
+                    } catch (err) {
+                        console.error(`History flush failed: ${(err as Error).message}`)
+                    }
                 }
             }
         }
