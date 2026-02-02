@@ -1,3 +1,4 @@
+import { spawn, spawnSync } from 'node:child_process'
 import { z } from 'zod'
 import { normalizePath } from '@memo/tools/tools/helpers'
 import type { McpTool } from '@memo/tools/tools/types'
@@ -28,13 +29,13 @@ export const grepTool: McpTool<GrepInput> = {
     description: '基于 ripgrep 查找文本，支持输出匹配内容、文件列表或计数',
     inputSchema: GREP_INPUT_SCHEMA,
     execute: async (input) => {
-        const rgPath = Bun.which('rg')
-        if (!rgPath) {
+        const rgCheck = spawnSync('rg', ['--version'], { stdio: 'ignore' })
+        if (rgCheck.error || rgCheck.status !== 0) {
             return textResult('rg 未安装或不在 PATH', true)
         }
 
         const basePath = input.path ? normalizePath(input.path) : process.cwd()
-        const args = ['rg', '--color', 'never']
+        const args = ['--color', 'never']
         const mode: OutputMode = input.output_mode ?? 'content'
 
         if (mode === 'files_with_matches') {
@@ -54,15 +55,29 @@ export const grepTool: McpTool<GrepInput> = {
         args.push(input.pattern, basePath)
 
         try {
-            const proc = Bun.spawn(args, {
-                stdout: 'pipe',
-                stderr: 'pipe',
+            const proc = spawn('rg', args, {
+                stdio: ['ignore', 'pipe', 'pipe'],
             })
+
+            const collectStream = (stream: NodeJS.ReadableStream | null) =>
+                new Promise<string>((resolve) => {
+                    if (!stream) return resolve('')
+                    const chunks: string[] = []
+                    stream.setEncoding('utf8')
+                    stream.on('data', (chunk) => chunks.push(chunk))
+                    stream.on('error', () => resolve(''))
+                    stream.on('end', () => resolve(chunks.join('')))
+                })
+
             const [stdout, stderr] = await Promise.all([
-                new Response(proc.stdout).text(),
-                new Response(proc.stderr).text(),
+                collectStream(proc.stdout),
+                collectStream(proc.stderr),
             ])
-            const exitCode = await proc.exited
+
+            const exitCode = await new Promise<number>((resolve, reject) => {
+                proc.on('error', (error) => reject(error))
+                proc.on('close', (code) => resolve(typeof code === 'number' ? code : -1))
+            })
 
             if (exitCode === 2) {
                 return textResult(`grep 失败(exit=2): ${stderr || stdout}`, true)

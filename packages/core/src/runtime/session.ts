@@ -148,9 +148,7 @@ function stableStringify(value: unknown): string {
     const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
         a.localeCompare(b),
     )
-    return `{${entries
-        .map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`)
-        .join(',')}}`
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`
 }
 
 /** 进程内的对话 Session，实现多轮运行与日志写入。 */

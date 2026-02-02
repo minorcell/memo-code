@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { describe, test } from 'bun:test'
+import { describe, test } from 'vitest'
 import { normalizePath } from '@memo/tools/tools/helpers'
 
 describe('helpers.normalizePath', () => {
