@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { exec } from 'node:child_process'
+import { promisify } from 'node:util'
 import { Box, useApp, Text } from 'ink'
 import {
     createAgentSession,
@@ -21,6 +23,8 @@ import { MainContent } from './components/layout/MainContent'
 import { InputPrompt } from './components/layout/InputPrompt'
 import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
 import { resolveSlashCommand } from './commands'
+
+const execAsync = promisify(exec)
 
 export type AppProps = {
     sessionOptions: AgentSessionOptions
@@ -145,20 +149,21 @@ export function App({
                     })
                 },
                 onObservation: ({ turn, step, observation }) => {
-                    updateTurn(turn, (turnState) => {
-                        const steps = turnState.steps.slice()
-                        while (steps.length <= step) {
-                            steps.push({ index: steps.length, assistantText: '' })
-                        }
-                        const target = steps[step]
-                        if (!target) return turnState
-                        steps[step] = {
-                            ...target,
-                            observation,
-                            toolStatus: inferToolStatus(observation),
-                        }
-                        return { ...turnState, steps }
-                    })
+                    // 不显示工具结果，只显示参数
+                    // updateTurn(turn, (turnState) => {
+                    //     const steps = turnState.steps.slice()
+                    //     while (steps.length <= step) {
+                    //         steps.push({ index: steps.length, assistantText: '' })
+                    //     }
+                    //     const target = steps[step]
+                    //     if (!target) return turnState
+                    //     steps[step] = {
+                    //         ...target,
+                    //         observation,
+                    //         toolStatus: inferToolStatus(observation),
+                    //     }
+                    //     return { ...turnState, steps }
+                    // })
                 },
                 onFinal: ({ turn, finalText, status, turnUsage, tokenUsage }) => {
                     updateTurn(turn, (turnState) => {
@@ -215,7 +220,17 @@ export function App({
         if (sessionRef.current) {
             await sessionRef.current.close()
         }
-        const savedPath = sessionLogPath ? `\nSession saved: ${basename(sessionLogPath)}` : ''
+        let savedPath = ''
+        if (sessionLogPath) {
+            try {
+                const info = await stat(sessionLogPath)
+                if (info.size > 0) {
+                    savedPath = `\nSession saved: ${basename(sessionLogPath)}`
+                }
+            } catch {
+                // 文件不存在或无法读取时忽略
+            }
+        }
         setExitMessage(`Bye!${savedPath}`)
         // Give time for the message to render
         setTimeout(() => {
@@ -230,6 +245,37 @@ export function App({
         setPendingHistoryMessages(null)
         setCurrentContextTokens(0) // Reset context tokens on clear
     }, [])
+
+    const handleNewSession = useCallback(async () => {
+        // Clear UI state
+        setTurns([])
+        setSystemMessages([])
+        setHistoricalTurns([])
+        setPendingHistoryMessages(null)
+        setCurrentContextTokens(0)
+
+        // Create new session
+        const newSessionId = randomUUID()
+        const newSessionOptions: AgentSessionOptions = {
+            ...sessionOptionsState,
+            sessionId: newSessionId,
+        }
+
+        // Close previous session
+        if (sessionRef.current) {
+            await sessionRef.current.close()
+        }
+
+        // Create new session
+        const created = await createAgentSession(deps, newSessionOptions)
+        sessionRef.current = created
+        setSession(created)
+        setSessionLogPath(created.historyFilePath ?? null)
+        setSessionOptionsState(newSessionOptions)
+
+        // Show system message
+        appendSystemMessage('New Session', 'Started a new session with fresh context.')
+    }, [deps, sessionOptionsState, appendSystemMessage])
 
     const handleHistorySelect = useCallback(
         async (entry: InputHistoryEntry) => {
@@ -309,6 +355,32 @@ export function App({
         [appendSystemMessage, busy, currentModel, currentProvider, persistCurrentProvider],
     )
 
+    const runShellCommand = useCallback(
+        async (command: string) => {
+            if (!command.trim()) {
+                appendSystemMessage('Shell Command', 'Usage: $ <command> (e.g. $ git status)')
+                return
+            }
+            setBusy(true)
+            try {
+                const { stdout, stderr } = await execAsync(command, {
+                    cwd,
+                    maxBuffer: 5 * 1024 * 1024, // prevent truncation on large outputs
+                })
+                const output = [stdout?.trim(), stderr?.trim()].filter(Boolean).join('\n')
+                appendSystemMessage('Shell Result', output || '(no output)')
+            } catch (err) {
+                const error = err as Error & { stdout?: string; stderr?: string }
+                const parts = [error.stdout?.trim(), error.stderr?.trim(), error.message]
+                const message = parts.filter(Boolean).join('\n')
+                appendSystemMessage('Shell Error', message || 'Command failed')
+            } finally {
+                setBusy(false)
+            }
+        },
+        [appendSystemMessage, cwd],
+    )
+
     const handleCommand = useCallback(
         async (raw: string) => {
             const result = resolveSlashCommand(raw, {
@@ -324,7 +396,7 @@ export function App({
                 return
             }
             if (result.kind === 'new') {
-                handleClear()
+                await handleNewSession()
                 return
             }
             if (result.kind === 'switch_model') {
@@ -375,6 +447,10 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 }
                 return
             }
+            if (result.kind === 'shell_command') {
+                await runShellCommand(result.command)
+                return
+            }
             appendSystemMessage(result.title, result.content)
         },
         [
@@ -388,6 +464,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
             currentProvider,
             contextLimit,
             providers,
+            runShellCommand,
         ],
     )
 
@@ -402,7 +479,20 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
 
     const handleSubmit = useCallback(
         async (value: string) => {
+            // Support plain "exit" in addition to "/exit"
+            if (value.trim().toLowerCase() === 'exit') {
+                await handleExit()
+                return
+            }
+
             if (!session || busy) return
+            const trimmed = value.trim()
+            if (trimmed.startsWith('$')) {
+                const command = trimmed.slice(1).trim()
+                setInputHistory((prev) => [...prev, value])
+                await runShellCommand(command)
+                return
+            }
             if (value.startsWith('/')) {
                 await handleCommand(value)
                 return
@@ -415,7 +505,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 setBusy(false)
             }
         },
-        [busy, handleCommand, session],
+        [busy, handleCommand, handleExit, session],
     )
 
     const lastTurn = turns[turns.length - 1]
@@ -455,6 +545,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 onSubmit={handleSubmit}
                 onExit={handleExit}
                 onClear={handleClear}
+                onNewSession={handleNewSession}
                 onCancelRun={handleCancelRun}
                 onHistorySelect={handleHistorySelect}
                 onModelSelect={handleModelSelect}

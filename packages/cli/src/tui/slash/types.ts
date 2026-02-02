@@ -8,6 +8,8 @@ export type SlashCommandContext = {
     closeSuggestions: (suppress?: boolean) => void
     /** 触发外层清屏逻辑。 */
     clearScreen: () => void
+    /** 触发新会话逻辑。 */
+    newSession?: () => void
     /** 触发退出逻辑。 */
     exitApp: () => void
     /** 显示系统消息。 */

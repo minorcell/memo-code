@@ -139,6 +139,18 @@ function isAbortError(err: unknown): err is Error {
     return err instanceof Error && err.name === 'AbortError'
 }
 
+// 稳定序列化用于重复动作检测（确保键顺序一致）
+function stableStringify(value: unknown): string {
+    if (value === null || typeof value !== 'object') return JSON.stringify(value)
+    if (Array.isArray(value)) {
+        return `[${value.map((v) => stableStringify(v)).join(',')}]`
+    }
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+        a.localeCompare(b),
+    )
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`
+}
+
 /** 进程内的对话 Session，实现多轮运行与日志写入。 */
 class AgentSessionImpl implements AgentSession {
     public id: string
@@ -153,8 +165,11 @@ class AgentSessionImpl implements AgentSession {
     private startedAt = Date.now()
     private hooks: HookRunnerMap
     private closed = false
+    private sessionStartEmitted = false
     private currentAbortController: AbortController | null = null
     private cancelling = false
+    private lastActionSignature: string | null = null
+    private repeatedActionCount = 0
 
     constructor(
         private deps: AgentSessionDeps & {
@@ -175,16 +190,32 @@ class AgentSessionImpl implements AgentSession {
         this.historyFilePath = historyFilePath
     }
 
-    /** 写入 Session 启动事件，记录配置与 token 限制。 */
+    /** 初始化：延迟写入 session_start，避免空会话落盘。 */
     async init() {
-        await this.emitEvent('session_start', {
-            meta: {
-                mode: this.mode,
-                tokenizer: this.tokenCounter.model,
-                warnPromptTokens: this.options.warnPromptTokens,
-                maxPromptTokens: this.options.maxPromptTokens,
-            },
-        })
+        // 留空，等第一次 runTurn 时再写 session_start 事件
+    }
+
+    private resetActionRepetition() {
+        this.lastActionSignature = null
+        this.repeatedActionCount = 0
+    }
+
+    private maybeWarnRepeatedAction(tool: string, input: unknown) {
+        const signature = `${tool}:${stableStringify(input)}`
+        if (this.lastActionSignature === signature) {
+            this.repeatedActionCount += 1
+        } else {
+            this.lastActionSignature = signature
+            this.repeatedActionCount = 1
+        }
+
+        if (this.repeatedActionCount === 3) {
+            const preview = stableStringify(input).slice(0, 200)
+            const warning = `系统提醒：你已连续3次调用同一工具「${tool}」且参数相同（${preview}${
+                preview.length >= 200 ? '…' : ''
+            }）。请确认是否陷入循环，必要时直接给出最终回答或调整参数。`
+            this.history.push({ role: 'system', content: warning })
+        }
     }
 
     /** 执行一次 Turn：接受用户输入，走 ReAct 循环，返回最终结果与步骤轨迹。 */
@@ -197,6 +228,18 @@ class AgentSessionImpl implements AgentSession {
         const steps: AgentStepTrace[] = []
         const turnUsage = emptyUsage()
         const turnStartedAt = Date.now()
+
+        if (!this.sessionStartEmitted) {
+            await this.emitEvent('session_start', {
+                meta: {
+                    mode: this.mode,
+                    tokenizer: this.tokenCounter.model,
+                    warnPromptTokens: this.options.warnPromptTokens,
+                    maxPromptTokens: this.options.maxPromptTokens,
+                },
+            })
+            this.sessionStartEmitted = true
+        }
 
         // 写入用户消息
         this.history.push({ role: 'user', content: input })
@@ -390,6 +433,11 @@ class AgentSessionImpl implements AgentSession {
 
                 // 处理工具调用（支持并发执行多个工具）
                 if (toolUseBlocks.length > 1) {
+                    // 重复调用防呆：对每个工具调用记录签名
+                    for (const block of toolUseBlocks) {
+                        this.maybeWarnRepeatedAction(block.name, block.input)
+                    }
+
                     // Tool Use API 模式：并发执行所有工具
                     const toolResults = await Promise.allSettled(
                         toolUseBlocks.map(async (toolBlock) => {
@@ -501,6 +549,7 @@ class AgentSessionImpl implements AgentSession {
 
                 // 单个工具调用（向后兼容模式）
                 if (parsed.action) {
+                    this.maybeWarnRepeatedAction(parsed.action.tool, parsed.action.input)
                     await this.emitEvent('action', {
                         turn,
                         step,
@@ -564,6 +613,7 @@ class AgentSessionImpl implements AgentSession {
 
                 // 检查是否是最终回复（end_turn 或有 final 字段）
                 if (stopReason === 'end_turn' || parsed.final) {
+                    this.resetActionRepetition()
                     finalText = parsed.final || assistantText
                     if (parsed.final) {
                         parsed.final = finalText
@@ -588,6 +638,8 @@ class AgentSessionImpl implements AgentSession {
                     break
                 }
 
+                // 无动作且未结束时，重置重复计数（保持“连续”语义）
+                this.resetActionRepetition()
                 break
             }
 
@@ -648,18 +700,21 @@ class AgentSessionImpl implements AgentSession {
     async close() {
         if (this.closed) return
         this.closed = true
-        await this.emitEvent('session_end', {
-            meta: {
-                durationMs: Date.now() - this.startedAt,
-                tokens: this.sessionUsage,
-            },
-        })
-        for (const sink of this.sinks) {
-            if (sink.flush) {
-                try {
-                    await sink.flush()
-                } catch (err) {
-                    console.error(`History flush failed: ${(err as Error).message}`)
+        const hasContent = this.sessionStartEmitted || this.turnIndex >= 0
+        if (hasContent) {
+            await this.emitEvent('session_end', {
+                meta: {
+                    durationMs: Date.now() - this.startedAt,
+                    tokens: this.sessionUsage,
+                },
+            })
+            for (const sink of this.sinks) {
+                if (sink.flush) {
+                    try {
+                        await sink.flush()
+                    } catch (err) {
+                        console.error(`History flush failed: ${(err as Error).message}`)
+                    }
                 }
             }
         }

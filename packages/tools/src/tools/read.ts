@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { extname } from 'node:path'
 import { gzipSync } from 'node:zlib'
+import { access, readFile } from 'node:fs/promises'
 import { normalizePath } from '@memo/tools/tools/helpers'
 import type { McpTool } from './types'
 import { textResult } from '@memo/tools/tools/mcp'
@@ -67,12 +68,9 @@ export const readTool: McpTool<ReadInput> = {
         const limit = Math.min(requestedLimit, MAX_LIMIT)
 
         try {
-            const file = Bun.file(path)
-            if (!(await file.exists())) {
-                return textResult(`文件不存在: ${path}`, true)
-            }
-
-            const size = file.size
+            await access(path)
+            const buffer = await readFile(path)
+            const size = buffer.byteLength
             const isImage = isImagePath(path)
 
             // 图片：压缩+base64 返回，防止上下文膨胀
@@ -83,7 +81,7 @@ export const readTool: McpTool<ReadInput> = {
                         true,
                     )
                 }
-                const bytes = new Uint8Array(await file.arrayBuffer())
+                const bytes = new Uint8Array(buffer)
                 const { data, encoding } = compressIfBeneficial(bytes)
                 const base64Full = bufferToBase64(data)
                 const truncated =
@@ -110,7 +108,7 @@ export const readTool: McpTool<ReadInput> = {
                 )
             }
 
-            const probe = new Uint8Array(await file.arrayBuffer())
+            const probe = new Uint8Array(buffer)
             const probeLength = Math.min(probe.length, BINARY_PROBE_LENGTH)
             for (let i = 0; i < probeLength; i++) {
                 if (probe[i] === 0) {

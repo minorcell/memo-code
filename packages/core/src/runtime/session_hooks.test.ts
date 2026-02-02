@@ -1,6 +1,6 @@
 /** @file Session Hook & Middleware 行为测试。 */
 import assert from 'node:assert'
-import { describe, test } from 'bun:test'
+import { describe, test } from 'vitest'
 import { createAgentSession, createTokenCounter } from '@memo/core'
 import type { Tool } from '@memo/core/toolRouter'
 
@@ -105,6 +105,39 @@ describe('session hooks & middleware', () => {
             const result = await session.runTurn('hi')
             assert.strictEqual(result.finalText, 'done')
             assert.deepStrictEqual(hookLog, ['action:echo', 'final:done'])
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('warns after three identical tool calls', async () => {
+        const outputs = [
+            '{"tool":"echo","input":{"text":"loop"}}',
+            '{"tool":"echo","input":{"text":"loop"}}',
+            '{"tool":"echo","input":{"text":"loop"}}',
+            '{"final":"done"}',
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => ({
+                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
+                }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('loop?')
+            assert.strictEqual(result.finalText, 'done')
+            const systemMessages = session.history.filter((m) => m.role === 'system')
+            // 0: initial system prompt, 1: warning
+            assert.strictEqual(systemMessages.length, 2)
+            assert.ok(
+                systemMessages[1]?.content.includes('连续3次调用同一工具'),
+                'should insert repetition warning',
+            )
         } finally {
             await session.close()
         }
