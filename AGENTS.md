@@ -13,7 +13,7 @@
 
 - 安装依赖：`pnpm install`。
 - 本地运行（自动选择 TUI/单轮模式）：`pnpm start` 或 `pnpm start "prompt" --once`。
-- 生成可分发包：`pnpm run build`；生成可执行二进制：`pnpm run build:binary`（产出 `memo`）。
+- 生成可分发包：`pnpm run build`（产出 `dist/index.js` 和 `dist/prompt.md`，适用于 NPM 发布）。
 - 格式化：`pnpm run format`（写入）/ `pnpm run format:check`（CI 只检查）。
 - 测试：`pnpm test` 全量；或按包：`pnpm run test:core`、`pnpm run test:tools`、`pnpm run test:cli`。CI 使用 `pnpm run ci` 串联格式检查、核心/工具测试与构建。
 - 本地常见故障：未设置 `OPENAI_API_KEY`/`DEEPSEEK_API_KEY` 会提示交互输入；非 TTY 环境会自动退回单轮模式。
