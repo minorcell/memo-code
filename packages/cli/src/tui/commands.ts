@@ -20,6 +20,7 @@ export type SlashCommandResult =
 const HELP_TEXT = `Available commands:
   /help       Show help and shortcuts
   /exit       Exit the session
+  exit        Exit the session (no slash)
   /new        Start a new session
   /models     Pick a model from config
   /history    Show session history
@@ -33,6 +34,7 @@ Shortcuts:
   Up/Down     Browse input history
   Ctrl+L      Start a new session
   Ctrl+C      Exit
+  exit        Type in input to exit
   Ctrl+X      Toggle mode
   Ctrl+/      Show help`
 

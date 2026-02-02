@@ -402,6 +402,12 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
 
     const handleSubmit = useCallback(
         async (value: string) => {
+            // Support plain "exit" in addition to "/exit"
+            if (value.trim().toLowerCase() === 'exit') {
+                await handleExit()
+                return
+            }
+
             if (!session || busy) return
             if (value.startsWith('/')) {
                 await handleCommand(value)
@@ -415,7 +421,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 setBusy(false)
             }
         },
-        [busy, handleCommand, session],
+        [busy, handleCommand, handleExit, session],
     )
 
     const lastTurn = turns[turns.length - 1]

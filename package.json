@@ -7,6 +7,7 @@
         "start": "bun run packages/cli/src/index.tsx",
         "build": "bun build packages/cli/src/index.tsx --target bun --outdir dist --minify",
         "build:binary": "bun build packages/cli/src/index.tsx --target=bun --compile --outfile=memo-code-cli",
+        "update:global": "bun run build:binary && mkdir -p \"$HOME/bin\" && cp memo-code-cli \"$HOME/bin/memo\"",
         "format": "bunx prettier --write .",
         "format:check": "bunx prettier --check .",
         "test": "bun test",
