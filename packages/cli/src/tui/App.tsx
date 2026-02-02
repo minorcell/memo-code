@@ -246,6 +246,37 @@ export function App({
         setCurrentContextTokens(0) // Reset context tokens on clear
     }, [])
 
+    const handleNewSession = useCallback(async () => {
+        // Clear UI state
+        setTurns([])
+        setSystemMessages([])
+        setHistoricalTurns([])
+        setPendingHistoryMessages(null)
+        setCurrentContextTokens(0)
+
+        // Create new session
+        const newSessionId = randomUUID()
+        const newSessionOptions: AgentSessionOptions = {
+            ...sessionOptionsState,
+            sessionId: newSessionId,
+        }
+
+        // Close previous session
+        if (sessionRef.current) {
+            await sessionRef.current.close()
+        }
+
+        // Create new session
+        const created = await createAgentSession(deps, newSessionOptions)
+        sessionRef.current = created
+        setSession(created)
+        setSessionLogPath(created.historyFilePath ?? null)
+        setSessionOptionsState(newSessionOptions)
+
+        // Show system message
+        appendSystemMessage('New Session', 'Started a new session with fresh context.')
+    }, [deps, sessionOptionsState, appendSystemMessage])
+
     const handleHistorySelect = useCallback(
         async (entry: InputHistoryEntry) => {
             if (!entry.sessionFile) {
@@ -365,7 +396,7 @@ export function App({
                 return
             }
             if (result.kind === 'new') {
-                handleClear()
+                await handleNewSession()
                 return
             }
             if (result.kind === 'switch_model') {
@@ -514,6 +545,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 onSubmit={handleSubmit}
                 onExit={handleExit}
                 onClear={handleClear}
+                onNewSession={handleNewSession}
                 onCancelRun={handleCancelRun}
                 onHistorySelect={handleHistorySelect}
                 onModelSelect={handleModelSelect}

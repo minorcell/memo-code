@@ -26,6 +26,15 @@ describe('parseAssistant thinking extraction', () => {
         expect(parsed.action?.tool).toBe('bash')
         expect(parsed.thinking).toBe('plain reasoning')
     })
+
+    test('repairs invalid JSON with unescaped quotes inside command', () => {
+        const message = `{"tool":"bash","input":{"command":"grep -r "Claude Code" --include="*.go" | head -5"}}`
+        const parsed = parseAssistant(message)
+
+        const command = (parsed.action?.input as { command?: string } | undefined)?.command
+        expect(parsed.action?.tool).toBe('bash')
+        expect(command).toBe('grep -r "Claude Code" --include="*.go" | head -5')
+    })
 })
 
 describe('buildThinking helper', () => {

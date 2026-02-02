@@ -15,6 +15,7 @@ type InputPromptProps = {
     onSubmit: (value: string) => void
     onExit: () => void
     onClear: () => void
+    onNewSession?: () => void
     onCancelRun: () => void
     onHistorySelect?: (entry: InputHistoryEntry) => void
     onModelSelect?: (provider: ProviderConfig) => void
@@ -71,6 +72,7 @@ export function InputPrompt({
     onSubmit,
     onExit,
     onClear,
+    onNewSession,
     onCancelRun,
     onModelSelect,
     onSystemMessage,
@@ -309,6 +311,9 @@ export function InputPrompt({
                     clearScreen: () => {
                         onClear()
                     },
+                    newSession: () => {
+                        onNewSession?.()
+                    },
                     exitApp: () => {
                         onExit()
                     },
@@ -382,6 +387,7 @@ export function InputPrompt({
             setDraft('')
             closeSuggestions()
             onClear()
+            onNewSession?.()
             return
         }
 
