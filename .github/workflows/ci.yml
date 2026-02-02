@@ -15,22 +15,28 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-            - uses: oven-sh/setup-bun@v1
+            - uses: pnpm/action-setup@v2
+              with:
+                  version: 9
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'pnpm'
 
             - name: Install ripgrep
               run: sudo apt-get update && sudo apt-get install -y ripgrep
 
             - name: Install dependencies
-              run: bun install
+              run: pnpm install
 
             - name: Format check
-              run: bun run format:check
+              run: pnpm run format:check
 
             - name: Test all packages
-              run: bun run test:core && bun run test:tools
+              run: pnpm run test:core && pnpm run test:tools
 
             - name: Test build
-              run: bun run build
+              run: pnpm run build
 
     # 仅在 tags 构建二进制文件
     build:
@@ -49,7 +55,13 @@ jobs:
                       artifact: memo-windows-x64.exe
         steps:
             - uses: actions/checkout@v4
-            - uses: oven-sh/setup-bun@v1
+            - uses: pnpm/action-setup@v2
+              with:
+                  version: 9
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'pnpm'
 
             - name: Install ripgrep (Linux)
               if: runner.os == 'Linux'
@@ -63,21 +75,13 @@ jobs:
               if: runner.os == 'Windows'
               run: choco install ripgrep -y
 
-            - run: bun install
+            - run: pnpm install
 
             - name: Build
-              run: bun build packages/cli/src/index.tsx --target=bun --compile --outfile=${{ matrix.artifact }}
-
-            - name: Test binary
-              run: ./${{ matrix.artifact }} --help
-              if: runner.os != 'Windows'
-
-            - name: Test binary (Windows)
-              run: .\${{ matrix.artifact }} --help
-              if: runner.os == 'Windows'
+              run: pnpm run build
 
             - uses: actions/upload-artifact@v4
               with:
                   name: ${{ matrix.artifact }}
-                  path: ${{ matrix.artifact }}
+                  path: dist/index.js
                   retention-days: 7

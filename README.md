@@ -1,13 +1,17 @@
 # Memo Code
 
-本地运行的 AI 编程助手，支持多轮对话、工具调用、并发执行。基于 Bun + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
+本地运行的 AI 编程助手，支持多轮对话、工具调用、并发。基于 Node.js + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
 
 ## 快速开始
 
-### 1. 安装依赖
+### 1. 安装
 
 ```bash
-bun install
+npm install -g @memo-code/memo
+# 或
+pnpm add -g @memo-code/memo
+# 或
+yarn global add @memo-code/memo
 ```
 
 ### 2. 配置 API Key
@@ -19,14 +23,14 @@ export DEEPSEEK_API_KEY=your_key  # 或 OPENAI_API_KEY
 ### 3. 启动使用
 
 ```bash
-bun start
-# 首次运行会引导配置 provider/model，并保存到 ~/.memo/config.toml
+memo
+# 首次运行会引导配置 provider/model，并（保存到 ~/.memo/config.toml）
 ```
 
 ## 使用方式
 
-- 交互式：`bun start`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
-- 单轮：`bun start "你的问题" --once`（纯文本输出，适合脚本）。
+- 交互式：`memo`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
+- 单轮：`memo "你的问题" --once`（纯文本输出，适合脚本）。
 
 ## 配置文件
 
@@ -98,31 +102,31 @@ JSONL 格式便于分析和调试。
 ### 本地运行
 
 ```bash
-bun start
+npm install
+npm start
 # 或
-bun start "prompt" --once
+npm start "prompt" --once
 ```
 
 ### 构建
 
 ```bash
-bun run build         # 生成 dist/index.js
-bun run build:binary  # 生成可执行文件 memo
+npm run build  # 生成 dist/index.js
 ```
 
 ### 测试
 
 ```bash
-bun test              # 全量测试
-bun run test:core     # 测试 core 包
-bun run test:tools    # 测试 tools 包
+pnpm test              # 全量测试
+pnpm test packages/core     # 测试 core 包
+pnpm test packages/tools    # 测试 tools 包
 ```
 
 ### 代码格式化
 
 ```bash
-bun run format        # 格式化所有文件
-bun run format:check  # 检查格式（CI）
+npm run format        # 格式化所有文件
+npm run format:check  # 检查格式（CI）
 ```
 
 ## 项目结构
@@ -150,7 +154,7 @@ memo-cli/
 
 ## 技术栈
 
-- **Runtime**: Bun 1.1+
+- **Runtime**: Node.js 18+
 - **语言**: TypeScript
 - **UI**: React + Ink
 - **Protocol**: MCP (Model Context Protocol)

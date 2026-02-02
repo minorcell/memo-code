@@ -122,7 +122,7 @@ safe_patterns = [
 ## 示例
 
 ```bash
-$ bun start "delete all log files"
+$ pnpm start "delete all log files"
 
 ⚠️  需要工具审批:
   Tool: bash

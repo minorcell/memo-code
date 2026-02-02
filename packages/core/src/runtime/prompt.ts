@@ -1,6 +1,8 @@
 /** @file 系统提示词加载：默认读取内置 Markdown 模板。 */
 import os from 'node:os'
-import prompt from './prompt.md' with { type: 'text' }
+import { readFile } from 'node:fs/promises'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const TEMPLATE_PATTERN = /{{\s*([\w.-]+)\s*}}/g
 
@@ -21,6 +23,9 @@ function resolveUsername(): string {
  * 可在外部通过依赖注入覆盖。
  */
 export async function loadSystemPrompt(): Promise<string> {
+    const __dirname = dirname(fileURLToPath(import.meta.url))
+    const promptPath = join(__dirname, 'prompt.md')
+    const prompt = await readFile(promptPath, 'utf-8')
     const vars = {
         date: new Date().toISOString(),
         user: resolveUsername(),

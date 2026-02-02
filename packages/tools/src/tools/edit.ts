@@ -1,7 +1,8 @@
-import { z } from 'zod'
+import { access, readFile, writeFile } from 'node:fs/promises'
 import { normalizePath } from '@memo/tools/tools/helpers'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
+import { z } from 'zod'
 
 const EDIT_INPUT_SCHEMA = z
     .object({
@@ -30,11 +31,8 @@ export const editTool: McpTool<EditInput> = {
         }
 
         try {
-            const file = Bun.file(path)
-            if (!(await file.exists())) {
-                return textResult(`文件不存在: ${path}`, true)
-            }
-            const original = await file.text()
+            await access(path)
+            const original = await readFile(path, 'utf8')
 
             if (!original.includes(input.old_string)) {
                 return textResult('未找到待替换文本', true)
@@ -55,9 +53,13 @@ export const editTool: McpTool<EditInput> = {
                 return textResult('未检测到内容变化')
             }
 
-            await Bun.write(path, replaced)
+            await writeFile(path, replaced, 'utf8')
             return textResult(`替换完成: file=${path} count=${count}`)
         } catch (err) {
+            const code = (err as NodeJS.ErrnoException).code
+            if (code === 'ENOENT') {
+                return textResult(`文件不存在: ${path}`, true)
+            }
             return textResult(`edit 失败: ${(err as Error).message}`, true)
         }
     },

@@ -12,6 +12,7 @@ import {
 import { JsonlHistorySink } from '@memo/core/runtime/history'
 import { loadSystemPrompt as defaultLoadPrompt } from '@memo/core/runtime/prompt'
 import { ToolRouter } from '@memo/core/toolRouter'
+import { readFile, access } from 'node:fs/promises'
 import type {
     AgentSessionDeps,
     AgentSessionOptions,
@@ -90,15 +91,13 @@ export async function withDefaultDeps(
         // 注入长期记忆
         const memoryPath = getMemoryPath(loaded)
         try {
-            const file = Bun.file(memoryPath)
-            if (await file.exists()) {
-                const memory = (await file.text()).trim()
-                if (memory) {
-                    basePrompt += `\n\n# Long-Term Memory\n${memory}`
-                }
+            await access(memoryPath)
+            const memory = (await readFile(memoryPath, 'utf-8')).trim()
+            if (memory) {
+                basePrompt += `\n\n# Long-Term Memory\n${memory}`
             }
-        } catch (err) {
-            console.warn(`Failed to read memo: ${(err as Error).message}`)
+        } catch {
+            // Memory file doesn't exist, ignore
         }
 
         return basePrompt

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { buildThinking, parseAssistant } from '@memo/core/utils/utils'
 
 describe('parseAssistant thinking extraction', () => {

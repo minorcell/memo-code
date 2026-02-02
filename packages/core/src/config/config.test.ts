@@ -3,7 +3,8 @@ import assert from 'node:assert'
 import { mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeAll, afterAll, describe, test, expect } from 'bun:test'
+import { beforeAll, afterAll, describe, test, expect } from 'vitest'
+import { readFile, writeFile } from 'node:fs/promises'
 import {
     buildSessionPath,
     loadMemoConfig,
@@ -121,7 +122,7 @@ describe('mcp config serialization', () => {
             },
         })
 
-        const text = await Bun.file(configPath).text()
+        const text = await readFile(configPath, 'utf-8')
         expect(text).toContain('[[providers.deepseek]]')
         expect(text).toContain('[mcp_servers.remote]')
         expect(text).toContain('type = "streamable_http"')
@@ -156,7 +157,7 @@ fallback_to_sse = true
 type = "sse"
 url = "https://legacy.example.com/mcp"
 `
-        await Bun.write(join(home, 'config.toml'), configText)
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
 
         const loaded = await loadMemoConfig()
         const servers = loaded.config.mcp_servers ?? {}
@@ -184,7 +185,7 @@ name = "legacy"
 env_api_key = "LEGACY_API_KEY"
 model = "legacy-model"
 `
-        await Bun.write(join(home, 'config.toml'), configText)
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
 
         const loaded = await loadMemoConfig()
         expect(loaded.needsSetup).toBe(true)

@@ -1,6 +1,6 @@
 /** @file Session Hook & Middleware 行为测试。 */
 import assert from 'node:assert'
-import { describe, test } from 'bun:test'
+import { describe, test } from 'vitest'
 import { createAgentSession, createTokenCounter } from '@memo/core'
 import type { Tool } from '@memo/core/toolRouter'
 

@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import { z } from 'zod'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
@@ -29,18 +30,30 @@ export const bashTool: McpTool<BashInput> = {
         if (!cmd) return textResult('bash 需要要执行的命令', true)
 
         try {
-            const proc = Bun.spawn(['bash', '-lc', cmd], {
-                stdout: 'pipe',
-                stderr: 'pipe',
+            const proc = spawn('bash', ['-lc', cmd], {
                 env: process.env,
+                stdio: ['ignore', 'pipe', 'pipe'],
             })
 
-            const stdoutPromise = new Response(proc.stdout).text().catch(() => '')
-            const stderrPromise = new Response(proc.stderr).text().catch(() => '')
+            const collectStream = (stream: NodeJS.ReadableStream | null) =>
+                new Promise<string>((resolve) => {
+                    if (!stream) return resolve('')
+                    const chunks: string[] = []
+                    stream.setEncoding('utf8')
+                    stream.on('data', (chunk) => chunks.push(chunk))
+                    stream.on('error', () => resolve(''))
+                    stream.on('end', () => resolve(chunks.join('')))
+                })
+
+            const stdoutPromise = collectStream(proc.stdout)
+            const stderrPromise = collectStream(proc.stderr)
 
             let timeoutId: ReturnType<typeof setTimeout> | undefined
 
-            const exitPromise = proc.exited
+            const exitPromise = new Promise<number>((resolve, reject) => {
+                proc.on('error', (error) => reject(error))
+                proc.on('close', (code) => resolve(typeof code === 'number' ? code : -1))
+            })
             const timeoutPromise =
                 timeout && timeout > 0
                     ? new Promise<never>((_, reject) => {
