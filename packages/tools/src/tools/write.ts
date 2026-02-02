@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { dirname } from 'node:path'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { normalizePath } from '@memo/tools/tools/helpers'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
@@ -41,7 +41,7 @@ export const writeTool: McpTool<WriteInput> = {
         const { data, info } = normalizeContent(input.content)
         try {
             await mkdir(dirname(path), { recursive: true })
-            await Bun.write(path, data)
+            await writeFile(path, data instanceof Uint8Array ? data : String(data))
             return textResult(`已写入 ${path} (overwrite, ${info})`)
         } catch (err) {
             return textResult(`写入失败: ${(err as Error).message}`, true)

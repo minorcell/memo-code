@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { describe, test } from 'bun:test'
+import { describe, test } from 'vitest'
 import { bashTool } from '@memo/tools/tools/bash'
 
 describe('bash tool', () => {
@@ -20,9 +20,6 @@ describe('bash tool', () => {
         const res = await bashTool.execute({ command: 'sleep 1', timeout: 50 })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
         assert.strictEqual(res.isError, true, 'should mark timeout as error')
-        assert.ok(
-            text.includes('超时'),
-            `expected timeout message, got "${text}"`,
-        )
+        assert.ok(text.includes('超时'), `expected timeout message, got "${text}"`)
     })
 })

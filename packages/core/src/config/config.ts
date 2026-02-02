@@ -1,5 +1,5 @@
 /** @file 配置管理：读取/写入 ~/.memo/config.toml 及路径构造工具。 */
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile, readFile, access } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -150,7 +150,7 @@ stream_output = ${config.stream_output ?? false}
 
 export async function writeMemoConfig(path: string, config: MemoConfig) {
     await mkdir(dirname(path), { recursive: true })
-    await Bun.write(path, serializeConfig(config))
+    await writeFile(path, serializeConfig(config), 'utf-8')
 }
 
 export type LoadedConfig = {
@@ -164,11 +164,8 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
     const home = process.env.MEMO_HOME ? expandHome(process.env.MEMO_HOME) : DEFAULT_MEMO_HOME
     const configPath = join(home, 'config.toml')
     try {
-        const file = Bun.file(configPath)
-        if (!(await file.exists())) {
-            return { config: DEFAULT_CONFIG, home, configPath, needsSetup: true }
-        }
-        const text = await file.text()
+        await access(configPath)
+        const text = await readFile(configPath, 'utf-8')
         const parsed = parse(text) as ParsedMemoConfig
         const providers = normalizeProviders(parsed.providers)
         const merged: MemoConfig = {

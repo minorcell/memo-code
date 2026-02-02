@@ -1,8 +1,9 @@
 import assert from 'node:assert'
+import { spawnSync } from 'node:child_process'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { describe, test, beforeAll, afterAll } from 'bun:test'
-import { $ } from 'bun'
+import { afterAll, beforeAll, describe, test } from 'vitest'
 import { globTool } from '@memo/tools/tools/glob'
 import { grepTool } from '@memo/tools/tools/grep'
 
@@ -11,18 +12,18 @@ let filePath: string
 
 async function makeTempDir(prefix: string) {
     const dir = join(tmpdir(), `${prefix}-${crypto.randomUUID()}`)
-    await $`mkdir -p ${dir}`
+    await mkdir(dir, { recursive: true })
     return dir
 }
 
 async function removeDir(dir: string) {
-    await $`rm -rf ${dir}`
+    await rm(dir, { recursive: true, force: true })
 }
 
 beforeAll(async () => {
     tempDir = await makeTempDir('memo-tools-glob-grep')
     filePath = join(tempDir, 'sample.txt')
-    await Bun.write(filePath, 'hello\nfoo bar\nbaz')
+    await writeFile(filePath, 'hello\nfoo bar\nbaz', 'utf8')
 })
 
 afterAll(async () => {
@@ -44,7 +45,10 @@ describe('glob tool', () => {
 })
 
 describe('grep tool', () => {
-    const rgAvailable = Boolean(Bun.which('rg'))
+    const rgAvailable = (() => {
+        const result = spawnSync('rg', ['--version'], { stdio: 'ignore' })
+        return !result.error && result.status === 0
+    })()
 
     test('finds content with default output', async () => {
         const res = await grepTool.execute({ pattern: 'foo', path: tempDir })
