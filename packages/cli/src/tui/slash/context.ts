@@ -2,7 +2,7 @@ import type { SlashCommand } from './types'
 
 export const contextCommand: SlashCommand = {
     name: 'context',
-    description: '设置上下文长度限制 (80k/120k/150k/200k)',
+    description: 'Set context length limit (80k/120k/150k/200k)',
     run: ({ closeSuggestions, setInputValue, showSystemMessage, data }) => {
         closeSuggestions()
         const options = '80k, 120k, 150k, 200k'
