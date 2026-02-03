@@ -345,7 +345,7 @@ export function InputPrompt({
                 onSetContextLimit?.(limit)
                 onSystemMessage?.(
                     'Context',
-                    `已设置上下文上限为 ${(limit / 1000).toFixed(0)}k tokens`,
+                    `Context limit set to ${(limit / 1000).toFixed(0)}k tokens`,
                 )
                 valueRef.current = ''
                 setValue('')
