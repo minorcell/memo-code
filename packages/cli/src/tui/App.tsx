@@ -280,7 +280,7 @@ export function App({
     const handleHistorySelect = useCallback(
         async (entry: InputHistoryEntry) => {
             if (!entry.sessionFile) {
-                appendSystemMessage('历史记录', '该记录没有可加载的上下文文件。')
+                appendSystemMessage('History', 'This entry has no context file to load.')
                 return
             }
             try {
@@ -296,11 +296,11 @@ export function App({
                 currentTurnRef.current = null
                 // 重新拉起 session，避免旧上下文残留/计数错位
                 setSessionOptionsState((prev) => ({ ...prev, sessionId: randomUUID() }))
-                appendSystemMessage('历史记录已加载', parsed.summary || entry.input)
+                appendSystemMessage('History loaded', parsed.summary || entry.input)
             } catch (err) {
                 appendSystemMessage(
-                    '历史记录加载失败',
-                    `无法读取 ${entry.sessionFile}: ${(err as Error).message}`,
+                    'Failed to load history',
+                    `Unable to read ${entry.sessionFile}: ${(err as Error).message}`,
                 )
             }
         },
@@ -314,7 +314,10 @@ export function App({
                 const nextConfig = { ...loaded.config, current_provider: name }
                 await writeMemoConfig(loaded.configPath, nextConfig)
             } catch (err) {
-                appendSystemMessage('配置保存失败', `未能保存模型选择: ${(err as Error).message}`)
+                appendSystemMessage(
+                    'Failed to save config',
+                    `Failed to save model selection: ${(err as Error).message}`,
+                )
             }
         },
         [appendSystemMessage],
@@ -328,11 +331,17 @@ export function App({
     const handleModelSelect = useCallback(
         async (provider: ProviderConfig) => {
             if (provider.name === currentProvider && provider.model === currentModel) {
-                appendSystemMessage('模型切换', `已在使用 ${provider.name} (${provider.model})`)
+                appendSystemMessage(
+                    'Model switch',
+                    `Already using ${provider.name} (${provider.model})`,
+                )
                 return
             }
             if (busy) {
-                appendSystemMessage('模型切换', '当前正在运行，按 Esc Esc 取消后再切换模型。')
+                appendSystemMessage(
+                    'Model switch',
+                    'Currently running. Press Esc Esc to cancel before switching models.',
+                )
                 return
             }
             setTurns([])
@@ -350,7 +359,10 @@ export function App({
                 providerName: provider.name,
             }))
             await persistCurrentProvider(provider.name)
-            appendSystemMessage('模型切换', `已切换到 ${provider.name} (${provider.model})`)
+            appendSystemMessage(
+                'Model switch',
+                `Switched to ${provider.name} (${provider.model})`,
+            )
         },
         [appendSystemMessage, busy, currentModel, currentProvider, persistCurrentProvider],
     )
@@ -407,7 +419,7 @@ export function App({
                 setContextLimit(result.limit)
                 appendSystemMessage(
                     'Context length',
-                    `已设置上下文上限为 ${(result.limit / 1000).toFixed(0)}k tokens`,
+                    `Context limit set to ${(result.limit / 1000).toFixed(0)}k tokens`,
                 )
                 return
             }
@@ -554,7 +566,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                     setContextLimit(limit)
                     appendSystemMessage(
                         'Context length',
-                        `已设置上下文上限为 ${(limit / 1000).toFixed(0)}k tokens`,
+                        `Context limit set to ${(limit / 1000).toFixed(0)}k tokens`,
                     )
                 }}
                 history={inputHistory}
