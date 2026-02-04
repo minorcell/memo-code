@@ -376,10 +376,6 @@ export function InputPrompt({
     )
 
     useInput((input, key) => {
-        if (key.ctrl && input === 'c') {
-            onExit()
-            return
-        }
         if (key.ctrl && input === 'l') {
             valueRef.current = ''
             setValue('')
