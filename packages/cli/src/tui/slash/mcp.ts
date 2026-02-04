@@ -32,7 +32,7 @@ function formatServerConfig(name: string, config: MCPServerConfig): string {
 
 export const mcpCommand: SlashCommand = {
     name: 'mcp',
-    description: '查看当前配置的 MCP servers',
+    description: 'Show configured MCP servers',
     run: ({ closeSuggestions, setInputValue, showSystemMessage, data }) => {
         closeSuggestions()
 

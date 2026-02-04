@@ -17,6 +17,7 @@ function tryParseJSON(text: string): unknown | null {
 
 /**
  * 从文本中提取所有 JSON 对象
+ * 支持脏JSON：包含换行符、注释等
  */
 function extractJSONObjects(
     text: string,
@@ -25,10 +26,14 @@ function extractJSONObjects(
     const seen = new Set<string>() // 去重
 
     // 匹配策略1: Markdown JSON 代码块 ```json ... ```
-    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*(?:```|$)/g
+    // 使用深度匹配来支持嵌套的大括号
+    const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/g
     let match: RegExpExecArray | null
     while ((match = codeBlockRegex.exec(text)) !== null) {
-        const json = match[1] || ''
+        const content = match[1] || ''
+        if (!content) continue
+        // 从代码块内容中提取JSON对象
+        const json = extractFirstJSONObject(content)
         if (!json || seen.has(json)) continue
         try {
             const obj = tryParseJSON(json)
@@ -41,20 +46,76 @@ function extractJSONObjects(
     }
 
     // 匹配策略2: 裸 JSON 对象（独立成行或被空格包围）
-    // 使用更精确的正则，匹配完整的 JSON 对象
-    const jsonRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g
-    while ((match = jsonRegex.exec(text)) !== null) {
-        const json = match[0]
-        if (!json || seen.has(json)) continue
-        // 确保这看起来像是个完整的对象
+    // 使用栈来匹配嵌套的大括号
+    const jsonMatches = findJSONObjects(text)
+    for (const { json, start, end } of jsonMatches) {
+        if (seen.has(json)) continue
         if (!json.includes('"tool"') && !json.includes('"final"')) continue
         try {
             const obj = tryParseJSON(json)
             if (obj === null) continue
-            results.push({ json, start: match.index, end: match.index + json.length, obj })
+            results.push({ json, start, end, obj })
             seen.add(json)
         } catch {
             // ignore invalid JSON
+        }
+    }
+
+    return results
+}
+
+/**
+ * 从文本中提取第一个完整的 JSON 对象
+ */
+function extractFirstJSONObject(text: string): string | null {
+    const matches = findJSONObjects(text)
+    return matches[0]?.json ?? null
+}
+
+/**
+ * 使用栈算法查找所有 JSON 对象
+ * 能正确处理嵌套的大括号
+ */
+function findJSONObjects(text: string): Array<{ json: string; start: number; end: number }> {
+    const results: Array<{ json: string; start: number; end: number }> = []
+    let braceCount = 0
+    let start = -1
+    let inString = false
+    let escapeNext = false
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i]
+
+        if (escapeNext) {
+            escapeNext = false
+            continue
+        }
+
+        if (char === '\\' && inString) {
+            escapeNext = true
+            continue
+        }
+
+        if (char === '"' && !inString) {
+            inString = true
+        } else if (char === '"' && inString) {
+            inString = false
+        }
+
+        if (inString) continue
+
+        if (char === '{') {
+            if (braceCount === 0) {
+                start = i
+            }
+            braceCount++
+        } else if (char === '}') {
+            braceCount--
+            if (braceCount === 0 && start !== -1) {
+                const json = text.slice(start, i + 1)
+                results.push({ json, start, end: i + 1 })
+                start = -1
+            }
         }
     }
 

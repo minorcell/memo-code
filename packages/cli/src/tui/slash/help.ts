@@ -23,7 +23,7 @@ Shortcuts:
 
 export const helpCommand: SlashCommand = {
     name: 'help',
-    description: '显示帮助信息',
+    description: 'Show help',
     run: ({ closeSuggestions, setInputValue, showSystemMessage }) => {
         closeSuggestions()
         setInputValue('')
