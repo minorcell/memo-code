@@ -104,18 +104,18 @@ export const StepView = memo(function StepView({ step }: StepViewProps) {
                     {parallelActions.map((tool, idx) => {
                         const toolParam = getMainParam(tool.input)
                         return (
-                        <Box key={idx}>
-                            <Text color="green">● </Text>
-                            <Text color="gray">Used </Text>
-                            <Text color="cyan">{tool.tool}</Text>
-                            {toolParam && (
-                                <>
-                                    <Text color="gray"> (</Text>
-                                    <Text color="cyan">{toolParam}</Text>
-                                    <Text color="gray">)</Text>
-                                </>
-                            )}
-                        </Box>
+                            <Box key={idx}>
+                                <Text color="green">● </Text>
+                                <Text color="gray">Used </Text>
+                                <Text color="cyan">{tool.tool}</Text>
+                                {toolParam && (
+                                    <>
+                                        <Text color="gray"> (</Text>
+                                        <Text color="cyan">{toolParam}</Text>
+                                        <Text color="gray">)</Text>
+                                    </>
+                                )}
+                            </Box>
                         )
                     })}
                 </>

@@ -59,7 +59,10 @@ mcell@memo-cli ▊
         const parsed = parseAssistant(message)
 
         expect(parsed.action?.tool).toBe('todo')
-        const input = parsed.action?.input as { type: string; todos: Array<{ id: string; content: string }> }
+        const input = parsed.action?.input as {
+            type: string
+            todos: Array<{ id: string; content: string }>
+        }
         expect(input?.type).toBe('replace')
         expect(input?.todos[0]?.content).toBe('task1')
     })
@@ -71,7 +74,10 @@ mcell@memo-cli ▊`
         const parsed = parseAssistant(message)
 
         expect(parsed.action?.tool).toBe('todo')
-        const input = parsed.action?.input as { type: string; todos: Array<{ id: string; content: string }> }
+        const input = parsed.action?.input as {
+            type: string
+            todos: Array<{ id: string; content: string }>
+        }
         expect(input?.todos).toHaveLength(2)
         expect(input?.todos[0]?.content).toBe('task1')
         expect(input?.todos[1]?.content).toBe('task2')
