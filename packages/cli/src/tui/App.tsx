@@ -74,6 +74,7 @@ export function App({
     const [pendingHistoryMessages, setPendingHistoryMessages] = useState<ChatMessage[] | null>(null)
     const sessionRef = useRef<AgentSession | null>(null)
     const [exitMessage, setExitMessage] = useState<string | null>(null)
+    const sequenceRef = useRef(0)
     const [contextLimit, setContextLimit] = useState<number>(
         sessionOptions.maxPromptTokens ?? 120000,
     )
@@ -84,10 +85,19 @@ export function App({
     const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null)
     const approvalResolverRef = useRef<((decision: ApprovalDecision) => void) | null>(null)
 
-    const appendSystemMessage = useCallback((title: string, content: string) => {
-        const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
-        setSystemMessages((prev) => [...prev, { id, title, content }])
+    const nextSequence = useCallback(() => {
+        sequenceRef.current += 1
+        return sequenceRef.current
     }, [])
+
+    const appendSystemMessage = useCallback(
+        (title: string, content: string) => {
+            const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+            const sequence = nextSequence()
+            setSystemMessages((prev) => [...prev, { id, title, content, sequence }])
+        },
+        [nextSequence],
+    )
 
     const updateTurn = useCallback((turnIndex: number, updater: (turn: TurnView) => TurnView) => {
         setTurns((prev) => {
@@ -149,7 +159,7 @@ export function App({
                         contextPromptTokens: promptTokens ?? existing.contextPromptTokens,
                     }))
                 },
-                onAction: ({ turn, step, action, thinking }) => {
+                onAction: ({ turn, step, action, thinking, parallelActions }) => {
                     updateTurn(turn, (turnState) => {
                         const steps = turnState.steps.slice()
                         while (steps.length <= step) {
@@ -162,12 +172,16 @@ export function App({
                             action,
                             thinking,
                             toolStatus: 'executing',
+                            parallelActions:
+                                parallelActions && parallelActions.length > 1
+                                    ? parallelActions
+                                    : undefined,
                         }
                         return { ...turnState, steps }
                     })
                 },
                 onObservation: ({ turn, step, observation }) => {
-                    // 保存 observation 用于显示批量工具调用
+                    // 保存 observation 供状态判断与后续用途
                     updateTurn(turn, (turnState) => {
                         const steps = turnState.steps.slice()
                         while (steps.length <= step) {
@@ -188,6 +202,7 @@ export function App({
                         const startedAt = turnState.startedAt ?? Date.now()
                         const durationMs = Math.max(0, Date.now() - startedAt)
                         const promptTokens = tokenUsage?.prompt ?? turnState.contextPromptTokens
+                        const sequence = turnState.sequence ?? nextSequence()
                         return {
                             ...turnState,
                             finalText,
@@ -196,13 +211,14 @@ export function App({
                             contextPromptTokens: promptTokens,
                             startedAt,
                             durationMs,
+                            sequence,
                         }
                     })
                     setBusy(false)
                 },
             },
         }),
-        [updateTurn, dangerous],
+        [updateTurn, dangerous, nextSequence],
     )
 
     useEffect(() => {
@@ -251,6 +267,7 @@ export function App({
         setHistoricalTurns([])
         setPendingHistoryMessages(null)
         setCurrentContextTokens(0) // Reset context tokens on clear
+        sequenceRef.current = 0
     }, [])
 
     const handleNewSession = useCallback(async () => {
@@ -260,6 +277,7 @@ export function App({
         setHistoricalTurns([])
         setPendingHistoryMessages(null)
         setCurrentContextTokens(0)
+        sequenceRef.current = 0
 
         // Create new session
         const newSessionId = randomUUID()
@@ -301,6 +319,7 @@ export function App({
                 setSessionLogPath(null)
                 setCurrentContextTokens(0) // Reset context tokens when loading history
                 currentTurnRef.current = null
+                sequenceRef.current = Math.max(sequenceRef.current, parsed.maxSequence)
                 // 重新拉起 session，避免旧上下文残留/计数错位
                 setSessionOptionsState((prev) => ({ ...prev, sessionId: randomUUID() }))
                 appendSystemMessage('History loaded', parsed.summary || entry.input)
@@ -610,6 +629,7 @@ function parseHistoryLog(raw: string): {
     summary: string
     messages: ChatMessage[]
     turns: TurnView[]
+    maxSequence: number
 } {
     const messages: ChatMessage[] = []
     const turns: TurnView[] = []
@@ -620,6 +640,7 @@ function parseHistoryLog(raw: string): {
         .filter(Boolean)
     let currentTurn: TurnView | null = null
     let turnCount = 0
+    let sequence = 0
 
     for (const line of lines) {
         let event: any
@@ -637,6 +658,7 @@ function parseHistoryLog(raw: string): {
                 userInput,
                 steps: [],
                 status: 'ok',
+                sequence: (sequence += 1),
             }
             turns.push(currentTurn)
             if (userInput) {
@@ -668,9 +690,24 @@ function parseHistoryLog(raw: string): {
                 const tool = typeof meta.tool === 'string' ? meta.tool : ''
                 const input = meta.input
                 const thinking = typeof meta.thinking === 'string' ? meta.thinking : ''
+                const toolBlocks = Array.isArray((meta as any).toolBlocks)
+                    ? ((meta as any).toolBlocks as Array<{ name?: unknown; input?: unknown }>)
+                    : []
+                const parallelActions = toolBlocks
+                    .map((block) => {
+                        const name = typeof block?.name === 'string' ? block.name : ''
+                        if (!name) return null
+                        return { tool: name, input: block?.input }
+                    })
+                    .filter(Boolean) as Array<{ tool: string; input: unknown }>
                 const lastStep = currentTurn.steps[currentTurn.steps.length - 1]
                 if (lastStep) {
-                    lastStep.action = { tool, input }
+                    if (parallelActions.length > 1) {
+                        lastStep.action = parallelActions[0]
+                        lastStep.parallelActions = parallelActions
+                    } else if (tool) {
+                        lastStep.action = { tool, input }
+                    }
                     if (thinking) {
                         lastStep.thinking = thinking
                     }
@@ -692,5 +729,6 @@ function parseHistoryLog(raw: string): {
         summary: summaryParts.join('\n'),
         messages,
         turns,
+        maxSequence: sequence,
     }
 }

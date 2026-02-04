@@ -564,6 +564,10 @@ class AgentSessionImpl implements AgentSession {
                                 tool: firstTool.name,
                                 input: firstTool.input,
                             },
+                            parallelActions: toolUseBlocks.map((block) => ({
+                                tool: block.name,
+                                input: block.input,
+                            })),
                             thinking: parsed.thinking,
                             history: snapshotHistory(this.history),
                         })

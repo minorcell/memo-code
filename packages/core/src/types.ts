@@ -214,6 +214,8 @@ export type ActionHookPayload = {
     turn: number
     step: number
     action: NonNullable<ParsedAssistant['action']>
+    /** 并发工具调用时，包含所有工具 action（顺序与调用一致）。 */
+    parallelActions?: Array<NonNullable<ParsedAssistant['action']>>
     thinking?: string
     history: ChatMessage[]
 }

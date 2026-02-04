@@ -74,7 +74,7 @@ export const MainContent = memo(function MainContent({
     const allCompletedTurns = isLastTurnComplete ? turns : turns.slice(0, -1)
     const inProgressTurn = isLastTurnComplete ? undefined : lastTurn
 
-    // Create a combined list of all static items (header + system messages + completed turns)
+    // Create a combined list of all static items (header + timeline events)
     type StaticItem =
         | { type: 'header'; data: typeof headerInfo }
         | { type: 'system'; data: SystemMessage }
@@ -87,14 +87,21 @@ export const MainContent = memo(function MainContent({
         staticItems.push({ type: 'header', data: headerInfo })
     }
 
-    // Add system messages
+    const timelineItems: Array<{ sequence: number; item: StaticItem }> = []
+
     for (const msg of systemMessages) {
-        staticItems.push({ type: 'system', data: msg })
+        timelineItems.push({ sequence: msg.sequence, item: { type: 'system', data: msg } })
     }
 
-    // Add completed turns
     for (const turn of allCompletedTurns) {
-        staticItems.push({ type: 'turn', data: turn })
+        const sequence = turn.sequence ?? 0
+        timelineItems.push({ sequence, item: { type: 'turn', data: turn } })
+    }
+
+    timelineItems.sort((a, b) => a.sequence - b.sequence)
+
+    for (const entry of timelineItems) {
+        staticItems.push(entry.item)
     }
 
     return (
