@@ -8,15 +8,25 @@ import type {
     FinalHookPayload,
     ObservationHookPayload,
     TurnStartHookPayload,
+    ApprovalHookPayload,
+    ApprovalResponseHookPayload,
 } from '@memo/core/types'
 
-export type HookName = 'onTurnStart' | 'onAction' | 'onObservation' | 'onFinal'
+export type HookName =
+    | 'onTurnStart'
+    | 'onAction'
+    | 'onObservation'
+    | 'onFinal'
+    | 'onApprovalRequest'
+    | 'onApprovalResponse'
 
 export type HookPayloadMap = {
     onTurnStart: TurnStartHookPayload
     onAction: ActionHookPayload
     onObservation: ObservationHookPayload
     onFinal: FinalHookPayload
+    onApprovalRequest: ApprovalHookPayload
+    onApprovalResponse: ApprovalResponseHookPayload
 }
 
 export type HookRunnerMap = {
@@ -29,6 +39,8 @@ function emptyHookMap(): HookRunnerMap {
         onAction: [],
         onObservation: [],
         onFinal: [],
+        onApprovalRequest: [],
+        onApprovalResponse: [],
     }
 }
 
@@ -38,6 +50,8 @@ function registerMiddleware(target: HookRunnerMap, middleware?: AgentMiddleware)
     if (middleware.onAction) target.onAction.push(middleware.onAction)
     if (middleware.onObservation) target.onObservation.push(middleware.onObservation)
     if (middleware.onFinal) target.onFinal.push(middleware.onFinal)
+    if (middleware.onApprovalRequest) target.onApprovalRequest.push(middleware.onApprovalRequest)
+    if (middleware.onApprovalResponse) target.onApprovalResponse.push(middleware.onApprovalResponse)
 }
 
 export function buildHookRunners(deps: AgentSessionDeps): HookRunnerMap {

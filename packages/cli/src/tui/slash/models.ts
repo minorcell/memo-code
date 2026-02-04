@@ -2,7 +2,7 @@ import type { SlashCommand } from './types'
 
 export const modelsCommand: SlashCommand = {
     name: 'models',
-    description: '选择模型（展示配置里的 providers）',
+    description: 'Select a model (from configured providers)',
     run: ({ closeSuggestions, setInputValue, showSystemMessage, data }) => {
         closeSuggestions(false)
 
