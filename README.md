@@ -12,6 +12,8 @@ npm install -g @memo-code/memo
 pnpm add -g @memo-code/memo
 # 或
 yarn global add @memo-code/memo
+# 或
+bun add -g @memo-code/memo
 ```
 
 ### 2. 配置 API Key
@@ -31,6 +33,7 @@ memo
 
 - 交互式：`memo`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
 - 单轮：`memo "你的问题" --once`（纯文本输出，适合脚本）。
+- 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 
 ## 配置文件
 
@@ -81,6 +84,18 @@ url = "https://your-mcp-server.com/mcp"
 - `todo`：管理任务列表
 
 通过 MCP 协议可扩展更多工具。
+
+## 工具审批系统
+
+新增工具审批机制，保护用户免受危险操作影响：
+
+- **自动审批**：安全工具（read、glob、grep等）自动通过
+- **手动审批**：危险工具（bash、write、edit等）需要用户确认
+- **审批选项**：
+    - `once`：仅批准当前操作
+    - `session`：批准本次会话中的所有同类操作
+    - `deny`：拒绝操作
+- **危险模式**：`--dangerous` 参数跳过所有审批（仅限信任场景）
 
 ## 会话历史
 
@@ -146,9 +161,10 @@ memo-cli/
 - `/help`：显示帮助与快捷键说明。
 - `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
 - `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
-- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`），不再经模型代理。
+- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`）。
 - `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
 - 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。
+- **工具审批**：危险操作会弹出审批对话框，可选择 `once`/`session`/`deny`。
 
 > 仅当会话包含用户消息时才写入 `sessions/` JSONL 日志，避免空会话文件。
 
