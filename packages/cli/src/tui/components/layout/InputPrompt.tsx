@@ -511,7 +511,7 @@ export function InputPrompt({
     return (
         <Box flexDirection="column" gap={1}>
             {/* Prompt line with › prefix - with dark gray background and padding */}
-            <Box flexDirection="column" backgroundColor="blackBright" paddingY={1}>
+            <Box flexDirection="column" paddingY={1}>
                 <Box>
                     <Text color="gray">{inputPrefix}</Text>
                     {disabled ? (
@@ -532,12 +532,6 @@ export function InputPrompt({
                         {index === lines.length - 2 && <Text color="cyan">{cursor}</Text>}
                     </Box>
                 ))}
-                {/* Shortcuts hint - inside gray background */}
-                {suggestionMode === 'none' && !disabled && (
-                    <Box>
-                        <Text color="gray">↓ for shortcuts</Text>
-                    </Box>
-                )}
             </Box>
 
             {suggestionMode !== 'none' ? (
