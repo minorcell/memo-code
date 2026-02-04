@@ -57,13 +57,14 @@ function findIgnoreRoot(startPath: string): string {
         // ignore invalid paths; fall back to cwd
         dir = process.cwd()
     }
+    const initial = dir
 
     while (true) {
         if (existsSync(join(dir, '.gitignore')) || existsSync(join(dir, '.git'))) {
             return dir
         }
         const parent = dirname(dir)
-        if (parent === dir) return dir
+        if (parent === dir) return initial
         dir = parent
     }
 }
