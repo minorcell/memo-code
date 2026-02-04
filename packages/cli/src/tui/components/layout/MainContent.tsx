@@ -35,6 +35,9 @@ function formatSessionId(id: string): string {
 function arePropsEqual(prevProps: MainContentProps, nextProps: MainContentProps): boolean {
     // Check header info (shouldn't change often)
     if (prevProps.headerInfo?.sessionId !== nextProps.headerInfo?.sessionId) return false
+    if (prevProps.headerInfo?.model !== nextProps.headerInfo?.model) return false
+    if (prevProps.headerInfo?.providerName !== nextProps.headerInfo?.providerName) return false
+    if (prevProps.headerInfo?.cwd !== nextProps.headerInfo?.cwd) return false
 
     // Check system messages
     if (prevProps.systemMessages.length !== nextProps.systemMessages.length) return false

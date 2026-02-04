@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { z } from 'zod'
-import { normalizePath } from '@memo/tools/tools/helpers'
+import { normalizePath, getIgnoreMatcher, appendLongResultHint } from '@memo/tools/tools/helpers'
+import { isAbsolute, resolve } from 'node:path'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
@@ -55,6 +56,7 @@ export const grepTool: McpTool<GrepInput> = {
         args.push(input.pattern, basePath)
 
         try {
+            const matcher = await getIgnoreMatcher(basePath)
             const proc = spawn('rg', args, {
                 stdio: ['ignore', 'pipe', 'pipe'],
             })
@@ -83,11 +85,31 @@ export const grepTool: McpTool<GrepInput> = {
                 return textResult(`grep 失败(exit=2): ${stderr || stdout}`, true)
             }
 
-            if (exitCode === 1 && !stdout.trim()) {
+            const rawOutput = stdout || stderr || ''
+            const lines = rawOutput
+                .split(/\r?\n/)
+                .map((line) => line.trimEnd())
+                .filter((line) => line.length > 0)
+            const kept = lines.filter((line) => {
+                if (mode === 'files_with_matches') {
+                    const path = line.trim()
+                    const absPath = isAbsolute(path) ? path : resolve(basePath, path)
+                    return !matcher.ignores(absPath)
+                }
+
+                const firstColon = line.indexOf(':')
+                if (firstColon === -1) return true
+                const path = line.slice(0, firstColon)
+                const absPath = isAbsolute(path) ? path : resolve(basePath, path)
+                return !matcher.ignores(absPath)
+            })
+
+            if (kept.length === 0) {
                 return textResult('未找到匹配')
             }
 
-            return textResult(stdout || stderr || `命令完成 exit=${exitCode}`)
+            const output = kept.join('\n')
+            return textResult(appendLongResultHint(output, kept.length))
         } catch (err) {
             return textResult(`grep 执行失败: ${(err as Error).message}`, true)
         }

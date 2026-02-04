@@ -26,6 +26,7 @@ import { InputPrompt } from './components/layout/InputPrompt'
 import { ApprovalModal } from './components/modals/ApprovalModal'
 import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
 import { resolveSlashCommand } from './commands'
+import { checkForUpdate } from './version'
 
 const execAsync = promisify(exec)
 
@@ -241,6 +242,21 @@ export function App({
             cancelled = true
         }
     }, [deps, sessionOptionsState])
+
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            const info = await checkForUpdate()
+            if (cancelled || !info) return
+            appendSystemMessage(
+                'Update',
+                `Update available: v${info.latest}. Run npm/pnpm/yarn/bun to update @memo-code/memo.`,
+            )
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [appendSystemMessage])
 
     useEffect(() => {
         return () => {

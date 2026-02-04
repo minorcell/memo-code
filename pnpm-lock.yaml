@@ -121,6 +121,9 @@ importers:
             fast-glob:
                 specifier: ^3.3.3
                 version: 3.3.3
+            ignore:
+                specifier: ^5.3.1
+                version: 5.3.2
             zod:
                 specifier: ^4.3.6
                 version: 4.3.6
@@ -707,7 +710,6 @@ packages:
             }
         cpu: [arm]
         os: [linux]
-        libc: [glibc]
 
     '@rollup/rollup-linux-arm-musleabihf@4.57.1':
         resolution:
@@ -716,7 +718,6 @@ packages:
             }
         cpu: [arm]
         os: [linux]
-        libc: [musl]
 
     '@rollup/rollup-linux-arm64-gnu@4.57.1':
         resolution:
@@ -725,7 +726,6 @@ packages:
             }
         cpu: [arm64]
         os: [linux]
-        libc: [glibc]
 
     '@rollup/rollup-linux-arm64-musl@4.57.1':
         resolution:
@@ -734,7 +734,6 @@ packages:
             }
         cpu: [arm64]
         os: [linux]
-        libc: [musl]
 
     '@rollup/rollup-linux-loong64-gnu@4.57.1':
         resolution:
@@ -743,7 +742,6 @@ packages:
             }
         cpu: [loong64]
         os: [linux]
-        libc: [glibc]
 
     '@rollup/rollup-linux-loong64-musl@4.57.1':
         resolution:
@@ -752,7 +750,6 @@ packages:
             }
         cpu: [loong64]
         os: [linux]
-        libc: [musl]
 
     '@rollup/rollup-linux-ppc64-gnu@4.57.1':
         resolution:
@@ -761,7 +758,6 @@ packages:
             }
         cpu: [ppc64]
         os: [linux]
-        libc: [glibc]
 
     '@rollup/rollup-linux-ppc64-musl@4.57.1':
         resolution:
@@ -770,7 +766,6 @@ packages:
             }
         cpu: [ppc64]
         os: [linux]
-        libc: [musl]
 
     '@rollup/rollup-linux-riscv64-gnu@4.57.1':
         resolution:
@@ -779,7 +774,6 @@ packages:
             }
         cpu: [riscv64]
         os: [linux]
-        libc: [glibc]
 
     '@rollup/rollup-linux-riscv64-musl@4.57.1':
         resolution:
@@ -788,7 +782,6 @@ packages:
             }
         cpu: [riscv64]
         os: [linux]
-        libc: [musl]
 
     '@rollup/rollup-linux-s390x-gnu@4.57.1':
         resolution:
@@ -797,7 +790,6 @@ packages:
             }
         cpu: [s390x]
         os: [linux]
-        libc: [glibc]
 
     '@rollup/rollup-linux-x64-gnu@4.57.1':
         resolution:
@@ -806,7 +798,6 @@ packages:
             }
         cpu: [x64]
         os: [linux]
-        libc: [glibc]
 
     '@rollup/rollup-linux-x64-musl@4.57.1':
         resolution:
@@ -815,7 +806,6 @@ packages:
             }
         cpu: [x64]
         os: [linux]
-        libc: [musl]
 
     '@rollup/rollup-openbsd-x64@4.57.1':
         resolution:
@@ -1531,6 +1521,13 @@ packages:
                 integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==,
             }
         engines: { node: '>=0.10.0' }
+
+    ignore@5.3.2:
+        resolution:
+            {
+                integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==,
+            }
+        engines: { node: '>= 4' }
 
     ignore@7.0.5:
         resolution:
@@ -3284,6 +3281,8 @@ snapshots:
     iconv-lite@0.7.2:
         dependencies:
             safer-buffer: 2.1.2
+
+    ignore@5.3.2: {}
 
     ignore@7.0.5: {}
 
