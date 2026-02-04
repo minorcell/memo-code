@@ -92,9 +92,9 @@ url = "https://your-mcp-server.com/mcp"
 - **自动审批**：安全工具（read、glob、grep等）自动通过
 - **手动审批**：危险工具（bash、write、edit等）需要用户确认
 - **审批选项**：
-  - `once`：仅批准当前操作
-  - `session`：批准本次会话中的所有同类操作
-  - `deny`：拒绝操作
+    - `once`：仅批准当前操作
+    - `session`：批准本次会话中的所有同类操作
+    - `deny`：拒绝操作
 - **危险模式**：`--dangerous` 参数跳过所有审批（仅限信任场景）
 
 ## 会话历史

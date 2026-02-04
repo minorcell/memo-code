@@ -385,10 +385,7 @@ export function App({
                 providerName: provider.name,
             }))
             await persistCurrentProvider(provider.name)
-            appendSystemMessage(
-                'Model switch',
-                `Switched to ${provider.name} (${provider.model})`,
-            )
+            appendSystemMessage('Model switch', `Switched to ${provider.name} (${provider.model})`)
         },
         [appendSystemMessage, busy, currentModel, currentProvider, persistCurrentProvider],
     )
