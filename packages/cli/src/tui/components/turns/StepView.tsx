@@ -12,7 +12,6 @@ type StepViewProps = {
 function getMainParam(toolInput: unknown): string | undefined {
     if (!toolInput) return undefined
 
-    // Handle string input (e.g., raw command)
     if (typeof toolInput === 'string') {
         if (toolInput.length > 50) {
             return toolInput.slice(0, 47) + '...'
@@ -20,27 +19,15 @@ function getMainParam(toolInput: unknown): string | undefined {
         return toolInput
     }
 
-    // Must be an object to proceed
     if (typeof toolInput !== 'object' || Array.isArray(toolInput)) return undefined
 
     const input = toolInput as Record<string, any>
 
-    // Priority order for common parameter names
-    const priorityKeys = [
-        'path',
-        'file',
-        'filename',
-        'url',
-        'command',
-        'pattern',
-        'query',
-        'content',
-    ]
+    const priorityKeys = ['path', 'file', 'filename', 'url', 'command', 'pattern', 'query', 'content']
 
     for (const key of priorityKeys) {
         if (input[key]) {
             const value = String(input[key])
-            // Truncate if too long
             if (value.length > 50) {
                 return value.slice(0, 47) + '...'
             }
@@ -48,7 +35,6 @@ function getMainParam(toolInput: unknown): string | undefined {
         }
     }
 
-    // If no priority key found, use the first string value
     for (const [key, value] of Object.entries(input)) {
         if (typeof value === 'string' && key !== 'description') {
             if (value.length > 50) {
@@ -68,14 +54,12 @@ function parseParallelTools(
     if (!observation) return []
 
     const tools: Array<{ tool: string; output: string }> = []
-    // 支持带下划线、连字符、点的工具名（如 mcp_server_name_tool-name）
     const regex = /\[([\w\-_.]+)\]: ([\s\S]*?)(?=\n\n\[|$)/g
     let match
 
     while ((match = regex.exec(observation)) !== null) {
         const output = match[2]?.trim() ?? ''
         const toolName = match[1] ?? 'unknown'
-        // Extract meaningful preview (first non-empty line or first 60 chars)
         const lines = output.split('\n').filter((l) => l.trim())
         const preview = lines[0] ?? output
         tools.push({
@@ -95,38 +79,28 @@ function areStepsEqual(prevProps: StepViewProps, nextProps: StepViewProps): bool
     if (prev.index !== next.index) return false
     if (prev.assistantText !== next.assistantText) return false
     if (prev.thinking !== next.thinking) return false
+    // 只比较 action 的 tool 和 input，因为显示只用这些
     if (prev.action?.tool !== next.action?.tool) return false
-    if (prev.observation !== next.observation) return false
+    if (JSON.stringify(prev.action?.input) !== JSON.stringify(next.action?.input)) return false
     if (prev.toolStatus !== next.toolStatus) return false
 
     return true
 }
 
-// Extract tool info from action for display
-function getToolInfo(action: { tool: string; input: unknown } | undefined): {
-    toolName: string | undefined
-    mainParam: string | undefined
-} {
-    if (!action) return { toolName: undefined, mainParam: undefined }
-    return {
-        toolName: action.tool,
-        mainParam: getMainParam(action.input),
-    }
-}
-
-export const StepView = memo(function StepView({ step, hideAssistantText = false }: StepViewProps) {
-    // Extract tool name and main parameter from action
+export const StepView = memo(function StepView({ step }: StepViewProps) {
+    // 始终从 action 获取工具信息（参数不会变）
     const toolName = step.action?.tool
     const toolInput = step.action?.input as Record<string, any> | undefined
     const mainParam = getMainParam(toolInput)
 
-    // Check if this is a parallel tool call
+    // 检查是否是真正的并行调用（需要多个工具）
     const parallelTools = parseParallelTools(step.observation)
+    // 只有明确标记为并行，或有多个工具时，才用并行模式显示
     const isParallel = parallelTools.length > 1
 
     return (
         <Box flexDirection="column" gap={0}>
-            {/* Render thinking text as muted (gray) */}
+            {/* Render thinking text */}
             {step.thinking && (
                 <Box>
                     <Text color="gray">● </Text>
@@ -136,7 +110,7 @@ export const StepView = memo(function StepView({ step, hideAssistantText = false
                 </Box>
             )}
 
-            {/* Render parallel tool usage */}
+            {/* 并行工具调用 - 显示多个工具 */}
             {isParallel && (
                 <>
                     {parallelTools.map((tool, idx) => (
@@ -144,19 +118,15 @@ export const StepView = memo(function StepView({ step, hideAssistantText = false
                             <Text color="green">● </Text>
                             <Text color="gray">Used </Text>
                             <Text color="cyan">{tool.tool}</Text>
-                            {tool.output && (
-                                <>
-                                    <Text color="gray"> (</Text>
-                                    <Text color="cyan">{tool.output}</Text>
-                                    <Text color="gray">)</Text>
-                                </>
-                            )}
+                            <Text color="gray"> (</Text>
+                            <Text color="cyan">{tool.output}</Text>
+                            <Text color="gray">)</Text>
                         </Box>
                     ))}
                 </>
             )}
 
-            {/* Render single tool usage */}
+            {/* 单工具调用 - 始终显示 action 中的参数，不显示 observation 内容 */}
             {!isParallel && toolName && (
                 <Box>
                     <Text color="green">● </Text>
