@@ -14,7 +14,6 @@ type MainContentProps = {
         model: string
         cwd: string
         sessionId: string
-        updateMessage?: string
     }
 }
 
@@ -39,7 +38,6 @@ function arePropsEqual(prevProps: MainContentProps, nextProps: MainContentProps)
     if (prevProps.headerInfo?.model !== nextProps.headerInfo?.model) return false
     if (prevProps.headerInfo?.providerName !== nextProps.headerInfo?.providerName) return false
     if (prevProps.headerInfo?.cwd !== nextProps.headerInfo?.cwd) return false
-    if (prevProps.headerInfo?.updateMessage !== nextProps.headerInfo?.updateMessage) return false
 
     // Check system messages
     if (prevProps.systemMessages.length !== nextProps.systemMessages.length) return false
@@ -80,9 +78,17 @@ export const MainContent = memo(function MainContent({
     const inProgressTurn = isLastTurnComplete ? undefined : lastTurn
 
     // Create a combined list of all static items (header + timeline events)
-    type StaticItem = { type: 'system'; data: SystemMessage } | { type: 'turn'; data: TurnViewType }
+    type StaticItem =
+        | { type: 'header'; data: typeof headerInfo }
+        | { type: 'system'; data: SystemMessage }
+        | { type: 'turn'; data: TurnViewType }
 
     const staticItems: StaticItem[] = []
+
+    // Add header
+    if (headerInfo) {
+        staticItems.push({ type: 'header', data: headerInfo })
+    }
 
     const timelineItems: Array<{ sequence: number; item: StaticItem }> = []
 
@@ -103,47 +109,51 @@ export const MainContent = memo(function MainContent({
 
     return (
         <Box flexDirection="column" gap={0}>
-            {headerInfo && (
-                <Box
-                    borderStyle="round"
-                    borderColor="blueBright"
-                    paddingX={2}
-                    paddingY={1}
-                    flexDirection="column"
-                    gap={1}
-                >
-                    <Box gap={1} alignItems="center">
-                        <Box flexDirection="column">
-                            <Text bold>Welcome to Memo Code CLI!</Text>
-                            <Text color="gray">Send /help for help information.</Text>
-                        </Box>
-                    </Box>
-                    <Box flexDirection="column" gap={0}>
-                        <Box>
-                            <Text color="gray">Directory: </Text>
-                            <Text color="cyan">{formatCwd(headerInfo.cwd)}</Text>
-                        </Box>
-                        <Box>
-                            <Text color="gray">Session: </Text>
-                            <Text color="cyan">{formatSessionId(headerInfo.sessionId)}</Text>
-                        </Box>
-                        <Box>
-                            <Text color="gray">Model: </Text>
-                            <Text color="cyan">{headerInfo.model}</Text>
-                            <Text color="gray"> (powered by {headerInfo.providerName})</Text>
-                        </Box>
-                        {headerInfo.updateMessage && (
-                            <Box>
-                                <Text color="yellow">{headerInfo.updateMessage}</Text>
-                            </Box>
-                        )}
-                    </Box>
-                </Box>
-            )}
-
             {/* All completed content in a single Static block */}
             <Static items={staticItems}>
                 {(item) => {
+                    if (item.type === 'header' && item.data) {
+                        const header = item.data
+                        return (
+                            <Box
+                                key="header"
+                                borderStyle="round"
+                                borderColor="blueBright"
+                                paddingX={2}
+                                paddingY={1}
+                                flexDirection="column"
+                                gap={1}
+                            >
+                                <Box gap={1} alignItems="center">
+                                    <Box flexDirection="column">
+                                        <Text bold>Welcome to Memo Code CLI!</Text>
+                                        <Text color="gray">Send /help for help information.</Text>
+                                    </Box>
+                                </Box>
+                                <Box flexDirection="column" gap={0}>
+                                    <Box>
+                                        <Text color="gray">Directory: </Text>
+                                        <Text color="cyan">{formatCwd(header.cwd)}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Text color="gray">Session: </Text>
+                                        <Text color="cyan">
+                                            {formatSessionId(header.sessionId)}
+                                        </Text>
+                                    </Box>
+                                    <Box>
+                                        <Text color="gray">Model: </Text>
+                                        <Text color="cyan">{header.model}</Text>
+                                        <Text color="gray">
+                                            {' '}
+                                            (powered by {header.providerName})
+                                        </Text>
+                                    </Box>
+                                </Box>
+                            </Box>
+                        )
+                    }
+
                     if (item.type === 'system') {
                         return <SystemMessageView key={item.data.id} message={item.data} />
                     }

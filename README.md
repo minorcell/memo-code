@@ -1,6 +1,20 @@
-# Memo Code
+<div align="center">
+  <img src="public/logo.svg" width="80" height="80" alt="Memo Logo">
+  <h1>Memo Code</h1>
+  <p>本地运行的 AI 编程助手，支持多轮对话、工具调用、并发</p>
+</div>
 
-本地运行的 AI 编程助手，支持多轮对话、工具调用、并发。基于 Node.js + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
+<p align="center">
+  <a href="public/memo-code-cli-show-01.mp4">
+    <img src="https://img.shields.io/badge/📹-观看演示视频-1a1a1a?style=for-the-badge" alt="Demo Video">
+  </a>
+</p>
+
+---
+
+<video src="public/memo-code-cli-show-01.mp4" width="100%"></video>
+
+基于 Node.js + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
 
 ## 快速开始
 
