@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { normalizePath } from '@memo/tools/tools/helpers'
+import { normalizePath, getIgnoreMatcher, appendLongResultHint } from '@memo/tools/tools/helpers'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 import fg from 'fast-glob'
@@ -25,12 +25,18 @@ export const globFastTool: McpTool<GlobInput> = {
         const cwd = input.path ? normalizePath(input.path) : process.cwd()
 
         try {
+            const matcher = await getIgnoreMatcher(cwd)
             const matches = await fg(input.pattern, {
                 cwd,
                 absolute: true,
                 onlyFiles: true,
             })
-            return textResult(matches.join('\n') || '未找到匹配文件')
+            const filtered = matches.filter((filePath) => !matcher.ignores(filePath))
+            if (filtered.length === 0) {
+                return textResult('未找到匹配文件')
+            }
+            const output = filtered.join('\n')
+            return textResult(appendLongResultHint(output, filtered.length))
         } catch (err) {
             return textResult(`glob 失败: ${(err as Error).message}`, true)
         }

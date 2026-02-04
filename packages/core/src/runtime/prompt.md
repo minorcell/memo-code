@@ -261,7 +261,7 @@ When user asks to create a commit:
 
 3. **Execute commit** (run commands in parallel where independent):
     - Add relevant untracked files
-    - Create commit with message ending: `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
+    - Create commit with message
     - Run git status to verify
 
 **Git Safety**:
@@ -278,8 +278,6 @@ When user asks to create a commit:
 ```bash
 git commit -m "$(cat <<'EOF'
 Commit message here.
-
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -313,7 +311,7 @@ gh pr create --title "title" --body "$(cat <<'EOF'
 ## Test plan
 [Checklist for testing]
 
-🤖 Generated with [Memo Code](https://github.com/yourusername/memo-cli)
+🤖 Generated with Memo Code
 EOF
 )"
 ```

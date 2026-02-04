@@ -26,6 +26,7 @@ import { InputPrompt } from './components/layout/InputPrompt'
 import { ApprovalModal } from './components/modals/ApprovalModal'
 import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
 import { resolveSlashCommand } from './commands'
+import { checkForUpdate } from './version'
 
 const execAsync = promisify(exec)
 
@@ -80,6 +81,7 @@ export function App({
     )
     // Track current session's actual context size (cumulative prompt tokens at turn start)
     const [currentContextTokens, setCurrentContextTokens] = useState<number>(0)
+    const [updateMessage, setUpdateMessage] = useState<string | null>(null)
 
     // 审批系统状态
     const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null)
@@ -241,6 +243,20 @@ export function App({
             cancelled = true
         }
     }, [deps, sessionOptionsState])
+
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            const info = await checkForUpdate()
+            if (cancelled || !info) return
+            setUpdateMessage(
+                `Update available: v${info.latest}. Run npm/pnpm/yarn/bun to update @memo-code/memo.`,
+            )
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     useEffect(() => {
         return () => {
@@ -583,6 +599,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                     model: currentModel,
                     cwd,
                     sessionId: sessionOptionsState.sessionId ?? 'unknown',
+                    updateMessage: updateMessage ?? undefined,
                 }}
             />
             <InputPrompt
