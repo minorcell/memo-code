@@ -68,7 +68,8 @@ function parseParallelTools(
     if (!observation) return []
 
     const tools: Array<{ tool: string; output: string }> = []
-    const regex = /\[(\w+)\]: ([\s\S]*?)(?=\n\n\[|$)/g
+    // 支持带下划线、连字符、点的工具名（如 mcp_server_name_tool-name）
+    const regex = /\[([\w\-_.]+)\]: ([\s\S]*?)(?=\n\n\[|$)/g
     let match
 
     while ((match = regex.exec(observation)) !== null) {
@@ -99,6 +100,18 @@ function areStepsEqual(prevProps: StepViewProps, nextProps: StepViewProps): bool
     if (prev.toolStatus !== next.toolStatus) return false
 
     return true
+}
+
+// Extract tool info from action for display
+function getToolInfo(action: { tool: string; input: unknown } | undefined): {
+    toolName: string | undefined
+    mainParam: string | undefined
+} {
+    if (!action) return { toolName: undefined, mainParam: undefined }
+    return {
+        toolName: action.tool,
+        mainParam: getMainParam(action.input),
+    }
 }
 
 export const StepView = memo(function StepView({ step, hideAssistantText = false }: StepViewProps) {

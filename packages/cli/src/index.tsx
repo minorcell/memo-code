@@ -17,6 +17,7 @@ import { App } from './tui/App'
 
 type CliOptions = {
     once: boolean
+    dangerous: boolean
 }
 
 type ParsedArgs = {
@@ -24,10 +25,11 @@ type ParsedArgs = {
     options: CliOptions
 }
 
-/** Minimal argv parsing, supports --once only. */
+/** Minimal argv parsing, supports --once and --dangerous. */
 function parseArgs(argv: string[]): ParsedArgs {
     const options: CliOptions = {
         once: false,
+        dangerous: false,
     }
     const questionParts: string[] = []
 
@@ -38,6 +40,10 @@ function parseArgs(argv: string[]): ParsedArgs {
         }
         if (arg === '--once') {
             options.once = true
+            continue
+        }
+        if (arg === '--dangerous' || arg === '-d') {
+            options.dangerous = true
             continue
         }
         questionParts.push(arg)
@@ -112,10 +118,25 @@ async function runPlainMode(parsed: ParsedArgs) {
         stream: loaded.config.stream_output ?? false,
     }
 
+    // 危险模式下显示警告
+    if (parsed.options.dangerous) {
+        console.log('⚠️  DANGEROUS MODE: All tool approvals are bypassed!')
+    }
+
     const deps: AgentSessionDeps = {
         onAssistantStep: (text: string) => {
             process.stdout.write(text)
         },
+        // 非危险模式下，plain 模式不支持交互式审批，所以不设置 requestApproval
+        // 当工具需要审批时会返回错误
+        requestApproval: parsed.options.dangerous
+            ? undefined
+            : (request) => {
+                  // Plain 模式下无法交互，直接拒绝
+                  console.log(`\n[approval required] ${request.toolName}: ${request.reason}`)
+                  console.log(`[approval] Run with --dangerous to bypass approval`)
+                  return Promise.resolve('deny')
+              },
         hooks: {
             onAction: ({ action }) => {
                 console.log(`\n[tool] ${action.tool}`)
@@ -172,6 +193,12 @@ async function runInteractiveTui(parsed: ParsedArgs) {
     }
     const sessionsDir = getSessionsDir(loaded, sessionOptions)
 
+    // 危险模式下显示警告
+    if (parsed.options.dangerous) {
+        console.log('⚠️  DANGEROUS MODE: All tool approvals are bypassed!')
+        console.log('   Use with caution.\n')
+    }
+
     const app = render(
         <App
             sessionOptions={sessionOptions}
@@ -182,6 +209,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             cwd={process.cwd()}
             sessionsDir={sessionsDir}
             providers={loaded.config.providers}
+            dangerous={parsed.options.dangerous}
         />,
         {
             exitOnCtrlC: false,
