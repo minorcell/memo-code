@@ -7,12 +7,10 @@ export type StepView = {
     assistantText: string
     thinking?: string
     action?: { tool: string; input: unknown }
+    /** 并发工具调用时的全部工具信息 */
+    parallelActions?: Array<{ tool: string; input: unknown }>
     observation?: string
     toolStatus?: ToolStatus
-    /** 并发调用标记：是否有多个工具同时执行 */
-    isParallel?: boolean
-    /** 并发调用的工具列表 */
-    parallelTools?: string[]
 }
 
 export type TurnView = {
@@ -26,10 +24,14 @@ export type TurnView = {
     finalText?: string
     startedAt?: number
     durationMs?: number
+    /** Timeline ordering (monotonic). Set when a turn is completed. */
+    sequence?: number
 }
 
 export type SystemMessage = {
     id: string
     title: string
     content: string
+    /** Timeline ordering (monotonic). */
+    sequence: number
 }

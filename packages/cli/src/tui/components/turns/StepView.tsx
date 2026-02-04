@@ -23,7 +23,20 @@ function getMainParam(toolInput: unknown): string | undefined {
 
     const input = toolInput as Record<string, any>
 
-    const priorityKeys = ['path', 'file', 'filename', 'url', 'command', 'pattern', 'query', 'content']
+    const priorityKeys = [
+        'file_path',
+        'path',
+        'file',
+        'filename',
+        'url',
+        'command',
+        'pattern',
+        'glob',
+        'query',
+        'content',
+        'cwd',
+        'dir',
+    ]
 
     for (const key of priorityKeys) {
         if (input[key]) {
@@ -47,30 +60,6 @@ function getMainParam(toolInput: unknown): string | undefined {
     return undefined
 }
 
-// Parse parallel tool calls from observation
-function parseParallelTools(
-    observation: string | undefined,
-): Array<{ tool: string; output: string }> {
-    if (!observation) return []
-
-    const tools: Array<{ tool: string; output: string }> = []
-    const regex = /\[([\w\-_.]+)\]: ([\s\S]*?)(?=\n\n\[|$)/g
-    let match
-
-    while ((match = regex.exec(observation)) !== null) {
-        const output = match[2]?.trim() ?? ''
-        const toolName = match[1] ?? 'unknown'
-        const lines = output.split('\n').filter((l) => l.trim())
-        const preview = lines[0] ?? output
-        tools.push({
-            tool: toolName,
-            output: preview.slice(0, 60) + (preview.length > 60 ? '...' : ''),
-        })
-    }
-
-    return tools
-}
-
 // Custom comparison for step memo
 function areStepsEqual(prevProps: StepViewProps, nextProps: StepViewProps): boolean {
     const prev = prevProps.step
@@ -82,6 +71,7 @@ function areStepsEqual(prevProps: StepViewProps, nextProps: StepViewProps): bool
     // 只比较 action 的 tool 和 input，因为显示只用这些
     if (prev.action?.tool !== next.action?.tool) return false
     if (JSON.stringify(prev.action?.input) !== JSON.stringify(next.action?.input)) return false
+    if (JSON.stringify(prev.parallelActions) !== JSON.stringify(next.parallelActions)) return false
     if (prev.toolStatus !== next.toolStatus) return false
 
     return true
@@ -93,10 +83,8 @@ export const StepView = memo(function StepView({ step }: StepViewProps) {
     const toolInput = step.action?.input as Record<string, any> | undefined
     const mainParam = getMainParam(toolInput)
 
-    // 检查是否是真正的并行调用（需要多个工具）
-    const parallelTools = parseParallelTools(step.observation)
-    // 只有明确标记为并行，或有多个工具时，才用并行模式显示
-    const isParallel = parallelTools.length > 1
+    const parallelActions = step.parallelActions ?? []
+    const isParallel = parallelActions.length > 1
 
     return (
         <Box flexDirection="column" gap={0}>
@@ -113,16 +101,23 @@ export const StepView = memo(function StepView({ step }: StepViewProps) {
             {/* 并行工具调用 - 显示多个工具 */}
             {isParallel && (
                 <>
-                    {parallelTools.map((tool, idx) => (
+                    {parallelActions.map((tool, idx) => {
+                        const toolParam = getMainParam(tool.input)
+                        return (
                         <Box key={idx}>
                             <Text color="green">● </Text>
                             <Text color="gray">Used </Text>
                             <Text color="cyan">{tool.tool}</Text>
-                            <Text color="gray"> (</Text>
-                            <Text color="cyan">{tool.output}</Text>
-                            <Text color="gray">)</Text>
+                            {toolParam && (
+                                <>
+                                    <Text color="gray"> (</Text>
+                                    <Text color="cyan">{toolParam}</Text>
+                                    <Text color="gray">)</Text>
+                                </>
+                            )}
                         </Box>
-                    ))}
+                        )
+                    })}
                 </>
             )}
 
