@@ -15,12 +15,15 @@ import {
     type ChatMessage,
     type ProviderConfig,
     type MCPServerConfig,
+    type ApprovalRequest,
+    type ApprovalDecision,
 } from '@memo/core'
 import type { InputHistoryEntry } from './suggestions'
 import type { StepView, SystemMessage, TurnView } from './types'
 import { TokenBar } from './components/layout/TokenBar'
 import { MainContent } from './components/layout/MainContent'
 import { InputPrompt } from './components/layout/InputPrompt'
+import { ApprovalModal } from './components/modals/ApprovalModal'
 import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
 import { resolveSlashCommand } from './commands'
 
@@ -35,6 +38,7 @@ export type AppProps = {
     cwd: string
     sessionsDir: string
     providers: ProviderConfig[]
+    dangerous?: boolean
 }
 
 function createEmptyTurn(index: number): TurnView {
@@ -50,6 +54,7 @@ export function App({
     cwd,
     sessionsDir,
     providers,
+    dangerous = false,
 }: AppProps) {
     const { exit } = useApp()
     const [currentProvider, setCurrentProvider] = useState(providerName)
@@ -69,16 +74,30 @@ export function App({
     const [pendingHistoryMessages, setPendingHistoryMessages] = useState<ChatMessage[] | null>(null)
     const sessionRef = useRef<AgentSession | null>(null)
     const [exitMessage, setExitMessage] = useState<string | null>(null)
+    const sequenceRef = useRef(0)
     const [contextLimit, setContextLimit] = useState<number>(
         sessionOptions.maxPromptTokens ?? 120000,
     )
     // Track current session's actual context size (cumulative prompt tokens at turn start)
     const [currentContextTokens, setCurrentContextTokens] = useState<number>(0)
 
-    const appendSystemMessage = useCallback((title: string, content: string) => {
-        const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
-        setSystemMessages((prev) => [...prev, { id, title, content }])
+    // 审批系统状态
+    const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null)
+    const approvalResolverRef = useRef<((decision: ApprovalDecision) => void) | null>(null)
+
+    const nextSequence = useCallback(() => {
+        sequenceRef.current += 1
+        return sequenceRef.current
     }, [])
+
+    const appendSystemMessage = useCallback(
+        (title: string, content: string) => {
+            const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+            const sequence = nextSequence()
+            setSystemMessages((prev) => [...prev, { id, title, content, sequence }])
+        },
+        [nextSequence],
+    )
 
     const updateTurn = useCallback((turnIndex: number, updater: (turn: TurnView) => TurnView) => {
         setTurns((prev) => {
@@ -115,6 +134,15 @@ export function App({
                     return { ...turn, steps }
                 })
             },
+            // 危险模式跳过审批
+            requestApproval: dangerous
+                ? undefined
+                : (request: ApprovalRequest) => {
+                      return new Promise((resolve) => {
+                          setPendingApproval(request)
+                          approvalResolverRef.current = resolve
+                      })
+                  },
             hooks: {
                 onTurnStart: ({ turn, input, promptTokens }) => {
                     currentTurnRef.current = turn
@@ -131,7 +159,7 @@ export function App({
                         contextPromptTokens: promptTokens ?? existing.contextPromptTokens,
                     }))
                 },
-                onAction: ({ turn, step, action, thinking }) => {
+                onAction: ({ turn, step, action, thinking, parallelActions }) => {
                     updateTurn(turn, (turnState) => {
                         const steps = turnState.steps.slice()
                         while (steps.length <= step) {
@@ -144,32 +172,37 @@ export function App({
                             action,
                             thinking,
                             toolStatus: 'executing',
+                            parallelActions:
+                                parallelActions && parallelActions.length > 1
+                                    ? parallelActions
+                                    : undefined,
                         }
                         return { ...turnState, steps }
                     })
                 },
                 onObservation: ({ turn, step, observation }) => {
-                    // 不显示工具结果，只显示参数
-                    // updateTurn(turn, (turnState) => {
-                    //     const steps = turnState.steps.slice()
-                    //     while (steps.length <= step) {
-                    //         steps.push({ index: steps.length, assistantText: '' })
-                    //     }
-                    //     const target = steps[step]
-                    //     if (!target) return turnState
-                    //     steps[step] = {
-                    //         ...target,
-                    //         observation,
-                    //         toolStatus: inferToolStatus(observation),
-                    //     }
-                    //     return { ...turnState, steps }
-                    // })
+                    // 保存 observation 供状态判断与后续用途
+                    updateTurn(turn, (turnState) => {
+                        const steps = turnState.steps.slice()
+                        while (steps.length <= step) {
+                            steps.push({ index: steps.length, assistantText: '' })
+                        }
+                        const target = steps[step]
+                        if (!target) return turnState
+                        steps[step] = {
+                            ...target,
+                            observation,
+                            toolStatus: inferToolStatus(observation),
+                        }
+                        return { ...turnState, steps }
+                    })
                 },
                 onFinal: ({ turn, finalText, status, turnUsage, tokenUsage }) => {
                     updateTurn(turn, (turnState) => {
                         const startedAt = turnState.startedAt ?? Date.now()
                         const durationMs = Math.max(0, Date.now() - startedAt)
                         const promptTokens = tokenUsage?.prompt ?? turnState.contextPromptTokens
+                        const sequence = turnState.sequence ?? nextSequence()
                         return {
                             ...turnState,
                             finalText,
@@ -178,13 +211,14 @@ export function App({
                             contextPromptTokens: promptTokens,
                             startedAt,
                             durationMs,
+                            sequence,
                         }
                     })
                     setBusy(false)
                 },
             },
         }),
-        [updateTurn],
+        [updateTurn, dangerous, nextSequence],
     )
 
     useEffect(() => {
@@ -220,23 +254,12 @@ export function App({
         if (sessionRef.current) {
             await sessionRef.current.close()
         }
-        let savedPath = ''
-        if (sessionLogPath) {
-            try {
-                const info = await stat(sessionLogPath)
-                if (info.size > 0) {
-                    savedPath = `\nSession saved: ${basename(sessionLogPath)}`
-                }
-            } catch {
-                // 文件不存在或无法读取时忽略
-            }
-        }
-        setExitMessage(`Bye!${savedPath}`)
+        setExitMessage('Bye!')
         // Give time for the message to render
         setTimeout(() => {
             exit()
-        }, 600)
-    }, [exit, sessionLogPath])
+        }, 300)
+    }, [exit])
 
     const handleClear = useCallback(() => {
         setTurns([])
@@ -244,6 +267,7 @@ export function App({
         setHistoricalTurns([])
         setPendingHistoryMessages(null)
         setCurrentContextTokens(0) // Reset context tokens on clear
+        sequenceRef.current = 0
     }, [])
 
     const handleNewSession = useCallback(async () => {
@@ -253,6 +277,7 @@ export function App({
         setHistoricalTurns([])
         setPendingHistoryMessages(null)
         setCurrentContextTokens(0)
+        sequenceRef.current = 0
 
         // Create new session
         const newSessionId = randomUUID()
@@ -294,6 +319,7 @@ export function App({
                 setSessionLogPath(null)
                 setCurrentContextTokens(0) // Reset context tokens when loading history
                 currentTurnRef.current = null
+                sequenceRef.current = Math.max(sequenceRef.current, parsed.maxSequence)
                 // 重新拉起 session，避免旧上下文残留/计数错位
                 setSessionOptionsState((prev) => ({ ...prev, sessionId: randomUUID() }))
                 appendSystemMessage('History loaded', parsed.summary || entry.input)
@@ -359,10 +385,7 @@ export function App({
                 providerName: provider.name,
             }))
             await persistCurrentProvider(provider.name)
-            appendSystemMessage(
-                'Model switch',
-                `Switched to ${provider.name} (${provider.model})`,
-            )
+            appendSystemMessage('Model switch', `Switched to ${provider.name} (${provider.model})`)
         },
         [appendSystemMessage, busy, currentModel, currentProvider, persistCurrentProvider],
     )
@@ -526,6 +549,16 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
     const contextPercent = calculateContextPercent(currentContextTokens, contextLimit)
     const displayTurns = useMemo(() => [...historicalTurns, ...turns], [historicalTurns, turns])
 
+    // 处理审批决策
+    const handleApprovalDecision = useCallback((decision: ApprovalDecision) => {
+        const resolver = approvalResolverRef.current
+        if (resolver) {
+            resolver(decision)
+            approvalResolverRef.current = null
+        }
+        setPendingApproval(null)
+    }, [])
+
     // Show exit message
     if (exitMessage) {
         const lines = exitMessage.split('\n')
@@ -553,7 +586,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 }}
             />
             <InputPrompt
-                disabled={!session || busy}
+                disabled={!session || busy || !!pendingApproval}
                 onSubmit={handleSubmit}
                 onExit={handleExit}
                 onClear={handleClear}
@@ -580,6 +613,10 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 contextLimit={contextLimit}
                 mcpServers={mcpServers}
             />
+            {/* 审批对话框显示在输入框下方 */}
+            {pendingApproval && (
+                <ApprovalModal request={pendingApproval} onDecision={handleApprovalDecision} />
+            )}
             <TokenBar contextPercent={contextPercent} />
         </Box>
     )
@@ -589,6 +626,7 @@ function parseHistoryLog(raw: string): {
     summary: string
     messages: ChatMessage[]
     turns: TurnView[]
+    maxSequence: number
 } {
     const messages: ChatMessage[] = []
     const turns: TurnView[] = []
@@ -599,6 +637,7 @@ function parseHistoryLog(raw: string): {
         .filter(Boolean)
     let currentTurn: TurnView | null = null
     let turnCount = 0
+    let sequence = 0
 
     for (const line of lines) {
         let event: any
@@ -616,6 +655,7 @@ function parseHistoryLog(raw: string): {
                 userInput,
                 steps: [],
                 status: 'ok',
+                sequence: (sequence += 1),
             }
             turns.push(currentTurn)
             if (userInput) {
@@ -647,9 +687,24 @@ function parseHistoryLog(raw: string): {
                 const tool = typeof meta.tool === 'string' ? meta.tool : ''
                 const input = meta.input
                 const thinking = typeof meta.thinking === 'string' ? meta.thinking : ''
+                const toolBlocks = Array.isArray((meta as any).toolBlocks)
+                    ? ((meta as any).toolBlocks as Array<{ name?: unknown; input?: unknown }>)
+                    : []
+                const parallelActions = toolBlocks
+                    .map((block) => {
+                        const name = typeof block?.name === 'string' ? block.name : ''
+                        if (!name) return null
+                        return { tool: name, input: block?.input }
+                    })
+                    .filter(Boolean) as Array<{ tool: string; input: unknown }>
                 const lastStep = currentTurn.steps[currentTurn.steps.length - 1]
                 if (lastStep) {
-                    lastStep.action = { tool, input }
+                    if (parallelActions.length > 1) {
+                        lastStep.action = parallelActions[0]
+                        lastStep.parallelActions = parallelActions
+                    } else if (tool) {
+                        lastStep.action = { tool, input }
+                    }
                     if (thinking) {
                         lastStep.thinking = thinking
                     }
@@ -671,5 +726,6 @@ function parseHistoryLog(raw: string): {
         summary: summaryParts.join('\n'),
         messages,
         turns,
+        maxSequence: sequence,
     }
 }

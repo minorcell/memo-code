@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { Box, Text, useInput } from 'ink'
-import os from 'node:os'
 import { getSessionLogDir, type ProviderConfig, type MCPServerConfig } from '@memo/core'
 import { getFileSuggestions, type InputHistoryEntry } from '../../suggestions'
 import { SuggestionList, type SuggestionListItem } from '../input/SuggestionList'
@@ -58,15 +57,6 @@ type SuggestionTrigger =
     | ModelsTrigger
     | ContextTrigger
 
-function getUsername(): string {
-    try {
-        const info = os.userInfo()
-        return info.username || 'user'
-    } catch {
-        return 'user'
-    }
-}
-
 export function InputPrompt({
     disabled,
     onSubmit,
@@ -102,8 +92,8 @@ export function InputPrompt({
     // Use ref to track input value for synchronous updates during rapid input (paste)
     const valueRef = useRef('')
 
-    const username = useMemo(() => getUsername(), [])
-    const cwdName = useMemo(() => cwd.split('/').pop() || cwd, [cwd])
+    // Prefix symbol for input prompt
+    const inputPrefix = '› '
 
     // Sync ref with state
     useEffect(() => {
@@ -376,10 +366,6 @@ export function InputPrompt({
     )
 
     useInput((input, key) => {
-        if (key.ctrl && input === 'c') {
-            onExit()
-            return
-        }
         if (key.ctrl && input === 'l') {
             valueRef.current = ''
             setValue('')
@@ -515,6 +501,8 @@ export function InputPrompt({
 
     // Split text into lines for multi-line display
     const lines = displayText.split('\n')
+    // Calculate prefix width for alignment (considering full-width characters)
+    const prefixWidth = 2 // '› ' is 2 characters wide
 
     const suggestionListItems: SuggestionListItem[] = suggestionItems.map(
         ({ value: _value, meta: _meta, ...rest }) => rest,
@@ -522,13 +510,10 @@ export function InputPrompt({
 
     return (
         <Box flexDirection="column" gap={1}>
-            {/* Prompt line with username@cwd */}
-            <Box flexDirection="column">
+            {/* Prompt line with › prefix - with dark gray background and padding */}
+            <Box flexDirection="column" paddingY={1}>
                 <Box>
-                    <Text color="cyan">{username}</Text>
-                    <Text color="gray">@</Text>
-                    <Text color="cyan">{cwdName}</Text>
-                    <Text color="yellow"> </Text>
+                    <Text color="gray">{inputPrefix}</Text>
                     {disabled ? (
                         <Text color="gray">{lines[0]}</Text>
                     ) : (
@@ -538,9 +523,10 @@ export function InputPrompt({
                         </>
                     )}
                 </Box>
-                {/* Additional lines (if multi-line input) */}
+                {/* Additional lines (if multi-line input) - aligned with prefix */}
                 {lines.slice(1).map((line, index) => (
                     <Box key={`line-${index}`}>
+                        <Text color="gray">{' '.repeat(prefixWidth)}</Text>
                         <Text color="white">{line}</Text>
                         {/* Show cursor on the last line */}
                         {index === lines.length - 2 && <Text color="cyan">{cursor}</Text>}

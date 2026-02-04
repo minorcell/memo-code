@@ -29,6 +29,8 @@ describe('session hooks & middleware', () => {
                 }),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
+                // 自动批准所有工具调用
+                requestApproval: async () => 'once',
                 hooks: {
                     onTurnStart: ({ turn }) => {
                         hookLog.push(`hook:start:${turn}`)
@@ -94,6 +96,8 @@ describe('session hooks & middleware', () => {
                 }),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
+                // 自动批准所有工具调用
+                requestApproval: async () => 'once',
                 hooks: {
                     onAction: ({ action }) => hookLog.push(`action:${action.tool}`),
                     onFinal: ({ finalText }) => hookLog.push(`final:${finalText}`),
@@ -125,6 +129,8 @@ describe('session hooks & middleware', () => {
                 }),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
+                // 自动批准所有工具调用
+                requestApproval: async () => 'session',
             },
             {},
         )
