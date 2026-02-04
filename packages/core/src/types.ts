@@ -1,5 +1,6 @@
 /** @file Core 与 Runtime 共享的公共类型声明（会被 UI/Tools 复用）。 */
 import type { McpTool } from '@memo/tools/tools/types'
+import type { ApprovalRequest, ApprovalDecision } from './approval/types'
 
 /**
  * Agent 层的基础类型声明，涵盖对话消息、解析结果与依赖注入接口。
@@ -147,6 +148,8 @@ export type AgentDeps = {
     middlewares?: AgentMiddleware[]
     /** 资源释放回调（如关闭 MCP Client）。 */
     dispose?: () => Promise<void>
+    /** 请求用户审批工具调用（用于危险操作） */
+    requestApproval?: (request: ApprovalRequest) => Promise<ApprovalDecision>
 }
 
 /** Session 模式：一次性或交互式。 */
@@ -236,6 +239,21 @@ export type FinalHookPayload = {
     steps: AgentStepTrace[]
 }
 
+export type ApprovalHookPayload = {
+    sessionId: string
+    turn: number
+    step: number
+    request: ApprovalRequest
+}
+
+export type ApprovalResponseHookPayload = {
+    sessionId: string
+    turn: number
+    step: number
+    fingerprint: string
+    decision: ApprovalDecision
+}
+
 export type AgentHookHandler<Payload> = (payload: Payload) => Promise<void> | void
 
 export type AgentHooks = {
@@ -243,6 +261,8 @@ export type AgentHooks = {
     onAction?: AgentHookHandler<ActionHookPayload>
     onObservation?: AgentHookHandler<ObservationHookPayload>
     onFinal?: AgentHookHandler<FinalHookPayload>
+    onApprovalRequest?: AgentHookHandler<ApprovalHookPayload>
+    onApprovalResponse?: AgentHookHandler<ApprovalResponseHookPayload>
 }
 
 export type AgentMiddleware = AgentHooks & {
