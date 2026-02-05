@@ -326,6 +326,24 @@ export function App({
         appendSystemMessage('New Session', 'Started a new session with fresh context.')
     }, [deps, sessionOptionsState, appendSystemMessage])
 
+    const applyContextLimit = useCallback(
+        (limit: number) => {
+            setContextLimit(limit)
+            setCurrentContextTokens(0)
+            setSessionOptionsState((prev) => ({
+                ...prev,
+                maxPromptTokens: limit,
+                sessionId: randomUUID(),
+            }))
+            appendSystemMessage(
+                'Context length',
+                `Context limit set to ${(limit / 1000).toFixed(0)}k tokens (new session started)`,
+            )
+            void persistContextLimit(limit)
+        },
+        [appendSystemMessage, persistContextLimit],
+    )
+
     const handleHistorySelect = useCallback(
         async (entry: InputHistoryEntry) => {
             if (!entry.sessionFile) {
@@ -367,6 +385,22 @@ export function App({
                 appendSystemMessage(
                     'Failed to save config',
                     `Failed to save model selection: ${(err as Error).message}`,
+                )
+            }
+        },
+        [appendSystemMessage],
+    )
+
+    const persistContextLimit = useCallback(
+        async (limit: number) => {
+            try {
+                const loaded = await loadMemoConfig()
+                const nextConfig = { ...loaded.config, max_prompt_tokens: limit }
+                await writeMemoConfig(loaded.configPath, nextConfig)
+            } catch (err) {
+                appendSystemMessage(
+                    'Failed to save config',
+                    `Failed to save context limit: ${(err as Error).message}`,
                 )
             }
         },
@@ -463,11 +497,7 @@ export function App({
                 return
             }
             if (result.kind === 'set_context_limit') {
-                setContextLimit(result.limit)
-                appendSystemMessage(
-                    'Context length',
-                    `Context limit set to ${(result.limit / 1000).toFixed(0)}k tokens`,
-                )
+                applyContextLimit(result.limit)
                 return
             }
             if (result.kind === 'init_agents_md') {
@@ -514,6 +544,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
         },
         [
             appendSystemMessage,
+            applyContextLimit,
             configPath,
             handleClear,
             handleExit,
@@ -651,11 +682,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 onModelSelect={handleModelSelect}
                 onSystemMessage={appendSystemMessage}
                 onSetContextLimit={(limit) => {
-                    setContextLimit(limit)
-                    appendSystemMessage(
-                        'Context length',
-                        `Context limit set to ${(limit / 1000).toFixed(0)}k tokens`,
-                    )
+                    applyContextLimit(limit)
                 }}
                 history={inputHistory}
                 cwd={cwd}

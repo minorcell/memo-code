@@ -128,6 +128,7 @@ async function runPlainMode(parsed: ParsedArgs) {
         sessionId,
         mode: 'once',
         stream: loaded.config.stream_output ?? false,
+        maxPromptTokens: loaded.config.max_prompt_tokens,
     }
 
     // 危险模式下显示警告
@@ -202,6 +203,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
         sessionId,
         mode: 'interactive',
         stream: loaded.config.stream_output ?? false,
+        maxPromptTokens: loaded.config.max_prompt_tokens,
     }
     const sessionsDir = getSessionsDir(loaded, sessionOptions)
 
