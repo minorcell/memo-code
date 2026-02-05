@@ -27,7 +27,7 @@ import { InputPrompt } from './components/layout/InputPrompt'
 import { ApprovalModal } from './components/modals/ApprovalModal'
 import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
 import { resolveSlashCommand } from './commands'
-import { checkForUpdate } from './version'
+import { checkForUpdate, findLocalPackageInfoSync } from './version'
 import { SetupWizard } from './components/setup/SetupWizard'
 
 const execAsync = promisify(exec)
@@ -87,6 +87,7 @@ export function App({
     const [setupPending, setSetupPending] = useState(needsSetup)
     // Track current session's actual context size (cumulative prompt tokens at turn start)
     const [currentContextTokens, setCurrentContextTokens] = useState<number>(0)
+    const localPackageInfo = useMemo(() => findLocalPackageInfoSync(), [])
 
     // 审批系统状态
     const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null)
@@ -636,6 +637,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                     cwd,
                     sessionId: sessionOptionsState.sessionId ?? 'unknown',
                     mcpNames: Object.keys(mcpServers ?? {}).sort(),
+                    version: localPackageInfo?.version ?? 'unknown',
                 }}
             />
             <InputPrompt

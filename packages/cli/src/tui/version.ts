@@ -1,7 +1,8 @@
 import { dirname, join, resolve } from 'node:path'
-import { statSync, existsSync } from 'node:fs'
+import { statSync, existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { get } from 'node:https'
+import { fileURLToPath } from 'node:url'
 
 type PackageInfo = {
     name: string
@@ -51,6 +52,21 @@ function isNewerVersion(latest: string, current: string): boolean {
     return false
 }
 
+function resolveStartDir(): string {
+    try {
+        const modulePath = fileURLToPath(import.meta.url)
+        return dirname(modulePath)
+    } catch {
+        // Fall back to argv/cwd when import.meta.url is unavailable or invalid.
+    }
+    const start = resolve(process.argv[1] ?? process.cwd())
+    try {
+        return statSync(start).isFile() ? dirname(start) : start
+    } catch {
+        return process.cwd()
+    }
+}
+
 async function readPackageInfo(dir: string): Promise<PackageInfo | null> {
     const pkgPath = join(dir, 'package.json')
     if (!existsSync(pkgPath)) return null
@@ -60,19 +76,40 @@ async function readPackageInfo(dir: string): Promise<PackageInfo | null> {
     return { name: parsed.name, version: parsed.version }
 }
 
-export async function findLocalPackageInfo(): Promise<PackageInfo | null> {
-    const start = resolve(process.argv[1] ?? process.cwd())
-    let dir = start
+function readPackageInfoSync(dir: string): PackageInfo | null {
+    const pkgPath = join(dir, 'package.json')
+    if (!existsSync(pkgPath)) return null
     try {
-        if (statSync(dir).isFile()) {
-            dir = dirname(dir)
-        }
+        const raw = readFileSync(pkgPath, 'utf8')
+        const parsed = JSON.parse(raw) as Partial<PackageInfo>
+        if (!parsed.name || !parsed.version) return null
+        return { name: parsed.name, version: parsed.version }
     } catch {
-        dir = process.cwd()
+        return null
     }
+}
+
+export async function findLocalPackageInfo(): Promise<PackageInfo | null> {
+    let dir = resolveStartDir()
 
     while (true) {
         const info = await readPackageInfo(dir)
+        if (info && info.name === '@memo-code/memo') {
+            return info
+        }
+        const parent = dirname(dir)
+        if (parent === dir) break
+        dir = parent
+    }
+
+    return null
+}
+
+export function findLocalPackageInfoSync(): PackageInfo | null {
+    let dir = resolveStartDir()
+
+    while (true) {
+        const info = readPackageInfoSync(dir)
         if (info && info.name === '@memo-code/memo') {
             return info
         }

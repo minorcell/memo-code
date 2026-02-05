@@ -15,6 +15,7 @@ type MainContentProps = {
         cwd: string
         sessionId: string
         mcpNames: string[]
+        version: string
     }
 }
 
@@ -39,6 +40,7 @@ function arePropsEqual(prevProps: MainContentProps, nextProps: MainContentProps)
     if (prevProps.headerInfo?.model !== nextProps.headerInfo?.model) return false
     if (prevProps.headerInfo?.providerName !== nextProps.headerInfo?.providerName) return false
     if (prevProps.headerInfo?.cwd !== nextProps.headerInfo?.cwd) return false
+    if (prevProps.headerInfo?.version !== nextProps.headerInfo?.version) return false
     if (prevProps.headerInfo?.mcpNames?.length !== nextProps.headerInfo?.mcpNames?.length) {
         return false
     }
@@ -159,6 +161,10 @@ export const MainContent = memo(function MainContent({
                                             {' '}
                                             (powered by {header.providerName})
                                         </Text>
+                                    </Box>
+                                    <Box>
+                                        <Text color="gray">Version: </Text>
+                                        <Text color="cyan">v{header.version}</Text>
                                     </Box>
                                     <Box>
                                         <Text color="gray">MCP: </Text>
