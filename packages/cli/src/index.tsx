@@ -15,10 +15,12 @@ import {
 } from '@memo/core'
 import { App } from './tui/App'
 import { runMcpCommand } from './mcp'
+import { findLocalPackageInfoSync } from './tui/version'
 
 type CliOptions = {
     once: boolean
     dangerous: boolean
+    showVersion: boolean
 }
 
 type ParsedArgs = {
@@ -31,12 +33,17 @@ function parseArgs(argv: string[]): ParsedArgs {
     const options: CliOptions = {
         once: false,
         dangerous: false,
+        showVersion: false,
     }
     const questionParts: string[] = []
 
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i]
         if (arg === undefined) {
+            continue
+        }
+        if (arg === '--version' || arg === '-v') {
+            options.showVersion = true
             continue
         }
         if (arg === '--once') {
@@ -233,6 +240,12 @@ async function main() {
         return
     }
     const parsed = parseArgs(argv)
+    if (parsed.options.showVersion) {
+        const info = findLocalPackageInfoSync()
+        const version = info?.version ?? 'unknown'
+        console.log(version)
+        return
+    }
     const isInteractive = process.stdin.isTTY && process.stdout.isTTY
     if (!isInteractive || parsed.options.once) {
         await runPlainMode(parsed)

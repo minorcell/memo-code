@@ -48,6 +48,7 @@ memo
 - 交互式：`memo`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
 - 单轮：`memo "你的问题" --once`（纯文本输出，适合脚本）。
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
+- 查看版本：`memo --version` 或 `memo -v`。
 
 ## 配置文件
 
