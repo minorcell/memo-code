@@ -105,6 +105,7 @@ describe('mcp config serialization', () => {
 
         await writeMemoConfig(configPath, {
             current_provider: 'deepseek',
+            max_prompt_tokens: 120000,
             providers: [
                 { name: 'deepseek', env_api_key: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
             ],
@@ -126,6 +127,7 @@ describe('mcp config serialization', () => {
 
         const text = await readFile(configPath, 'utf-8')
         expect(text).toContain('[[providers.deepseek]]')
+        expect(text).toContain('max_prompt_tokens = 120000')
         expect(text).toContain('[mcp_servers.remote]')
         expect(text).toContain('type = "streamable_http"')
         expect(text).toContain('url = "https://example.com/mcp"')
@@ -146,6 +148,7 @@ describe('mcp config serialization', () => {
         const configText = `
 current_provider = "deepseek"
 stream_output = false
+max_prompt_tokens = 150000
 
 [[providers.deepseek]]
 name = "deepseek"
@@ -166,6 +169,7 @@ url = "https://legacy.example.com/mcp"
 
         const loaded = await loadMemoConfig()
         const servers = loaded.config.mcp_servers ?? {}
+        expect(loaded.config.max_prompt_tokens).toBe(150000)
         const remote = servers.remote
         expectHttpServer(remote)
         expect(remote.type ?? 'streamable_http').toBe('streamable_http')

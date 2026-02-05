@@ -49,6 +49,8 @@ export type MCPServerConfig =
 export type MemoConfig = {
     current_provider: string
     stream_output?: boolean
+    /** Persistent prompt token limit (maps to AgentSessionOptions.maxPromptTokens). */
+    max_prompt_tokens?: number
     /** Map of server name to server configuration */
     mcp_servers?: Record<string, MCPServerConfig>
     providers: ProviderConfig[]
@@ -165,10 +167,17 @@ function serializeConfig(config: MemoConfig) {
             .join('\n\n')
     }
 
-    const mainConfig = `
-current_provider = "${config.current_provider}"
-stream_output = ${config.stream_output ?? false}
-`.trim()
+    const mainLines = [
+        `current_provider = "${config.current_provider}"`,
+        `stream_output = ${config.stream_output ?? false}`,
+    ]
+    if (
+        typeof config.max_prompt_tokens === 'number' &&
+        Number.isFinite(config.max_prompt_tokens)
+    ) {
+        mainLines.push(`max_prompt_tokens = ${Math.floor(config.max_prompt_tokens)}`)
+    }
+    const mainConfig = mainLines.join('\n')
 
     return [mainConfig, providers, mcpSection].filter(Boolean).join('\n\n')
 }
@@ -193,9 +202,16 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
         const text = await readFile(configPath, 'utf-8')
         const parsed = parse(text) as ParsedMemoConfig
         const providers = normalizeProviders(parsed.providers)
+        const maxPromptTokens =
+            typeof parsed.max_prompt_tokens === 'number' &&
+            Number.isFinite(parsed.max_prompt_tokens) &&
+            parsed.max_prompt_tokens > 0
+                ? Math.floor(parsed.max_prompt_tokens)
+                : undefined
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
             stream_output: parsed.stream_output ?? DEFAULT_CONFIG.stream_output,
+            max_prompt_tokens: maxPromptTokens,
             providers,
             mcp_servers: parsed.mcp_servers ?? {},
         }

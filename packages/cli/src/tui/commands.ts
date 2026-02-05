@@ -25,7 +25,7 @@ const HELP_TEXT = `Available commands:
   /new        Start a new session
   /models     Pick a model from config
   /resume     Resume session history
-  /context    Show or set context length (e.g. /context 120k)
+  /context    Show or set context length (starts new session)
   /mcp        Show configured MCP servers
   /init       Generate AGENTS.md for current project
   $           Execute shell command (e.g. $ git status)
@@ -84,7 +84,7 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
                 return {
                     kind: 'message',
                     title: 'Context',
-                    content: `Current: ${(context.contextLimit / 1000).toFixed(0)}k\nUsage: /context <length>\nChoices: ${options}`,
+                    content: `Current: ${(context.contextLimit / 1000).toFixed(0)}k\nUsage: /context <length> (starts new session)\nChoices: ${options}`,
                 }
             }
             if (!CONTEXT_CHOICES.includes(candidate as (typeof CONTEXT_CHOICES)[number])) {
