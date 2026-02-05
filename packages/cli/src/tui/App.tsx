@@ -326,6 +326,22 @@ export function App({
         appendSystemMessage('New Session', 'Started a new session with fresh context.')
     }, [deps, sessionOptionsState, appendSystemMessage])
 
+    const persistContextLimit = useCallback(
+        async (limit: number) => {
+            try {
+                const loaded = await loadMemoConfig()
+                const nextConfig = { ...loaded.config, max_prompt_tokens: limit }
+                await writeMemoConfig(loaded.configPath, nextConfig)
+            } catch (err) {
+                appendSystemMessage(
+                    'Failed to save config',
+                    `Failed to save context limit: ${(err as Error).message}`,
+                )
+            }
+        },
+        [appendSystemMessage],
+    )
+
     const applyContextLimit = useCallback(
         (limit: number) => {
             setContextLimit(limit)
@@ -385,22 +401,6 @@ export function App({
                 appendSystemMessage(
                     'Failed to save config',
                     `Failed to save model selection: ${(err as Error).message}`,
-                )
-            }
-        },
-        [appendSystemMessage],
-    )
-
-    const persistContextLimit = useCallback(
-        async (limit: number) => {
-            try {
-                const loaded = await loadMemoConfig()
-                const nextConfig = { ...loaded.config, max_prompt_tokens: limit }
-                await writeMemoConfig(loaded.configPath, nextConfig)
-            } catch (err) {
-                appendSystemMessage(
-                    'Failed to save config',
-                    `Failed to save context limit: ${(err as Error).message}`,
                 )
             }
         },

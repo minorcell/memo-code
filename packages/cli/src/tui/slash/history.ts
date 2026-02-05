@@ -1,8 +1,9 @@
 import type { SlashCommand } from './types'
+import { getSlashDescription } from './specs'
 
 export const resumeCommand: SlashCommand = {
     name: 'resume',
-    description: 'Resume history',
+    description: getSlashDescription('resume'),
     run: ({ closeSuggestions, setInputValue, showSystemMessage }) => {
         closeSuggestions(false)
         setInputValue('resume ')

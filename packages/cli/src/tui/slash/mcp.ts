@@ -1,4 +1,5 @@
 import type { SlashCommand } from './types'
+import { getSlashDescription } from './specs'
 import type { MCPServerConfig } from '@memo/core'
 
 function formatServerConfig(name: string, config: MCPServerConfig): string {
@@ -42,7 +43,7 @@ function formatServerConfig(name: string, config: MCPServerConfig): string {
 
 export const mcpCommand: SlashCommand = {
     name: 'mcp',
-    description: 'Show configured MCP servers',
+    description: getSlashDescription('mcp'),
     run: ({ closeSuggestions, setInputValue, showSystemMessage, data }) => {
         closeSuggestions()
 

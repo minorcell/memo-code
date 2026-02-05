@@ -171,10 +171,7 @@ function serializeConfig(config: MemoConfig) {
         `current_provider = "${config.current_provider}"`,
         `stream_output = ${config.stream_output ?? false}`,
     ]
-    if (
-        typeof config.max_prompt_tokens === 'number' &&
-        Number.isFinite(config.max_prompt_tokens)
-    ) {
+    if (typeof config.max_prompt_tokens === 'number' && Number.isFinite(config.max_prompt_tokens)) {
         mainLines.push(`max_prompt_tokens = ${Math.floor(config.max_prompt_tokens)}`)
     }
     const mainConfig = mainLines.join('\n')
