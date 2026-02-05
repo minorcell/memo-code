@@ -74,6 +74,7 @@ export function App({
     const [systemMessages, setSystemMessages] = useState<SystemMessage[]>([])
     const [busy, setBusy] = useState(false)
     const currentTurnRef = useRef<number | null>(null)
+    const nextUserInputOverrideRef = useRef<string | null>(null)
     const [inputHistory, setInputHistory] = useState<string[]>([])
     const [sessionLogPath, setSessionLogPath] = useState<string | null>(null)
     const [historicalTurns, setHistoricalTurns] = useState<TurnView[]>([])
@@ -154,6 +155,11 @@ export function App({
             hooks: {
                 onTurnStart: ({ turn, input, promptTokens }) => {
                     currentTurnRef.current = turn
+                    const override = nextUserInputOverrideRef.current
+                    if (override) {
+                        nextUserInputOverrideRef.current = null
+                    }
+                    const displayInput = override ?? input
                     // Update the cumulative context tokens for display
                     if (promptTokens && promptTokens > 0) {
                         setCurrentContextTokens(promptTokens)
@@ -161,7 +167,7 @@ export function App({
                     updateTurn(turn, (existing) => ({
                         ...existing,
                         index: turn,
-                        userInput: input,
+                        userInput: displayInput,
                         steps: [],
                         startedAt: Date.now(),
                         contextPromptTokens: promptTokens ?? existing.contextPromptTokens,
@@ -326,6 +332,22 @@ export function App({
         appendSystemMessage('New Session', 'Started a new session with fresh context.')
     }, [deps, sessionOptionsState, appendSystemMessage])
 
+    const persistContextLimit = useCallback(
+        async (limit: number) => {
+            try {
+                const loaded = await loadMemoConfig()
+                const nextConfig = { ...loaded.config, max_prompt_tokens: limit }
+                await writeMemoConfig(loaded.configPath, nextConfig)
+            } catch (err) {
+                appendSystemMessage(
+                    'Failed to save config',
+                    `Failed to save context limit: ${(err as Error).message}`,
+                )
+            }
+        },
+        [appendSystemMessage],
+    )
+
     const applyContextLimit = useCallback(
         (limit: number) => {
             setContextLimit(limit)
@@ -385,22 +407,6 @@ export function App({
                 appendSystemMessage(
                     'Failed to save config',
                     `Failed to save model selection: ${(err as Error).message}`,
-                )
-            }
-        },
-        [appendSystemMessage],
-    )
-
-    const persistContextLimit = useCallback(
-        async (limit: number) => {
-            try {
-                const loaded = await loadMemoConfig()
-                const nextConfig = { ...loaded.config, max_prompt_tokens: limit }
-                await writeMemoConfig(loaded.configPath, nextConfig)
-            } catch (err) {
-                appendSystemMessage(
-                    'Failed to save config',
-                    `Failed to save context limit: ${(err as Error).message}`,
                 )
             }
         },
@@ -530,6 +536,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 }
                 setBusy(true)
                 try {
+                    nextUserInputOverrideRef.current = '/init (generate AGENTS.md)'
                     await session.runTurn(initPrompt)
                 } catch (err) {
                     setBusy(false)

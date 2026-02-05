@@ -1,4 +1,5 @@
 import type { ProviderConfig, MCPServerConfig } from '@memo/core/config/config'
+import { HELP_TEXT } from './slash/help_text'
 
 export type SlashResolveContext = {
     configPath: string
@@ -17,28 +18,6 @@ export type SlashCommandResult =
     | { kind: 'set_context_limit'; limit: number }
     | { kind: 'init_agents_md' }
     | { kind: 'shell_command'; command: string }
-
-const HELP_TEXT = `Available commands:
-  /help       Show help and shortcuts
-  /exit       Exit the session
-  exit        Exit the session (no slash)
-  /new        Start a new session
-  /models     Pick a model from config
-  /resume     Resume session history
-  /context    Show or set context length (starts new session)
-  /mcp        Show configured MCP servers
-  /init       Generate AGENTS.md for current project
-  $           Execute shell command (e.g. $ git status)
-
-Shortcuts:
-  Enter       Send message
-  Shift+Enter New line in input
-  Up/Down     Browse input history
-  Ctrl+L      Start a new session
-  Ctrl+C      Exit
-  exit        Type in input to exit
-  Ctrl+X      Toggle mode
-  Ctrl+/      Show help`
 
 export function resolveSlashCommand(raw: string, context: SlashResolveContext): SlashCommandResult {
     const [commandRaw, ...rest] = raw.trim().slice(1).split(/\s+/)

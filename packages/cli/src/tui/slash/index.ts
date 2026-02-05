@@ -6,6 +6,7 @@ import { modelsCommand } from './models'
 import { helpCommand } from './help'
 import { contextCommand } from './context'
 import { mcpCommand } from './mcp'
+import { initCommand } from './init'
 
 export const SLASH_COMMANDS: SlashCommand[] = [
     helpCommand,
@@ -15,6 +16,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     modelsCommand,
     contextCommand,
     mcpCommand,
+    initCommand,
 ]
 
 export type { SlashCommand, SlashCommandContext } from './types'

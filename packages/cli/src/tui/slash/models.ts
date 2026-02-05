@@ -1,8 +1,9 @@
 import type { SlashCommand } from './types'
+import { getSlashDescription } from './specs'
 
 export const modelsCommand: SlashCommand = {
     name: 'models',
-    description: 'Select a model (from configured providers)',
+    description: getSlashDescription('models'),
     run: ({ closeSuggestions, setInputValue, showSystemMessage, data }) => {
         closeSuggestions(false)
 
