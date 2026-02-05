@@ -1,6 +1,6 @@
 {
     "name": "@memo-code/memo",
-    "version": "0.5.1",
+    "version": "0.5.12",
     "private": false,
     "type": "module",
     "description": "AI programming assistant with multi-turn conversations, tool calling, and concurrent execution",
