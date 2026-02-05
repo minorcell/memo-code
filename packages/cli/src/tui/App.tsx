@@ -258,7 +258,7 @@ export function App({
             if (cancelled || !info) return
             appendSystemMessage(
                 'Update',
-                `Update available: v${info.latest}. Run npm/pnpm/yarn/bun to update @memo-code/memo.`,
+                `Update available: v${info.latest}. Run: npm install -g @memo-code/memo@latest`,
             )
         })()
         return () => {
