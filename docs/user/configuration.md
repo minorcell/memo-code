@@ -34,9 +34,9 @@ base_url = "https://api.deepseek.com"
 - `current_provider`：当前默认 provider（用于 `/models` 与启动选择）
 - `stream_output`：是否启用流式输出
 - `providers.<name>`：provider 列表（可配置多个）
-  - `env_api_key`：从哪个环境变量读取 API Key
-  - `model`：模型 ID
-  - `base_url`：OpenAI-compatible endpoint（可选）
+    - `env_api_key`：从哪个环境变量读取 API Key
+    - `model`：模型 ID
+    - `base_url`：OpenAI-compatible endpoint（可选）
 
 ### 多 provider 示例
 
@@ -77,4 +77,3 @@ MCP 支持写在 `config.toml` 的 `[mcp_servers.<name>]` 下，也可以用 `me
 
 - 会话日志：默认 `~/.memo/sessions/`（见 [会话与日志](./sessions-history.md)）
 - 长期记忆：默认 `~/.memo/Agents.md`（见 [长期记忆](./memory.md)）
-

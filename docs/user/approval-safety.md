@@ -53,4 +53,3 @@ memo --dangerous
 - 让它先做 dry-run：先让它列出计划/将要改的文件清单，再批准写入
 - 对 `bash`：优先用只读命令（`git status`、`rg`、`ls`），避免 `rm/sudo/chmod` 等高危
 - 对写入：让它只改你点名的文件，并要求输出变更摘要
-

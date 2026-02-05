@@ -62,4 +62,3 @@ bearer_token_env_var = "MCP_TOKEN"
 ## 生效时机
 
 MCP servers 在创建 session 时加载。修改配置后，建议重启 `memo` 或开始一个新会话以确保重新加载。
-
