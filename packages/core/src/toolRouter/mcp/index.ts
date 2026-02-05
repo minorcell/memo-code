@@ -7,9 +7,12 @@ import { McpClientPool } from './pool'
 export class McpToolRegistry {
     private pool: McpClientPool
     private tools: Map<string, McpTool> = new Map()
+    private readonly shouldLog: boolean
 
     constructor() {
         this.pool = new McpClientPool()
+        this.shouldLog =
+            process.env.MEMO_MCP_LOG === '1' || !(process.stdout.isTTY && process.stdin.isTTY)
     }
 
     /**
@@ -50,11 +53,15 @@ export class McpToolRegistry {
                     }
 
                     totalTools += connection.tools.length
-                    console.log(
-                        `[MCP] Connected to '${name}' with ${connection.tools.length} tools`,
-                    )
+                    if (this.shouldLog) {
+                        console.log(
+                            `[MCP] Connected to '${name}' with ${connection.tools.length} tools`,
+                        )
+                    }
                 } catch (err) {
-                    console.error(`[MCP] Failed to connect to server '${name}':`, err)
+                    if (this.shouldLog) {
+                        console.error(`[MCP] Failed to connect to server '${name}':`, err)
+                    }
                 }
             }),
         )

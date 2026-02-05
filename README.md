@@ -85,6 +85,23 @@ url = "https://your-mcp-server.com/mcp"
 # headers = { Authorization = "Bearer xxx" }
 ```
 
+也可以通过 CLI 管理 MCP 配置（对齐 Codex CLI 风格）：
+
+```bash
+# 列出 MCP servers
+memo mcp list
+
+# 添加本地 MCP server（stdio）
+memo mcp add local_tools -- /path/to/mcp-server --flag
+
+# 添加远程 MCP server（streamable HTTP）
+memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var MCP_TOKEN
+
+# 查看/删除
+memo mcp get remote
+memo mcp remove remote
+```
+
 ## 内置工具
 
 - `bash`：执行 shell 命令

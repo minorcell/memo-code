@@ -541,10 +541,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
             setSetupPending(false)
             appendSystemMessage('Setup', `Config saved to ${loaded.configPath}`)
         } catch (err) {
-            appendSystemMessage(
-                'Setup',
-                `Failed to reload config: ${(err as Error).message}`,
-            )
+            appendSystemMessage('Setup', `Failed to reload config: ${(err as Error).message}`)
         }
     }, [appendSystemMessage])
 
@@ -638,6 +635,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                     model: currentModel,
                     cwd,
                     sessionId: sessionOptionsState.sessionId ?? 'unknown',
+                    mcpNames: Object.keys(mcpServers ?? {}).sort(),
                 }}
             />
             <InputPrompt

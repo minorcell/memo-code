@@ -59,17 +59,24 @@ export type MCPServerConfig =
           type?: 'stdio'
           command: string
           args?: string[]
+          env?: Record<string, string>
+          /** 子进程 stderr 行为（默认在 TTY 中静默）。 */
+          stderr?: 'inherit' | 'pipe' | 'ignore'
       }
     | {
           type?: 'streamable_http'
           url: string
           fallback_to_sse?: boolean
           headers?: Record<string, string>
+          http_headers?: Record<string, string>
+          bearer_token_env_var?: string
       }
     | {
           type: 'sse'
           url: string
           headers?: Record<string, string>
+          http_headers?: Record<string, string>
+          bearer_token_env_var?: string
       }
 
 /** MCP Client 连接信息 */

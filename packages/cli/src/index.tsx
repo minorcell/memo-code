@@ -14,6 +14,7 @@ import {
     type MemoConfig,
 } from '@memo/core'
 import { App } from './tui/App'
+import { runMcpCommand } from './mcp'
 
 type CliOptions = {
     once: boolean
@@ -225,7 +226,13 @@ async function runInteractiveTui(parsed: ParsedArgs) {
 }
 
 async function main() {
-    const parsed = parseArgs(process.argv.slice(2))
+    const argv = process.argv.slice(2)
+    if (argv[0] === 'mcp' || (argv[0] === '--' && argv[1] === 'mcp')) {
+        const offset = argv[0] === '--' ? 2 : 1
+        await runMcpCommand(argv.slice(offset))
+        return
+    }
+    const parsed = parseArgs(argv)
     const isInteractive = process.stdin.isTTY && process.stdout.isTTY
     if (!isInteractive || parsed.options.once) {
         await runPlainMode(parsed)

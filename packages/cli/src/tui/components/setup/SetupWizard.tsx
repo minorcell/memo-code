@@ -120,10 +120,7 @@ export function SetupWizard({ configPath, onComplete, onExit }: SetupWizardProps
         ),
     )
 
-    const progress = useMemo(
-        () => `Step ${stepIndex + 1}/${STEPS.length}`,
-        [stepIndex],
-    )
+    const progress = useMemo(() => `Step ${stepIndex + 1}/${STEPS.length}`, [stepIndex])
 
     return (
         <Box flexDirection="column">

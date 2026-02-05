@@ -9,11 +9,15 @@ function formatServerConfig(name: string, config: MCPServerConfig): string {
         // HTTP 类型 (streamable_http 或 sse)
         lines.push(`  - Type: ${config.type ?? 'streamable_http'}`)
         lines.push(`  - URL: ${config.url}`)
+        if (config.bearer_token_env_var) {
+            lines.push(`  - Bearer token env: ${config.bearer_token_env_var}`)
+        }
         if (config.type !== 'sse' && config.fallback_to_sse !== undefined) {
             lines.push(`  - Fallback to SSE: ${config.fallback_to_sse}`)
         }
-        if (config.headers && Object.keys(config.headers).length > 0) {
-            const headerStr = Object.entries(config.headers)
+        const headers = config.http_headers ?? config.headers
+        if (headers && Object.keys(headers).length > 0) {
+            const headerStr = Object.entries(headers)
                 .map(([k, v]) => `${k}=${v}`)
                 .join(', ')
             lines.push(`  - Headers: ${headerStr}`)
@@ -24,6 +28,12 @@ function formatServerConfig(name: string, config: MCPServerConfig): string {
         lines.push(`  - Command: ${config.command}`)
         if (config.args && config.args.length > 0) {
             lines.push(`  - Args: ${config.args.join(' ')}`)
+        }
+        if (config.env && Object.keys(config.env).length > 0) {
+            const envStr = Object.entries(config.env)
+                .map(([k, v]) => `${k}=${v}`)
+                .join(', ')
+            lines.push(`  - Env: ${envStr}`)
         }
     }
 
