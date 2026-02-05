@@ -14,6 +14,7 @@ import {
     type MemoConfig,
 } from '@memo/core'
 import { App } from './tui/App'
+import { runMcpCommand } from './mcp'
 
 type CliOptions = {
     once: boolean
@@ -52,7 +53,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     return { question: questionParts.join(' '), options }
 }
 
-async function ensureProviderConfig() {
+async function ensureProviderConfig(mode: 'plain' | 'tui') {
     const loaded = await loadMemoConfig()
     if (!loaded.needsSetup) return loaded
 
@@ -71,6 +72,10 @@ async function ensureProviderConfig() {
             `Detected API key in env. Wrote default provider (${defaultProvider.name}) to ${loaded.configPath}`,
         )
         return { ...loaded, needsSetup: false }
+    }
+
+    if (mode === 'tui') {
+        return loaded
     }
 
     const rl = createInterface({ input, output })
@@ -109,7 +114,7 @@ async function ensureProviderConfig() {
 }
 
 async function runPlainMode(parsed: ParsedArgs) {
-    const loaded = await ensureProviderConfig()
+    const loaded = await ensureProviderConfig('plain')
     const provider = selectProvider(loaded.config)
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
@@ -183,7 +188,7 @@ async function runPlainMode(parsed: ParsedArgs) {
 }
 
 async function runInteractiveTui(parsed: ParsedArgs) {
-    const loaded = await ensureProviderConfig()
+    const loaded = await ensureProviderConfig('tui')
     const provider = selectProvider(loaded.config)
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
@@ -210,6 +215,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             sessionsDir={sessionsDir}
             providers={loaded.config.providers}
             dangerous={parsed.options.dangerous}
+            needsSetup={loaded.needsSetup}
         />,
         {
             exitOnCtrlC: false,
@@ -220,7 +226,13 @@ async function runInteractiveTui(parsed: ParsedArgs) {
 }
 
 async function main() {
-    const parsed = parseArgs(process.argv.slice(2))
+    const argv = process.argv.slice(2)
+    if (argv[0] === 'mcp' || (argv[0] === '--' && argv[1] === 'mcp')) {
+        const offset = argv[0] === '--' ? 2 : 1
+        await runMcpCommand(argv.slice(offset))
+        return
+    }
+    const parsed = parseArgs(argv)
     const isInteractive = process.stdin.isTTY && process.stdout.isTTY
     if (!isInteractive || parsed.options.once) {
         await runPlainMode(parsed)

@@ -19,6 +19,10 @@ export type MCPServerConfig =
           type?: 'stdio'
           command: string
           args?: string[]
+          /** 传递给本地进程的环境变量（会与当前环境合并）。 */
+          env?: Record<string, string>
+          /** 子进程 stderr 行为（默认在 TTY 中静默）。 */
+          stderr?: 'inherit' | 'pipe' | 'ignore'
       }
     | {
           /** 通过 Streamable HTTP 连接远程 MCP（必要时可回退 SSE）。 */
@@ -28,12 +32,18 @@ export type MCPServerConfig =
           fallback_to_sse?: boolean
           /** 附加请求头（如鉴权）。 */
           headers?: Record<string, string>
+          /** codex 风格字段：附加请求头（优先于 headers）。 */
+          http_headers?: Record<string, string>
+          /** codex 风格字段：Bearer token env var。 */
+          bearer_token_env_var?: string
       }
     | {
           /** 强制使用 SSE（旧版 HTTP 传输）。 */
           type: 'sse'
           url: string
           headers?: Record<string, string>
+          http_headers?: Record<string, string>
+          bearer_token_env_var?: string
       }
 
 export type MemoConfig = {
@@ -125,17 +135,32 @@ function serializeConfig(config: MemoConfig) {
                     if ('fallback_to_sse' in conf && conf.fallback_to_sse !== undefined) {
                         lines.push(`fallback_to_sse = ${conf.fallback_to_sse}`)
                     }
-                    if (conf.headers && Object.keys(conf.headers).length > 0) {
-                        const headerEntries = Object.entries(conf.headers)
+                    if (conf.bearer_token_env_var) {
+                        lines.push(
+                            `bearer_token_env_var = ${JSON.stringify(conf.bearer_token_env_var)}`,
+                        )
+                    }
+                    const headers = conf.http_headers ?? conf.headers
+                    if (headers && Object.keys(headers).length > 0) {
+                        const headerEntries = Object.entries(headers)
                             .map(([k, v]) => `${JSON.stringify(k)} = ${JSON.stringify(v)}`)
                             .join(', ')
-                        lines.push(`headers = { ${headerEntries} }`)
+                        const headerKey = conf.http_headers ? 'http_headers' : 'headers'
+                        lines.push(`${headerKey} = { ${headerEntries} }`)
                     }
                     return lines.join('\n')
                 }
                 const argsLine = conf.args ? `args = ${JSON.stringify(conf.args)}` : ''
                 const typeLine = conf.type ? `type = "${conf.type}"\n` : ''
-                return `[mcp_servers.${name}]\n${typeLine}command = "${conf.command}"\n${argsLine}`
+                const stderrLine = conf.stderr ? `stderr = "${conf.stderr}"\n` : ''
+                const base =
+                    `[mcp_servers.${name}]\n${typeLine}command = "${conf.command}"\n${stderrLine}${argsLine}`.trimEnd()
+                const envEntries = conf.env ? Object.entries(conf.env) : []
+                if (envEntries.length === 0) return base
+                const envLines = envEntries
+                    .map(([key, value]) => `${JSON.stringify(key)} = ${JSON.stringify(value)}`)
+                    .join('\n')
+                return `${base}\n\n[mcp_servers.${name}.env]\n${envLines}`
             })
             .join('\n\n')
     }

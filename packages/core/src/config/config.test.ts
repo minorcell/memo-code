@@ -114,10 +114,12 @@ describe('mcp config serialization', () => {
                     url: 'https://example.com/mcp',
                     headers: { Authorization: 'Bearer token', 'X-Trace': '1' },
                     fallback_to_sse: false,
+                    bearer_token_env_var: 'MCP_TOKEN',
                 },
                 local: {
                     command: '/bin/echo',
                     args: ['hello'],
+                    env: { FOO: 'bar' },
                 },
             },
         })
@@ -128,10 +130,13 @@ describe('mcp config serialization', () => {
         expect(text).toContain('type = "streamable_http"')
         expect(text).toContain('url = "https://example.com/mcp"')
         expect(text).toContain('fallback_to_sse = false')
+        expect(text).toContain('bearer_token_env_var = "MCP_TOKEN"')
         expect(text).toContain('headers = { "Authorization" = "Bearer token", "X-Trace" = "1" }')
         expect(text).toContain('[mcp_servers.local]')
         expect(text).toContain('command = "/bin/echo"')
         expect(text).toContain('args = ["hello"]')
+        expect(text).toContain('[mcp_servers.local.env]')
+        expect(text).toContain('"FOO" = "bar"')
     })
 
     test('loadMemoConfig parses http and sse servers with headers', async () => {

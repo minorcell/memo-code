@@ -26,12 +26,25 @@ function buildRequestInit(headers?: Record<string, string>): RequestInit | undef
     return { headers }
 }
 
+function resolveHttpHeaders(config: Extract<MCPServerConfig, { url: string }>) {
+    const headers = {
+        ...(config.http_headers ?? config.headers ?? {}),
+    }
+    if (config.bearer_token_env_var) {
+        const token = process.env[config.bearer_token_env_var]
+        if (token && !headers.Authorization) {
+            headers.Authorization = `Bearer ${token}`
+        }
+    }
+    return headers
+}
+
 /** 通过 HTTP 连接 MCP Server */
 async function connectOverHttp(
     config: Extract<MCPServerConfig, { url: string }>,
 ): Promise<{ client: Client; transport: ClientTransport }> {
     const baseUrl = new URL(config.url)
-    const requestInit = buildRequestInit(config.headers)
+    const requestInit = buildRequestInit(resolveHttpHeaders(config))
 
     // SSE 类型强制使用 SSE 传输
     if (config.type === 'sse') {
@@ -75,10 +88,19 @@ async function connectWithConfig(
     }
 
     // stdio 类型
-    const transport = new StdioClientTransport({
+    const stdioOptions: {
+        command: string
+        args?: string[]
+        env?: Record<string, string>
+        stderr?: 'inherit' | 'pipe' | 'ignore'
+    } = {
         command: config.command,
         args: config.args,
-    })
+        env: config.env ? { ...process.env, ...config.env } : undefined,
+        stderr:
+            config.stderr ?? (process.stdout.isTTY && process.stdin.isTTY ? 'ignore' : undefined),
+    }
+    const transport = new StdioClientTransport(stdioOptions as any)
     const client = createMcpClient()
     await client.connect(transport)
     return { client, transport }
