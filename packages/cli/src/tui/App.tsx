@@ -8,6 +8,7 @@ import { Box, useApp, Text } from 'ink'
 import {
     createAgentSession,
     loadMemoConfig,
+    selectProvider,
     writeMemoConfig,
     type AgentSession,
     type AgentSessionDeps,
@@ -27,6 +28,7 @@ import { ApprovalModal } from './components/modals/ApprovalModal'
 import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './utils'
 import { resolveSlashCommand } from './commands'
 import { checkForUpdate } from './version'
+import { SetupWizard } from './components/setup/SetupWizard'
 
 const execAsync = promisify(exec)
 
@@ -40,6 +42,7 @@ export type AppProps = {
     sessionsDir: string
     providers: ProviderConfig[]
     dangerous?: boolean
+    needsSetup?: boolean
 }
 
 function createEmptyTurn(index: number): TurnView {
@@ -56,10 +59,12 @@ export function App({
     sessionsDir,
     providers,
     dangerous = false,
+    needsSetup = false,
 }: AppProps) {
     const { exit } = useApp()
     const [currentProvider, setCurrentProvider] = useState(providerName)
     const [currentModel, setCurrentModel] = useState(model)
+    const [providersState, setProvidersState] = useState(providers)
     const [sessionOptionsState, setSessionOptionsState] = useState<AgentSessionOptions>({
         ...sessionOptions,
         providerName,
@@ -79,6 +84,7 @@ export function App({
     const [contextLimit, setContextLimit] = useState<number>(
         sessionOptions.maxPromptTokens ?? 120000,
     )
+    const [setupPending, setSetupPending] = useState(needsSetup)
     // Track current session's actual context size (cumulative prompt tokens at turn start)
     const [currentContextTokens, setCurrentContextTokens] = useState<number>(0)
 
@@ -225,6 +231,7 @@ export function App({
     useEffect(() => {
         let cancelled = false
         ;(async () => {
+            if (setupPending) return
             const prev = sessionRef.current
             if (prev) {
                 await prev.close()
@@ -241,7 +248,7 @@ export function App({
         return () => {
             cancelled = true
         }
-    }, [deps, sessionOptionsState])
+    }, [deps, sessionOptionsState, setupPending])
 
     useEffect(() => {
         let cancelled = false
@@ -439,7 +446,7 @@ export function App({
                 providerName: currentProvider,
                 model: currentModel,
                 mcpServers,
-                providers,
+                providers: providersState,
                 contextLimit,
             })
             if (result.kind === 'exit') {
@@ -514,10 +521,32 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
             currentModel,
             currentProvider,
             contextLimit,
-            providers,
+            providersState,
             runShellCommand,
         ],
     )
+
+    const handleSetupComplete = useCallback(async () => {
+        try {
+            const loaded = await loadMemoConfig()
+            const provider = selectProvider(loaded.config)
+            setProvidersState(loaded.config.providers)
+            setCurrentProvider(provider.name)
+            setCurrentModel(provider.model)
+            setSessionOptionsState((prev) => ({
+                ...prev,
+                sessionId: randomUUID(),
+                providerName: provider.name,
+            }))
+            setSetupPending(false)
+            appendSystemMessage('Setup', `Config saved to ${loaded.configPath}`)
+        } catch (err) {
+            appendSystemMessage(
+                'Setup',
+                `Failed to reload config: ${(err as Error).message}`,
+            )
+        }
+    }, [appendSystemMessage])
 
     useEffect(() => {
         if (!session || !pendingHistoryMessages?.length) return
@@ -589,6 +618,16 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
         )
     }
 
+    if (setupPending) {
+        return (
+            <SetupWizard
+                configPath={configPath}
+                onComplete={handleSetupComplete}
+                onExit={handleExit}
+            />
+        )
+    }
+
     return (
         <Box flexDirection="column">
             <MainContent
@@ -622,7 +661,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 cwd={cwd}
                 sessionsDir={sessionsDir}
                 currentSessionFile={sessionLogPath ?? undefined}
-                providers={providers}
+                providers={providersState}
                 configPath={configPath}
                 providerName={currentProvider}
                 model={currentModel}

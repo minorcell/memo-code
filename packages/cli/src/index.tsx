@@ -52,7 +52,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     return { question: questionParts.join(' '), options }
 }
 
-async function ensureProviderConfig() {
+async function ensureProviderConfig(mode: 'plain' | 'tui') {
     const loaded = await loadMemoConfig()
     if (!loaded.needsSetup) return loaded
 
@@ -71,6 +71,10 @@ async function ensureProviderConfig() {
             `Detected API key in env. Wrote default provider (${defaultProvider.name}) to ${loaded.configPath}`,
         )
         return { ...loaded, needsSetup: false }
+    }
+
+    if (mode === 'tui') {
+        return loaded
     }
 
     const rl = createInterface({ input, output })
@@ -109,7 +113,7 @@ async function ensureProviderConfig() {
 }
 
 async function runPlainMode(parsed: ParsedArgs) {
-    const loaded = await ensureProviderConfig()
+    const loaded = await ensureProviderConfig('plain')
     const provider = selectProvider(loaded.config)
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
@@ -183,7 +187,7 @@ async function runPlainMode(parsed: ParsedArgs) {
 }
 
 async function runInteractiveTui(parsed: ParsedArgs) {
-    const loaded = await ensureProviderConfig()
+    const loaded = await ensureProviderConfig('tui')
     const provider = selectProvider(loaded.config)
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
@@ -210,6 +214,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             sessionsDir={sessionsDir}
             providers={loaded.config.providers}
             dangerous={parsed.options.dangerous}
+            needsSetup={loaded.needsSetup}
         />,
         {
             exitOnCtrlC: false,
