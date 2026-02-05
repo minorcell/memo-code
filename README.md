@@ -209,8 +209,9 @@ memo-cli/
 
 ## 相关文档
 
+- [用户指南](./docs/user/README.md) - 面向使用者的分模块说明
 - [Core 架构](./docs/core.md) - 核心实现详解
-- [重构报告](./docs/refactor-complete.md) - Tool Use API 迁移说明
+- [CLI 适配更新](./docs/cli-update.md) - Tool Use API 迁移说明
 - [开发指南](./CONTRIBUTING.md) - 贡献指南
 - [项目约定](./AGENTS.md) - 代码规范和开发流程
 
