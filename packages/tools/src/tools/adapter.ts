@@ -19,6 +19,14 @@ export function adaptTool(legacyTool: LegacyMcpTool): Tool {
         description: legacyTool.description,
         source: 'native',
         inputSchema: convertZodToJSONSchema(legacyTool.inputSchema),
+        validateInput: (input: unknown) => {
+            const parsed = legacyTool.inputSchema.safeParse(input)
+            if (!parsed.success) {
+                const detail = parsed.error.issues[0]?.message ?? 'invalid input'
+                return { ok: false, error: `${legacyTool.name} invalid input: ${detail}` }
+            }
+            return { ok: true, data: parsed.data }
+        },
         execute: legacyTool.execute as (input: unknown) => Promise<CallToolResult>,
     }
 }
