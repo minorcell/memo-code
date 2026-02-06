@@ -1,0 +1,66 @@
+name: Deploy Web to GitHub Pages
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - 'web/**'
+            - '.github/workflows/deploy-web-pages.yml'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+concurrency:
+    group: pages
+    cancel-in-progress: true
+
+jobs:
+    build:
+        name: Build Web
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'pnpm'
+                  cache-dependency-path: web/pnpm-lock.yaml
+
+            - name: Configure GitHub Pages
+              uses: actions/configure-pages@v5
+
+            - name: Install dependencies
+              working-directory: web
+              run: pnpm install --frozen-lockfile
+
+            - name: Build static site
+              working-directory: web
+              env:
+                  GITHUB_ACTIONS: 'true'
+                  GITHUB_REPOSITORY: ${{ github.repository }}
+              run: pnpm build
+
+            - name: Upload Pages artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: web/out
+
+    deploy:
+        name: Deploy to GitHub Pages
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Deploy
+              id: deployment
+              uses: actions/deploy-pages@v4

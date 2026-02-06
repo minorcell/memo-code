@@ -4,8 +4,18 @@ import type { NextConfig } from 'next'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const workspaceRoot = resolve(currentDir, '..')
+const repository = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? ''
+const isGithubPagesBuild = process.env.GITHUB_ACTIONS === 'true' && repository.length > 0
+const pageBasePath = isGithubPagesBuild ? `/${repository}` : ''
 
 const nextConfig: NextConfig = {
+    output: 'export',
+    basePath: pageBasePath,
+    assetPrefix: pageBasePath,
+    trailingSlash: true,
+    images: {
+        unoptimized: true,
+    },
     outputFileTracingRoot: workspaceRoot,
     turbopack: {
         root: workspaceRoot,
