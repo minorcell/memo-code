@@ -1,12 +1,16 @@
 <div align="center">
   <img src="public/logo.svg" width="80" height="80" alt="Memo Logo">
   <h1>Memo Code</h1>
-  <p>本地运行的 AI 编程助手，支持多轮对话、工具调用、并发</p>
+  <p>A lightweight coding agent that runs in your terminal.</p>
 </div>
 
 <p align="center">
+  <a href="README.zh.md">Chinese Documentation</a>
+</p>
+
+<p align="center">
   <a href="public/memo-code-cli-show-01.mp4">
-    <img src="https://img.shields.io/badge/📹-观看演示视频-1a1a1a?style=for-the-badge" alt="Demo Video">
+    <img src="https://img.shields.io/badge/📹-Watch%20Demo%20Video-1a1a1a?style=for-the-badge" alt="Demo Video">
   </a>
 </p>
 
@@ -14,47 +18,49 @@
 
 <video src="public/memo-code-cli-show-01.mp4" width="100%"></video>
 
-基于 Node.js + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
+Built with Node.js + TypeScript. DeepSeek is the default provider, and OpenAI-compatible APIs are supported.
 
-## 快速开始
+Memo Code is an open-source coding agent that lives in your terminal, understands repository context, and helps you move faster with natural-language commands.
 
-### 1. 安装
+## Quick Start
+
+### 1. Install
 
 ```bash
 npm install -g @memo-code/memo
-# 或
+# or
 pnpm add -g @memo-code/memo
-# 或
+# or
 yarn global add @memo-code/memo
-# 或
+# or
 bun add -g @memo-code/memo
 ```
 
-### 2. 配置 API Key
+### 2. Configure API Key
 
 ```bash
-export DEEPSEEK_API_KEY=your_key  # 或 OPENAI_API_KEY
+export DEEPSEEK_API_KEY=your_key  # or OPENAI_API_KEY
 ```
 
-### 3. 启动使用
+### 3. Start
 
 ```bash
 memo
-# 首次运行会引导配置 provider/model，并（保存到 ~/.memo/config.toml）
+# First run guides provider/model setup and saves config to ~/.memo/config.toml
 ```
 
-## 使用方式
+## Usage
 
-- 交互式：`memo`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
-- 单轮：`memo "你的问题" --once`（纯文本输出，适合脚本）。
-- 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
-- 查看版本：`memo --version` 或 `memo -v`。
+- Interactive mode: `memo` (default TUI; supports multi-turn chat, streaming, tool visualization, shortcuts).
+- One-shot mode: `memo "your prompt" --once` (plain text output; useful for scripts).
+- Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
+- Version: `memo --version` or `memo -v`.
 
-## 配置文件
+## Configuration
 
-位置：`~/.memo/config.toml`（可通过 `MEMO_HOME` 环境变量修改）
+Location: `~/.memo/config.toml` (can be changed via `MEMO_HOME`).
 
-### Provider 配置
+### Provider Configuration
 
 ```toml
 current_provider = "deepseek"
@@ -67,73 +73,73 @@ model = "deepseek-chat"
 base_url = "https://api.deepseek.com"
 ```
 
-支持配置多个 Provider，通过 `current_provider` 切换。
+You can configure multiple providers and switch with `current_provider`.
 
-### MCP 工具配置
+### MCP Tool Configuration
 
-支持本地和远程 MCP 服务器：
+Both local and remote MCP servers are supported:
 
 ```toml
-# 本地 MCP 服务器
+# Local MCP server
 [mcp_servers.local_tools]
 command = "/path/to/mcp-server"
 args = []
 
-# 远程 HTTP MCP 服务器
+# Remote HTTP MCP server
 [mcp_servers.remote]
 type = "streamable_http"
 url = "https://your-mcp-server.com/mcp"
 # headers = { Authorization = "Bearer xxx" }
 ```
 
-也可以通过 CLI 管理 MCP 配置（对齐 Codex CLI 风格）：
+You can also manage MCP configs via CLI (aligned with Codex CLI style):
 
 ```bash
-# 列出 MCP servers
+# List MCP servers
 memo mcp list
 
-# 添加本地 MCP server（stdio）
+# Add local MCP server (stdio)
 memo mcp add local_tools -- /path/to/mcp-server --flag
 
-# 添加远程 MCP server（streamable HTTP）
+# Add remote MCP server (streamable HTTP)
 memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var MCP_TOKEN
 
-# 查看/删除
+# Show/remove
 memo mcp get remote
 memo mcp remove remote
 ```
 
-## 内置工具
+## Built-in Tools
 
-- `bash`：执行 shell 命令
-- `read`：读取文件
-- `write`：写入文件
-- `edit`：编辑文件
-- `glob`：搜索文件（模式匹配）
-- `grep`：搜索内容（正则匹配）
-- `webfetch`：获取网页
-- `save_memory`：保存长期记忆
-- `todo`：管理任务列表
+- `bash`: execute shell commands
+- `read`: read files
+- `write`: write files
+- `edit`: edit files
+- `glob`: find files by pattern
+- `grep`: search content by regex
+- `webfetch`: fetch webpages
+- `save_memory`: save long-term memory
+- `todo`: manage a task list
 
-通过 MCP 协议可扩展更多工具。
+More tools can be added through MCP.
 
-## 工具审批系统
+## Tool Approval System
 
-新增工具审批机制，保护用户免受危险操作影响：
+Memo includes a tool-approval mechanism to reduce risky operations:
 
-- **自动审批**：安全工具（read、glob、grep等）自动通过
-- **手动审批**：危险工具（bash、write、edit等）需要用户确认
-- **审批选项**：
-    - `once`：仅批准当前操作
-    - `session`：批准本次会话中的所有同类操作
-    - `deny`：拒绝操作
-- **危险模式**：`--dangerous` 参数跳过所有审批（仅限信任场景）
+- **Auto-approve**: safe tools (`read`, `glob`, `grep`, etc.)
+- **Manual approval**: risky tools (`bash`, `write`, `edit`, etc.)
+- **Approval options**:
+    - `once`: approve current operation only
+    - `session`: approve all matching operations for this session
+    - `deny`: reject operation
+- **Dangerous mode**: `--dangerous` skips all approvals (trusted scenarios only)
 
-## 会话历史
+## Session History
 
-所有会话自动保存到 `~/.memo/sessions/`，按工作目录和日期组织：
+All sessions are saved to `~/.memo/sessions/`, grouped by working directory and date:
 
-```
+```text
 ~/.memo/sessions/
   ├── workspace-name/
   │   ├── 2026-02-01_143020_abc123.jsonl
@@ -142,79 +148,79 @@ memo mcp remove remote
       └── 2026-02-01_160000_xyz789.jsonl
 ```
 
-JSONL 格式便于分析和调试。
+JSONL format is useful for analysis and debugging.
 
-## 开发
+## Development
 
-### 本地运行
+### Run Locally
 
 ```bash
 pnpm install
 pnpm start
-# 或
+# or
 pnpm start "prompt" --once
 ```
 
-### 构建
+### Build
 
 ```bash
-pnpm run build  # 生成 dist/index.js
+pnpm run build  # generates dist/index.js
 ```
 
-### 测试
+### Test
 
 ```bash
-pnpm test              # 全量测试
-pnpm test packages/core     # 测试 core 包
-pnpm test packages/tools    # 测试 tools 包
+pnpm test                   # all tests
+pnpm test packages/core     # core package
+pnpm test packages/tools    # tools package
 ```
 
-### 代码格式化
+### Format
 
 ```bash
-npm run format        # 格式化所有文件
-npm run format:check  # 检查格式（CI）
+npm run format        # format all files
+npm run format:check  # check format (CI)
 ```
 
-## 项目结构
+## Project Structure
 
-```
+```text
 memo-cli/
 ├── packages/
-│   ├── core/       # 核心逻辑：Session、工具路由、配置
-│   ├── tools/      # 内置工具实现
-│   └── cli/        # TUI 界面
-├── docs/           # 技术文档
-└── dist/           # 构建输出
+│   ├── core/       # core logic: Session, tool routing, config
+│   ├── tools/      # built-in tool implementations
+│   └── cli/        # TUI interface
+├── docs/           # technical docs
+└── dist/           # build output
 ```
 
-## CLI 快捷键与命令
+## CLI Shortcuts and Commands
 
-- `/help`：显示帮助与快捷键说明。
-- `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
-- `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
-- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`）。
-- `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
-- 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。
-- **工具审批**：危险操作会弹出审批对话框，可选择 `once`/`session`/`deny`。
+- `/help`: show help and shortcut guide.
+- `/models`: list available Provider/Model entries and switch with Enter; also supports direct selection like `/models deepseek`.
+- `/context`: open 80k/120k/150k/200k options and apply immediately.
+- `$ <cmd>`: run a local shell command in current cwd and display result directly (`Shell Result`).
+- `resume` history: type `resume` to list and load past sessions for current directory.
+- Exit and clear: `exit` / `/exit`, `Ctrl+L` for new session, `Esc Esc` to cancel current run or clear input.
+- **Tool approval**: risky operations open an approval dialog with `once`/`session`/`deny`.
 
-> 仅当会话包含用户消息时才写入 `sessions/` JSONL 日志，避免空会话文件。
+> Session logs are written only when a session contains user messages, to avoid empty files.
 
-## 技术栈
+## Tech Stack
 
 - **Runtime**: Node.js 18+
-- **语言**: TypeScript
+- **Language**: TypeScript
 - **UI**: React + Ink
 - **Protocol**: MCP (Model Context Protocol)
-- **Token 计数**: tiktoken
+- **Token counting**: tiktoken
 
-## 相关文档
+## Related Docs
 
-- [用户指南](./docs/user/README.md) - 面向使用者的分模块说明
-- [Core 架构](./docs/core.md) - 核心实现详解
-- [CLI 适配更新](./docs/cli-update.md) - Tool Use API 迁移说明
-- [开发指南](./CONTRIBUTING.md) - 贡献指南
-- [项目约定](./AGENTS.md) - 代码规范和开发流程
+- [User Guide](./docs/user/README.md) - User-facing docs by module
+- [Core Architecture](./docs/core.md) - Core implementation details
+- [CLI Adaptation History](./docs/cli-update.md) - Historical migration notes (Tool Use API)
+- [Contributing](./CONTRIBUTING.md) - Contribution guide
+- [Project Guidelines](./AGENTS.md) - Coding conventions and development process
 
 ## License
 

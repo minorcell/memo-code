@@ -1,55 +1,55 @@
-# 工具审批与安全
+# Tool Approval and Safety
 
-Memo 默认启用工具审批：当模型尝试执行潜在危险操作（写文件/执行命令等）时，会先向你请求许可，避免误操作。
+Memo enables tool approval by default. When the model tries potentially risky actions (file writes, command execution, etc.), Memo asks for permission first.
 
-## 哪些情况会触发审批？
+## What Triggers Approval?
 
-当前默认策略为：
+Current default policy:
 
-- **只读工具**：通常自动执行（例如 `read/glob/grep/webfetch`）
-- **写入工具**：需要审批（例如 `write/edit/save_memory`）
-- **执行工具**：需要审批（例如 `bash`）
+- **Read-only tools**: usually auto-approved (`read`, `glob`, `grep`, `webfetch`)
+- **Write tools**: approval required (`write`, `edit`, `save_memory`)
+- **Execution tools**: approval required (`bash`)
 
-> MCP 工具的风险等级会根据工具名进行保守推断：未知工具默认按“写入”级别处理。
+> MCP tools use conservative risk inference by name. Unknown tools are treated like write-level risk by default.
 
-## 审批选项含义
+## Approval Options
 
-在 TUI 弹窗里通常有三种选择：
+TUI dialog usually offers:
 
-- `Allow once`：仅允许这一次（同一 turn 结束后清除）
-- `Allow all session`：本会话内对“同一请求指纹”自动放行
-- `Reject`：拒绝执行
+- `Allow once`: allow only this call (cleared after current turn)
+- `Allow all session`: auto-allow matching call fingerprint for current session
+- `Reject`: deny execution
 
-指纹（fingerprint）是按“工具名 + 参数”生成的：参数不同通常会再次询问。
+Fingerprint is based on `tool name + arguments`. Different arguments usually trigger approval again.
 
-## `--dangerous`（跳过审批）什么时候用？
+## When to Use `--dangerous` (Skip Approvals)
 
 ```bash
 memo --dangerous
-# 或 memo -d
+# or memo -d
 ```
 
-适合：
+Suitable when:
 
-- 你非常信任当前提示与操作内容
-- 想在受控目录快速批量修改（并且你会 review diff）
+- You strongly trust the prompt and operations.
+- You need fast batch edits in a controlled directory and will review diffs.
 
-不适合：
+Not suitable when:
 
-- 你不确定模型会执行什么命令/改哪些文件
-- 你正在重要仓库或包含敏感数据的目录
+- You are unsure which commands/files will be touched.
+- You are in a critical repository or a directory with sensitive data.
 
-## 单轮模式（`--once`）与审批
+## One-shot Mode (`--once`) and Approval
 
-单轮模式通常无法弹出交互式审批，因此默认会拒绝需要审批的工具调用，导致该次操作被取消。
+One-shot mode usually cannot show interactive approval dialogs, so tool calls requiring approval are denied by default.
 
-如果你确实需要在单轮模式里做写入/执行类操作：
+If you need write/exec actions in one-shot mode:
 
-- 方案 A：改用交互式 TUI（`memo`）
-- 方案 B：使用 `--dangerous`（风险自担，务必确认 cwd 与命令/写入目标）
+- Option A: use interactive TUI (`memo`)
+- Option B: use `--dangerous` (you assume the risk; confirm cwd and targets carefully)
 
-## 使用建议（降低风险）
+## Safety Practices
 
-- 让它先做 dry-run：先让它列出计划/将要改的文件清单，再批准写入
-- 对 `bash`：优先用只读命令（`git status`、`rg`、`ls`），避免 `rm/sudo/chmod` 等高危
-- 对写入：让它只改你点名的文件，并要求输出变更摘要
+- Ask for a dry run first: let Memo list planned files/operations before approving writes.
+- For `bash`: prefer read-only commands (`git status`, `rg`, `ls`), avoid high-risk commands like `rm`/`sudo`/`chmod`.
+- For writes: constrain changes to explicitly named files and ask for a change summary.

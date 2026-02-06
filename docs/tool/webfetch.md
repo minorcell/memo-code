@@ -1,37 +1,43 @@
-# Memo CLI `webfetch` 工具
+# Memo CLI `webfetch` Tool
 
-受限 HTTP GET，返回处理后的纯文本正文（会自动剥离 HTML 标签），带超时与大小限制。
+Performs restricted HTTP GET and returns processed plain-text body preview (HTML tags stripped), with timeout and size limits.
 
-## 基本信息
+## Basic Info
 
-- 工具名称：`webfetch`
-- 描述：HTTP GET 请求，返回处理后的纯文本正文（自动剥离 HTML 标签）
-- 文件：`packages/tools/src/tools/webfetch.ts`
-- 确认：否
+- Tool name: `webfetch`
+- Description: HTTP GET that returns cleaned plain-text body preview (auto-strips HTML)
+- File: `packages/tools/src/tools/webfetch.ts`
+- Confirmation: no
 
-## 参数
+## Parameters
 
-- `url`（字符串，必填）：请求的完整 URL，协议仅支持 `http: / https: / data:`。
+- `url` (string, required): full request URL. Supported schemes: `http:`, `https:`, `data:`.
 
-## 行为
+## Behavior
 
-- 校验 URL 与协议；不支持的协议或无效 URL 直接报错。
-- 10s 超时，通过 AbortController 中止。
-- 响应体限制 512000 bytes：`content-length` 超限直接拒绝；流式读取时超限则中止。
-- 对 HTML 内容进行剥离：
-    - 去除 `<script>/<style>`，将块级元素/换行标签转换为换行，`<li>` 前置 `- `，去掉其他标签。
-    - 进行常见实体解码，压缩多余空白与空行。
-- 非 HTML 直接 `trim`。
-- 预览文本最长 4000 字符；超出时截断并标注 `text_truncated=true`。
-- 返回格式：`status=<code> bytes=<len> text_chars=<chars> text="<preview>" [text_truncated=true] [source=html_stripped]`。
-- 超时、中止或 fetch 异常返回错误消息并标记 `isError=true`。
+- Validates URL and scheme; unsupported/invalid URL is rejected.
+- 10-second timeout via AbortController.
+- Body size cap 512000 bytes:
+    - rejects early if `content-length` exceeds limit
+    - aborts during stream read if limit is exceeded
+- For HTML responses, strips content:
+    - removes `<script>/<style>`
+    - converts block elements and line breaks to newlines
+    - prefixes `<li>` with `- `
+    - removes other tags
+    - decodes common entities and compresses extra whitespace/blank lines
+- Non-HTML content is `trim`med directly.
+- Preview text max length is 4000 chars; longer text is truncated with `text_truncated=true`.
+- Return format:
+    - `status=<code> bytes=<len> text_chars=<chars> text="<preview>" [text_truncated=true] [source=html_stripped]`
+- Timeout/abort/fetch errors return `isError=true` with error message.
 
-## 输出示例
+## Output Example
 
 `status=200 bytes=10240 text_chars=3800 text="Example content..." source=html_stripped`
 
-## 注意
+## Notes
 
-- 仅 GET，不发送自定义头；未处理重定向/压缩细节。
-- 一律按 UTF-8 解码，非 UTF-8 站点可能乱码。
-- 大型 `data:` URL 仍需经过 fetch，可能受体积限制中止。
+- GET only. No custom headers. Redirect/compression details are not specially handled.
+- Always decoded as UTF-8; non-UTF-8 pages may produce garbled text.
+- Large `data:` URLs still go through fetch and may hit size limits.

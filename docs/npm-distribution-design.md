@@ -1,42 +1,42 @@
-# NPM 分发设计文档
+# NPM Distribution Design
 
-## 1. 设计目标
+## 1. Design Goals
 
-### 1.1 核心诉求
+### 1.1 Core Requirements
 
-- **跨平台兼容**: 支持 macOS、Linux、Windows 无需重新编译
-- **零运行时依赖**: 所有依赖打包到单一文件，用户无需关心依赖安装
-- **标准 Node.js**: 仅依赖 Node.js >=18，不依赖 Bun 等特定运行时
-- **最小化体积**: 发布包 < 100KB，安装快速
+- **Cross-platform compatibility**: support macOS, Linux, and Windows without per-platform recompilation
+- **Zero runtime dependency setup for users**: package all dependencies into one deliverable file
+- **Standard Node.js runtime**: require only Node.js >=18 (no Bun-specific runtime dependency)
+- **Small package size**: published package under 100KB for fast install
 
-### 1.2 与二进制分发的对比
+### 1.2 Comparison with Binary Distribution
 
-| 特性     | NPM 分发                | 二进制分发              |
-| -------- | ----------------------- | ----------------------- |
-| 跨平台   | ✅ 一次构建，全平台运行 | ❌ 需为每个平台单独构建 |
-| 签名需求 | 无                      | macOS/Windows 需签名    |
-| 包体积   | ~38KB                   | ~50-100MB               |
-| 更新机制 | npm update              | 手动下载替换            |
-| 环境要求 | Node.js >=18            | 无                      |
-| 安装速度 | 快                      | 慢                      |
+| Feature              | NPM Distribution              | Binary Distribution            |
+| -------------------- | ----------------------------- | ------------------------------ |
+| Cross-platform       | ✅ build once, run everywhere | ❌ separate build per platform |
+| Signing requirements | none                          | macOS/Windows signing required |
+| Package size         | ~38KB                         | ~50-100MB                      |
+| Update workflow      | `npm update`                  | manual download/replace        |
+| Runtime requirement  | Node.js >=18                  | none                           |
+| Install speed        | fast                          | slower                         |
 
-## 2. 架构设计
+## 2. Architecture
 
-### 2.1 整体架构
+### 2.1 Overall Architecture
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │           @memo-code/memo               │
 │  ┌─────────────────────────────────┐   │
-│  │      dist/index.js (ESM)        │   │  ← 单一入口文件
-│  │  - CLI 逻辑                      │   │
-│  │  - Core 运行时                   │   │
-│  │  - Tools 实现                    │   │
+│  │      dist/index.js (ESM)        │   │  ← single entry file
+│  │  - CLI logic                     │   │
+│  │  - Core runtime                  │   │
+│  │  - Tools implementation          │   │
 │  │  - UI (React/Ink)                │   │
 │  └─────────────────────────────────┘   │
 │              ↓                          │
 │  ┌─────────────────────────────────┐   │
-│  │      dist/prompt.md             │   │  ← 运行时资源
+│  │      dist/prompt.md             │   │  ← runtime resource
 │  └─────────────────────────────────┘   │
 └─────────────────────────────────────────┘
                     ↓
@@ -45,20 +45,20 @@
 └─────────────────────────────────────────┘
 ```
 
-### 2.2 构建流水线
+### 2.2 Build Pipeline
 
-```
+```text
 Source Code                    Build Output
 ────────────                   ────────────
 packages/cli/src/
   └─ index.tsx    ───┐         dist/
                      ├─tsup──→   ├─ index.js (bundled)
 packages/core/src/  ─┤            │   - React/Ink UI
-  ├─ runtime/        │            │   - Session 管理
-  ├─ config/         │            │   - LLM 调用
-  └─ ...             │            │   - Token 计数
+  ├─ runtime/        │            │   - Session management
+  ├─ config/         │            │   - LLM invocation
+  └─ ...             │            │   - Token counting
                      │            │
-packages/tools/src/ ─┤            │   ← 所有依赖内联
+packages/tools/src/ ─┤            │   ← all dependencies inlined
   ├─ bash.ts         │            │
   ├─ read/write/     │            │
   └─ ...             │            │
@@ -68,60 +68,59 @@ packages/core/src/   │            │
       └─ prompt.md ──┴──────────→├─ prompt.md
 ```
 
-### 2.3 依赖处理策略
+### 2.3 Dependency Strategy
 
-| 依赖类型         | 处理方式   | 原因            |
-| ---------------- | ---------- | --------------- |
-| `react`, `ink`   | 打包内联   | 运行时必需      |
-| `fast-glob`      | 打包内联   | 避免用户安装    |
-| `openai`         | 打包内联   | API 客户端      |
-| `tiktoken`       | 打包内联   | Token 计数      |
-| `zod`            | 打包内联   | Schema 验证     |
-| Node.js 内置模块 | `external` | 由 Node.js 提供 |
+| Dependency Type | Handling      | Reason                           |
+| --------------- | ------------- | -------------------------------- |
+| `react`, `ink`  | bundle inline | required at runtime              |
+| `fast-glob`     | bundle inline | avoid user-side install concerns |
+| `openai`        | bundle inline | API client                       |
+| `tiktoken`      | bundle inline | token counting                   |
+| `zod`           | bundle inline | schema validation                |
+| Node built-ins  | `external`    | provided by Node.js              |
 
-## 3. 关键实现细节
+## 3. Key Implementation Details
 
-### 3.1 构建配置 (tsup)
+### 3.1 Build Config (`tsup`)
 
 ```typescript
 export default defineConfig({
     entry: ['packages/cli/src/index.tsx'],
-    format: ['esm'], // ESM 格式
-    target: 'node18', // 最低 Node.js 版本
-    bundle: true, // 打包所有依赖
-    minify: true, // 压缩代码
-    splitting: false, // 单一文件
-    external: [], // 无外部依赖
+    format: ['esm'], // ESM format
+    target: 'node18', // minimum Node.js version
+    bundle: true, // bundle all dependencies
+    minify: true, // minify code
+    splitting: false, // single file output
+    external: [], // no external runtime deps
     banner: {
-        js: '#!/usr/bin/env node', // Shebang
+        js: '#!/usr/bin/env node', // shebang
     },
     onSuccess() {
-        // 复制资源文件
+        // copy runtime resource file
         copyFileSync('packages/core/src/runtime/prompt.md', 'dist/prompt.md')
     },
 })
 ```
 
-### 3.2 资源文件处理
+### 3.2 Resource File Handling
 
-**问题**: `prompt.md` 是 Markdown 模板，需要运行时读取。
+**Problem**: `prompt.md` is a runtime-read Markdown template.
 
-**方案**:
+**Solution**:
 
-- 构建时复制到 `dist/prompt.md`
-- `package.json` `files` 字段显式包含
-- 运行时通过 `__dirname` 定位
+- Copy it to `dist/prompt.md` during build
+- Include it explicitly in `package.json` `files`
+- Locate it with `__dirname` at runtime
 
 ```typescript
-// 运行时读取
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const promptPath = join(__dirname, 'prompt.md')
 const prompt = await readFile(promptPath, 'utf-8')
 ```
 
-### 3.3 路径别名解析
+### 3.3 Path Alias Resolution
 
-**开发时** (tsconfig.json):
+**During development** (`tsconfig.json`):
 
 ```json
 {
@@ -134,9 +133,9 @@ const prompt = await readFile(promptPath, 'utf-8')
 }
 ```
 
-**构建时**: tsup 自动解析并内联，最终产物无路径别名。
+**During build**: tsup resolves and inlines aliases automatically.
 
-**测试时** (vitest.config.ts):
+**During test** (`vitest.config.ts`):
 
 ```typescript
 import tsconfigPaths from 'vite-tsconfig-paths'
@@ -146,47 +145,43 @@ export default defineConfig({
 })
 ```
 
-## 4. 跨平台兼容性
+## 4. Cross-platform Compatibility
 
-### 4.1 文件路径处理
+### 4.1 File Path Handling
 
 ```typescript
-// 使用 Node.js path 模块，自动处理分隔符
 import { join, normalize } from 'node:path'
 
-// 正确
+// correct
 const filePath = join(process.cwd(), 'config.toml')
 
-// 错误 (硬编码分隔符)
-const filePath = `${process.cwd()}/config.toml`
+// avoid hard-coded separators
+const filePath2 = `${process.cwd()}/config.toml`
 ```
 
-### 4.2 环境检测
+### 4.2 Environment Detection
 
 ```typescript
-// 检测 ripgrep 可用性
 const rgAvailable = (() => {
     const result = spawnSync('rg', ['--version'], { stdio: 'ignore' })
     return !result.error && result.status === 0
 })()
 ```
 
-### 4.3 Shell 命令执行
+### 4.3 Shell Command Execution
 
 ```typescript
-// 使用 bash -lc 确保加载用户配置
 spawn('bash', ['-lc', command], {
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
 })
 ```
 
-## 5. 发布流程
+## 5. Release Workflow
 
-### 5.1 CI/CD 流程
+### 5.1 CI/CD Flow
 
 ```yaml
-# .github/workflows/ci.yml
 jobs:
     test:
         runs-on: ubuntu-latest
@@ -201,101 +196,101 @@ jobs:
             - run: pnpm run build
 ```
 
-### 5.2 手动发布步骤
+### 5.2 Manual Release Steps
 
 ```bash
-# 1. 确保测试通过
+# 1) ensure everything passes
 pnpm run ci
 
-# 2. 更新版本号
-npm version patch  # 或 minor/major
+# 2) bump version
+npm version patch  # or minor/major
 
-# 3. 构建并发布
+# 3) build and publish
 npm publish --access public
 ```
 
-### 5.3 发布后验证
+### 5.3 Post-release Validation
 
 ```bash
-# 1. 清理本地缓存
+# 1) clear local cache
 npm cache clean --force
 
-# 2. 全局安装测试
+# 2) global install test
 npm install -g @memo-code/memo
 
-# 3. 验证运行
+# 3) runtime verification
 memo --version
 memo "test prompt"
 ```
 
-## 6. 安装方式对比
+## 6. Installation Modes
 
-| 方式      | 命令                             | 适用场景   |
-| --------- | -------------------------------- | ---------- |
-| 全局安装  | `npm install -g @memo-code/memo` | 日常使用   |
-| pnpm 全局 | `pnpm add -g @memo-code/memo`    | pnpm 用户  |
-| npx 运行  | `npx @memo-code/memo`            | 临时使用   |
-| 本地安装  | `npm install @memo-code/memo`    | 项目内使用 |
+| Mode           | Command                          | Typical Use          |
+| -------------- | -------------------------------- | -------------------- |
+| Global install | `npm install -g @memo-code/memo` | daily usage          |
+| pnpm global    | `pnpm add -g @memo-code/memo`    | pnpm users           |
+| npx run        | `npx @memo-code/memo`            | temporary usage      |
+| Local install  | `npm install @memo-code/memo`    | project-scoped usage |
 
-## 7. 故障排查设计
+## 7. Troubleshooting Design
 
-### 7.1 常见问题
+### 7.1 Common Issues
 
-| 问题                   | 原因                   | 解决方案                               |
-| ---------------------- | ---------------------- | -------------------------------------- |
-| `command not found`    | 全局 bin 目录不在 PATH | 添加 `$(npm bin -g)` 到 PATH           |
-| `prompt.md not found`  | 资源文件未复制         | 检查 `files` 字段包含 `dist/prompt.md` |
-| `ERR_MODULE_NOT_FOUND` | 路径别名未解析         | 确保构建时无外部依赖                   |
-| Windows 执行失败       | PowerShell 执行策略    | `Set-ExecutionPolicy RemoteSigned`     |
+| Issue                     | Cause                            | Fix                                      |
+| ------------------------- | -------------------------------- | ---------------------------------------- |
+| `command not found`       | global bin directory not in PATH | add `$(npm bin -g)` to PATH              |
+| `prompt.md not found`     | resource file not copied         | ensure `files` includes `dist/prompt.md` |
+| `ERR_MODULE_NOT_FOUND`    | path aliases unresolved          | ensure fully bundled build output        |
+| Windows execution failure | PowerShell policy                | `Set-ExecutionPolicy RemoteSigned`       |
 
-### 7.2 调试模式
+### 7.2 Debug Mode
 
 ```bash
-# 查看详细日志
+# verbose logs
 DEBUG=* memo
 
-# 检查配置文件
+# check config
 memo --config
 
-# 运行诊断
+# run diagnostics
 memo --doctor
 ```
 
-## 8. 安全考虑
+## 8. Security Considerations
 
-### 8.1 依赖安全
+### 8.1 Dependency Security
 
-- 所有依赖在构建时锁定版本
-- 使用 `npm audit` 定期检查
-- 避免动态 `require()` 防止注入
+- lock dependency versions at build time
+- run `npm audit` regularly
+- avoid dynamic `require()` where possible
 
-### 8.2 运行时安全
+### 8.2 Runtime Security
 
-- 工具执行前确认（bash、write、edit）
-- 路径白名单检查
-- 沙箱执行外部命令
+- approve risky tools before execution (`bash`, `write`, `edit`)
+- enforce path allowlists
+- run external commands in controlled environments
 
-## 9. 未来扩展
+## 9. Future Extensions
 
-### 9.1 可能的优化
+### 9.1 Possible Optimizations
 
-- **代码分割**: 按需加载大型依赖（如 tiktoken wasm）
-- **压缩算法**: 使用 Brotli 进一步减小体积
-- **增量更新**: 支持热更新机制
+- **Code splitting**: lazy-load large dependencies (for example tiktoken wasm)
+- **Compression**: use Brotli to reduce package size further
+- **Incremental updates**: support hot-update style mechanism
 
-### 9.2 平台特定优化
+### 9.2 Platform-specific Improvements
 
-- **macOS**: 考虑 Notarization（如分发 App）
-- **Windows**: 提供 PowerShell 模块
-- **Linux**: 提供 snap/flatpak 包
+- **macOS**: consider Notarization if distributing as an app
+- **Windows**: provide PowerShell module
+- **Linux**: provide snap/flatpak package
 
-## 10. 总结
+## 10. Summary
 
-本设计通过以下策略实现高效跨平台分发：
+This design achieves efficient cross-platform distribution through:
 
-1. **单一文件**: 所有代码打包到 `dist/index.js`
-2. **资源内嵌**: `prompt.md` 随包分发
-3. **零依赖**: 用户只需 Node.js
-4. **标准工具链**: pnpm + tsup + vitest
+1. **Single entry file**: all code bundled into `dist/index.js`
+2. **Bundled resource**: `prompt.md` ships with package
+3. **Minimal runtime requirement**: users only need Node.js
+4. **Standard toolchain**: pnpm + tsup + vitest
 
-相比二进制分发，NPM 分发具有更好的跨平台兼容性和更小的包体积，适合以 Node.js 为基础的 CLI 工具。
+Compared with binary distribution, NPM distribution gives better cross-platform compatibility and much smaller package size for Node.js-based CLI tools.

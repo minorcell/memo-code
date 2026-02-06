@@ -1,44 +1,44 @@
-# 会话与日志（History / Sessions）
+# Sessions and Logs (History / Sessions)
 
-Memo 会把会话过程以 JSONL 事件流写到本地，便于恢复上下文、排查问题与复盘。
+Memo writes session activity as a local JSONL event stream for context resume, debugging, and review.
 
-## 会话日志保存位置
+## Session Log Location
 
-默认目录：
+Default directory:
 
 - `~/.memo/sessions/`
 
-可通过 `MEMO_HOME` 重定向（见 [配置](./configuration.md)）。
+Can be redirected with `MEMO_HOME` (see [Configuration](./configuration.md)).
 
-文件组织方式：
+File organization:
 
-- 按当前工作目录（cwd）做“桶目录”（路径会被清洗/截断）
-- 每个会话一个 JSONL 文件：`YYYY-MM-DD_HHMMSS_<sessionId>.jsonl`
+- Bucketed by current working directory (sanitized/truncated path)
+- One JSONL per session: `YYYY-MM-DD_HHMMSS_<sessionId>.jsonl`
 
-> 只有当会话包含用户消息时才会落盘，避免产生空文件。
+> Logs are only written when the session includes user messages, avoiding empty files.
 
-## JSONL 里有什么？
+## What Is Stored in JSONL?
 
-每一行是一个事件（JSON 对象），常见事件包括：
+Each line is one event object. Common events:
 
 - `session_start` / `session_end`
 - `turn_start` / `turn_end`
-- `assistant`（模型输出）
-- `action`（工具调用）
-- `observation`（工具结果）
-- `final`（最终答复）
+- `assistant` (model output)
+- `action` (tool call)
+- `observation` (tool result)
+- `final` (final response)
 
-你通常不需要读懂全部字段；排障时关注 `action/observation/final` 即可。
+You usually do not need every field; for troubleshooting, focus on `action/observation/final`.
 
-## 如何恢复历史（`resume`）
+## How to Resume History (`resume`)
 
-在 TUI 输入框键入：
+Type in TUI input:
 
-- `resume`（或 `resume <关键词>`）
+- `resume` (or `resume <keyword>`)
 
-会弹出历史会话建议；选中后会把历史对话加载进当前 session 作为上下文，继续对话。
+Memo shows matching history suggestions. When selected, it loads prior dialogue into current session context.
 
-## 相关建议
+## Suggestions
 
-- 复现/报错时：把对应的 `.jsonl` 文件路径发出来通常能更快定位问题
-- 觉得上下文太长时：用 `/new` 新会话，或用 `/context` 降低上限
+- When reporting issues, sharing the relevant `.jsonl` path usually speeds up diagnosis.
+- If context gets too long, use `/new` for a new session or lower cap with `/context`.

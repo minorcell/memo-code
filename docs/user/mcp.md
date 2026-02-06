@@ -1,40 +1,40 @@
-# MCP 扩展（外部工具/服务）
+# MCP Extensions (External Tools/Services)
 
-MCP（Model Context Protocol）允许 Memo 连接外部工具服务器，把更多能力以“工具”的形式提供给模型（例如：内部知识库、工单系统、浏览器自动化等）。
+MCP (Model Context Protocol) lets Memo connect external tool servers and expose additional capabilities to the model (for example internal knowledge base, ticket systems, browser automation).
 
-## 配置方式一：使用 CLI 管理（推荐）
+## Option 1: Manage via CLI (Recommended)
 
-列出：
+List servers:
 
 ```bash
 memo mcp list
 memo mcp list --json
 ```
 
-添加本地 stdio server：
+Add local stdio server:
 
 ```bash
 memo mcp add local_tools -- /path/to/mcp-server --flag
 ```
 
-添加远程 HTTP server（streamable HTTP）：
+Add remote HTTP server (streamable HTTP):
 
 ```bash
 memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var MCP_TOKEN
 ```
 
-查看/删除：
+View/remove:
 
 ```bash
 memo mcp get remote
 memo mcp remove remote
 ```
 
-> `memo mcp login/logout` 当前版本尚未支持 OAuth 流程（会提示改用 bearer token env var）。
+> `memo mcp login/logout` does not support OAuth flow in current version; use bearer-token env var instead.
 
-## 配置方式二：直接编辑 `config.toml`
+## Option 2: Edit `config.toml` Directly
 
-本地 stdio：
+Local stdio:
 
 ```toml
 [mcp_servers.local_tools]
@@ -42,7 +42,7 @@ command = "/path/to/mcp-server"
 args = ["--flag"]
 ```
 
-远程 HTTP：
+Remote HTTP:
 
 ```toml
 [mcp_servers.remote]
@@ -51,14 +51,14 @@ url = "https://your-mcp-server.com/mcp"
 bearer_token_env_var = "MCP_TOKEN"
 ```
 
-## 在 TUI 中查看 MCP servers
+## View MCP Servers in TUI
 
-在 TUI 输入：
+Type in TUI:
 
 - `/mcp`
 
-会显示当前配置文件里已加载的 MCP server 列表与关键字段。
+This shows loaded MCP servers from current config and key fields.
 
-## 生效时机
+## When Changes Take Effect
 
-MCP servers 在创建 session 时加载。修改配置后，建议重启 `memo` 或开始一个新会话以确保重新加载。
+MCP servers are loaded when a session is created. After changing config, restart `memo` or start a new session to ensure reload.

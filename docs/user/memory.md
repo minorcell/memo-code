@@ -1,37 +1,37 @@
-# 长期记忆（Memory）
+# Long-term Memory
 
-Memo 支持把“用户偏好/身份信息”写入本地记忆文件，并在后续会话中注入到系统提示词里，提升一致性。
+Memo can store user preferences/profile info in a local memory file and inject it into future system prompts for more consistent behavior.
 
-## 记忆文件位置
+## Memory File Location
 
-默认：
+Default:
 
 - `~/.memo/Agents.md`
 
-可通过 `MEMO_HOME` 改位置（见 [配置](./configuration.md)）。
+You can relocate it with `MEMO_HOME` (see [Configuration](./configuration.md)).
 
-## `save_memory` 能存什么？
+## What `save_memory` Should Store
 
-适合：
+Suitable:
 
-- 语言偏好：如“用户偏好中文回答”
-- 技术偏好：如“用户更喜欢 TypeScript”“更偏向函数式风格”
-- 输出偏好：如“输出要简洁、先结论后步骤”
+- Language preferences: for example, "User prefers Chinese responses"
+- Technical preferences: for example, "User prefers TypeScript" or "leans functional style"
+- Output preferences: for example, "Keep answers concise, conclusion first"
 
-不适合（不要存）：
+Not suitable (do not store):
 
-- 项目结构、业务逻辑、仓库细节（这些应写进项目的 `AGENTS.md`）
-- 密钥/令牌/个人敏感信息
+- Project structure/business logic/repo details (put these in project `AGENTS.md`)
+- Secrets/tokens/personal sensitive information
 
-## 实际使用方式
+## How It Is Used in Practice
 
-通常你只需要在对话里明确表达偏好；模型会在合适时机调用 `save_memory`。
+Usually you only need to state your preference in chat; the model may call `save_memory` when appropriate.
 
-如果你想显式提示它记住某件事，可以这样说：
+If you want explicit memory capture, say something like:
 
-- “请记住：我希望所有回答用中文，并尽量简洁。”
+- "Please remember: I want all responses in Chinese and as concise as possible."
 
-## 相关文档
+## Related Docs
 
-- 工具细节：`docs/tool/save_memory.md`
-- 项目级说明：仓库内的 `AGENTS.md`（给 AI 助手的项目约定）
+- Tool details: `docs/tool/save_memory.md`
+- Project-level conventions: `AGENTS.md` inside the repository
