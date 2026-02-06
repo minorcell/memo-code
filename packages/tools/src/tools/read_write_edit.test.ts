@@ -155,4 +155,39 @@ describe('edit tool', () => {
         const content = await readText(target)
         assert.strictEqual(content, 'x z x z')
     })
+
+    test('supports batch edits in one call', async () => {
+        const target = join(tempDir, 'edit-batch.txt')
+        await writeTool.execute({ file_path: target, content: 'alpha beta gamma beta' })
+        const res = await editTool.execute({
+            file_path: target,
+            edits: [
+                { old_string: 'alpha', new_string: 'A' },
+                { old_string: 'beta', new_string: 'B', replace_all: true },
+                { old_string: 'gamma', new_string: 'G' },
+            ],
+        })
+        const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
+        assert.ok(text.includes('edits=3'))
+        assert.ok(text.includes('count=4'))
+        const content = await readText(target)
+        assert.strictEqual(content, 'A B G B')
+    })
+
+    test('fails batch edits atomically when one edit is missing', async () => {
+        const target = join(tempDir, 'edit-batch-atomic.txt')
+        await writeTool.execute({ file_path: target, content: 'foo bar baz' })
+        const res = await editTool.execute({
+            file_path: target,
+            edits: [
+                { old_string: 'foo', new_string: 'FOO' },
+                { old_string: 'not-found', new_string: 'X' },
+            ],
+        })
+        const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
+        assert.ok(res.isError, 'should fail when any batch edit is missing')
+        assert.ok(text.includes('未找到'))
+        const content = await readText(target)
+        assert.strictEqual(content, 'foo bar baz')
+    })
 })
