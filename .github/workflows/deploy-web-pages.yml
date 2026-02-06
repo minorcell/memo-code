@@ -49,6 +49,7 @@ jobs:
               env:
                   GITHUB_ACTIONS: 'true'
                   GITHUB_REPOSITORY: ${{ github.repository }}
+                  NEXT_PUBLIC_BASE_PATH: ''
               run: pnpm build
 
             - name: Upload Pages artifact
