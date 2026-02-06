@@ -7,7 +7,7 @@ export type StepView = {
     assistantText: string
     thinking?: string
     action?: { tool: string; input: unknown }
-    /** 并发工具调用时的全部工具信息 */
+    /** All tool information during parallel tool calls */
     parallelActions?: Array<{ tool: string; input: unknown }>
     observation?: string
     toolStatus?: ToolStatus
