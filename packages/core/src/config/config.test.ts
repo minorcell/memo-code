@@ -200,4 +200,23 @@ model = "legacy-model"
         expect(loaded.needsSetup).toBe(true)
         expect(loaded.config.current_provider).not.toBe('legacy')
     })
+
+    test('loadMemoConfig falls back to default max_prompt_tokens when missing', async () => {
+        const home = join(tempBase, 'memo-home-missing-limit')
+        process.env.MEMO_HOME = home
+        await mkdir(home, { recursive: true })
+        const configText = `
+current_provider = "deepseek"
+stream_output = false
+
+[[providers.deepseek]]
+name = "deepseek"
+env_api_key = "DEEPSEEK_API_KEY"
+model = "deepseek-chat"
+`
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
+
+        const loaded = await loadMemoConfig()
+        expect(loaded.config.max_prompt_tokens).toBe(120000)
+    })
 })

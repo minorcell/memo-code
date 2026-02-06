@@ -22,8 +22,6 @@ import type {
     TurnStatus,
     TextBlock,
     ToolUseBlock,
-    ApprovalRequest,
-    ApprovalDecision,
 } from '@memo/core/types'
 import {
     buildHookRunners,
@@ -32,8 +30,10 @@ import {
     type HookRunnerMap,
 } from '@memo/core/runtime/hooks'
 import { createApprovalManager, type ApprovalManager } from '@memo/core/approval'
+import type { ApprovalRequest, ApprovalDecision } from '@memo/core/approval'
 
 const DEFAULT_SESSION_MODE: SessionMode = 'interactive'
+const DEFAULT_MAX_PROMPT_TOKENS = 120_000
 
 function emptyUsage(): TokenUsage {
     return { prompt: 0, completion: 0, total: 0 }
@@ -328,6 +328,7 @@ class AgentSessionImpl implements AgentSession {
         const steps: AgentStepTrace[] = []
         const turnUsage = emptyUsage()
         const turnStartedAt = Date.now()
+        const effectiveMaxPromptTokens = this.options.maxPromptTokens ?? DEFAULT_MAX_PROMPT_TOKENS
 
         if (!this.sessionStartEmitted) {
             await this.emitEvent('session_start', {
@@ -335,7 +336,7 @@ class AgentSessionImpl implements AgentSession {
                     mode: this.mode,
                     tokenizer: this.tokenCounter.model,
                     warnPromptTokens: this.options.warnPromptTokens,
-                    maxPromptTokens: this.options.maxPromptTokens,
+                    maxPromptTokens: effectiveMaxPromptTokens,
                 },
             })
             this.sessionStartEmitted = true
@@ -366,10 +367,7 @@ class AgentSessionImpl implements AgentSession {
             // ReAct 主循环
             for (let step = 0; ; step++) {
                 const estimatedPrompt = this.tokenCounter.countMessages(this.history)
-                if (
-                    this.options.maxPromptTokens &&
-                    estimatedPrompt > this.options.maxPromptTokens
-                ) {
+                if (estimatedPrompt > effectiveMaxPromptTokens) {
                     const limitMessage = `Context tokens (${estimatedPrompt}) exceed the limit. Please shorten the input or restart the session.`
                     const finalPayload = JSON.stringify({ final: limitMessage })
                     this.history.push({ role: 'assistant', content: finalPayload })

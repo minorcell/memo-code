@@ -65,6 +65,7 @@ const DEFAULT_MEMORY_FILE = 'Agents.md'
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
     stream_output: false,
+    max_prompt_tokens: 120000,
     providers: [
         {
             name: 'deepseek',
@@ -208,7 +209,7 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
             stream_output: parsed.stream_output ?? DEFAULT_CONFIG.stream_output,
-            max_prompt_tokens: maxPromptTokens,
+            max_prompt_tokens: maxPromptTokens ?? DEFAULT_CONFIG.max_prompt_tokens,
             providers,
             mcp_servers: parsed.mcp_servers ?? {},
         }
