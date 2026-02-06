@@ -1,0 +1,41 @@
+name: Feature Request
+description: Propose a new feature or enhancement
+labels: ['enhancement', 'needs-triage']
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Please describe user value and scope clearly. Search existing issues first to avoid duplicates.
+    - type: checkboxes
+      id: checks
+      attributes:
+          label: Pre-check
+          options:
+              - label: I searched existing issues and discussions and did not find the same request.
+                required: true
+    - type: textarea
+      id: problem
+      attributes:
+          label: Problem Statement
+          description: What user/problem is not solved well today?
+      validations:
+          required: true
+    - type: textarea
+      id: proposal
+      attributes:
+          label: Proposed Solution
+          description: Describe the preferred solution and key UX/API shape.
+      validations:
+          required: true
+    - type: textarea
+      id: alternatives
+      attributes:
+          label: Alternatives Considered
+          description: Optional; what alternatives did you evaluate?
+    - type: textarea
+      id: acceptance
+      attributes:
+          label: Acceptance Criteria
+          placeholder: |
+              - [ ] ...
+              - [ ] ...

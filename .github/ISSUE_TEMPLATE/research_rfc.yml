@@ -1,0 +1,38 @@
+name: Research / RFC
+description: Architecture or roadmap research proposal
+labels: ['enhancement', 'needs-triage', 'area:core']
+body:
+    - type: checkboxes
+      id: checks
+      attributes:
+          label: Pre-check
+          options:
+              - label: I searched existing roadmap/research issues.
+                required: true
+    - type: input
+      id: scope
+      attributes:
+          label: Scope
+          placeholder: e.g. CLI/TUI command architecture
+      validations:
+          required: true
+    - type: textarea
+      id: context
+      attributes:
+          label: Context
+      validations:
+          required: true
+    - type: textarea
+      id: analysis
+      attributes:
+          label: Comparison / Analysis
+          description: Include links and concrete evidence.
+      validations:
+          required: true
+    - type: textarea
+      id: plan
+      attributes:
+          label: Proposed Plan
+          description: Phases, milestones, risks, and rollback plan.
+      validations:
+          required: true

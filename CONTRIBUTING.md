@@ -28,6 +28,13 @@ Thanks for your interest in **Memo Code CLI**. Please read these guidelines befo
 - Recommended branch names: `feature/<topic>`, `fix/<topic>`, `docs/<topic>`.
 - In PRs, state change scope, risk points, and validation methods; keep commits clean and focused.
 
+## Issue Governance
+
+- New issues are triaged automatically with `needs-triage` and area/type labels.
+- Potential duplicates are flagged as `duplicate-candidate`; maintainers should confirm manually.
+- Confirmed duplicates should be closed with state reason `duplicate` and linked to the canonical issue.
+- Keep one canonical tracking issue per topic; use checklists/sub-issues there instead of parallel duplicates.
+
 ## Tips
 
 - Prioritize Core/Tools contracts and reusability; keep UI as a thin wrapper (see `docs/dev-direction.md`).
