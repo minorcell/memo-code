@@ -1,2 +1,7 @@
 node_modules
 dist
+.next
+out
+coverage
+web/.next
+web/out
