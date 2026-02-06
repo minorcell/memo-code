@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { z } from 'zod'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
+import { normalizePath, isWritePathAllowed } from '@memo/tools/tools/helpers'
 
 const BASH_INPUT_SCHEMA = z
     .object({
@@ -24,6 +25,23 @@ function truncateOutput(text: string, maxChars: number) {
     return { value: text.slice(0, maxChars), truncated: true }
 }
 
+function stripShellToken(raw: string) {
+    return raw.trim().replace(/^['"]|['"]$/g, '')
+}
+
+function findOutOfSandboxAbsolutePaths(command: string) {
+    const tokens = command.split(/\s+/).map(stripShellToken).filter(Boolean)
+    const outOfScope: string[] = []
+    for (const token of tokens) {
+        if (!token.startsWith('/')) continue
+        const normalized = normalizePath(token)
+        if (!isWritePathAllowed(normalized)) {
+            outOfScope.push(normalized)
+        }
+    }
+    return Array.from(new Set(outOfScope))
+}
+
 /**
  * 执行任意 bash 命令，将 exit/stdout/stderr 拼接返回。
  * 主要用于调试/脚本执行，注意命令安全性需由上层控制。
@@ -35,6 +53,13 @@ export const bashTool: McpTool<BashInput> = {
     execute: async ({ command, timeout }) => {
         const cmd = command.trim()
         if (!cmd) return textResult('bash 需要要执行的命令', true)
+        const deniedPaths = findOutOfSandboxAbsolutePaths(cmd)
+        if (deniedPaths.length > 0) {
+            return textResult(
+                `sandbox 拒绝执行: 命令包含越界绝对路径 (${deniedPaths.join(', ')})`,
+                true,
+            )
+        }
 
         try {
             const proc = spawn('bash', ['-lc', cmd], {

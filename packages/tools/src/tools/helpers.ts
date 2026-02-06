@@ -1,4 +1,5 @@
-import { normalize, resolve, dirname, join, relative } from 'node:path'
+import { normalize, resolve, dirname, join, relative, isAbsolute } from 'node:path'
+import { homedir } from 'node:os'
 import { existsSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import ignore, { type Ignore } from 'ignore'
@@ -8,6 +9,43 @@ import ignore, { type Ignore } from 'ignore'
  */
 export function normalizePath(rawPath: string) {
     return normalize(resolve(rawPath))
+}
+
+function isSubPath(targetPath: string, rootPath: string) {
+    const rel = relative(rootPath, targetPath)
+    return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
+function parseWritableRootsFromEnv() {
+    const raw = process.env.MEMO_SANDBOX_WRITABLE_ROOTS?.trim()
+    if (!raw) return []
+    return raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => normalizePath(item))
+}
+
+export function getWritableRoots() {
+    const roots = new Set<string>()
+    roots.add(normalizePath(process.cwd()))
+    const memoHome = process.env.MEMO_HOME?.trim() || join(homedir(), '.memo')
+    roots.add(normalizePath(memoHome))
+    for (const item of parseWritableRootsFromEnv()) {
+        roots.add(item)
+    }
+    return Array.from(roots)
+}
+
+export function isWritePathAllowed(absPath: string) {
+    const roots = getWritableRoots()
+    return roots.some((root) => isSubPath(absPath, root))
+}
+
+export function writePathDenyReason(absPath: string) {
+    if (isWritePathAllowed(absPath)) return null
+    const roots = getWritableRoots()
+    return `sandbox 拒绝写入: ${absPath} 不在允许目录内 (${roots.join(', ')})`
 }
 
 export const DEFAULT_IGNORE_PATTERNS = [

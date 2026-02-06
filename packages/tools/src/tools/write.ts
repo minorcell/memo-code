@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { dirname } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { normalizePath } from '@memo/tools/tools/helpers'
+import { normalizePath, writePathDenyReason } from '@memo/tools/tools/helpers'
 import type { McpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
@@ -38,6 +38,10 @@ export const writeTool: McpTool<WriteInput> = {
     inputSchema: WRITE_INPUT_SCHEMA,
     execute: async (input) => {
         const path = normalizePath(input.file_path)
+        const denyReason = writePathDenyReason(path)
+        if (denyReason) {
+            return textResult(denyReason, true)
+        }
         const { data, info } = normalizeContent(input.content)
         try {
             await mkdir(dirname(path), { recursive: true })
