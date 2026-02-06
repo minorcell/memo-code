@@ -24,9 +24,18 @@ describe('bash tool', () => {
     })
 
     test('truncates oversized stdout to prevent context blow-up', async () => {
-        const res = await bashTool.execute({ command: "head -c 6000 /dev/zero | tr '\\0' 'a'" })
+        const res = await bashTool.execute({
+            command: 'node -e "process.stdout.write(\'a\'.repeat(6000))"',
+        })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
         assert.ok(text.includes('<system_hint>bash 输出已截断'), 'should append truncation hint')
         assert.ok(!text.includes('a'.repeat(5000)), 'should not keep full stdout')
+    })
+
+    test('denies command with absolute path outside writable roots', async () => {
+        const res = await bashTool.execute({ command: 'cat /etc/hosts' })
+        const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
+        assert.strictEqual(res.isError, true)
+        assert.ok(text.includes('sandbox 拒绝执行'))
     })
 })

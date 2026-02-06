@@ -148,4 +148,49 @@ describe('session hooks & middleware', () => {
             await session.close()
         }
     })
+
+    test('bypasses approval in dangerous mode', async () => {
+        const outputs = ['{"tool":"echo","input":{"text":"safe"}}', '{"final":"done"}']
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => ({
+                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
+                }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'deny',
+            },
+            { dangerous: true },
+        )
+        try {
+            const result = await session.runTurn('go')
+            assert.strictEqual(result.finalText, 'done')
+            assert.strictEqual(result.steps[0]?.observation, 'echo:safe')
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('rejects native tool input via validateInput before execute', async () => {
+        const outputs = ['{"tool":"write","input":{}}', '{"final":"done"}']
+        const session = await createAgentSession(
+            {
+                callLLM: async () => ({
+                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
+                }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('hi')
+            assert.strictEqual(result.finalText, 'done')
+            assert.ok(result.steps[0]?.observation.includes('write invalid input'))
+        } finally {
+            await session.close()
+        }
+    })
 })

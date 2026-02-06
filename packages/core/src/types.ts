@@ -173,6 +173,8 @@ export type AgentSessionOptions = {
     maxPromptTokens?: number
     /** 是否启用 LLM 流式输出。 */
     stream?: boolean
+    /** 危险模式：跳过审批（不等于关闭沙箱）。 */
+    dangerous?: boolean
 }
 
 /** Session 运行需要的依赖（含扩展项）。 */

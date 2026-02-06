@@ -10,7 +10,7 @@ export const DEFAULT_TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
     grep: 'read',
     webfetch: 'read',
     todo: 'read',
-    save_memory: 'read',
+    save_memory: 'write',
 
     // 写入工具 - 需要审批
     write: 'write',

@@ -135,6 +135,10 @@ function parseToolInput(tool: ToolRegistry[string], rawInput: unknown) {
         return { ok: false as const, error: `${tool.name} invalid input: expected object` }
     }
 
+    if (typeof tool.validateInput === 'function') {
+        return tool.validateInput(candidate)
+    }
+
     return { ok: true as const, data: candidate }
 }
 
@@ -193,7 +197,7 @@ class AgentSessionImpl implements AgentSession {
         this.hooks = buildHookRunners(deps)
         this.historyFilePath = historyFilePath
         this.approvalManager = createApprovalManager({
-            dangerous: false, // 危险模式由外部控制
+            dangerous: options.dangerous ?? false,
             mode: 'auto',
         })
     }

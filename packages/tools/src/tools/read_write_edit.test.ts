@@ -8,6 +8,7 @@ import { writeTool } from '@memo/tools/tools/write'
 import { editTool } from '@memo/tools/tools/edit'
 
 let tempDir: string
+let prevWritableRoots: string | undefined
 
 async function makeTempDir(prefix: string) {
     const dir = join(tmpdir(), `${prefix}-${crypto.randomUUID()}`)
@@ -30,9 +31,16 @@ async function readText(path: string) {
 
 beforeAll(async () => {
     tempDir = await makeTempDir('memo-tools')
+    prevWritableRoots = process.env.MEMO_SANDBOX_WRITABLE_ROOTS
+    process.env.MEMO_SANDBOX_WRITABLE_ROOTS = tempDir
 })
 
 afterAll(async () => {
+    if (prevWritableRoots === undefined) {
+        delete process.env.MEMO_SANDBOX_WRITABLE_ROOTS
+    } else {
+        process.env.MEMO_SANDBOX_WRITABLE_ROOTS = prevWritableRoots
+    }
     await removeDir(tempDir)
 })
 
