@@ -9,4 +9,3 @@ describe('tool classifier', () => {
         assert.strictEqual(classifier.needsApproval('write', 'auto'), true)
     })
 })
-

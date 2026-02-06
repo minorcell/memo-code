@@ -24,9 +24,7 @@ export interface Tool {
     /** 输入参数的 JSON Schema */
     inputSchema: JSONSchema
     /** 可选的输入校验器（通常由 native/zod 适配层提供） */
-    validateInput?: (
-        input: unknown,
-    ) => { ok: true; data: unknown } | { ok: false; error: string }
+    validateInput?: (input: unknown) => { ok: true; data: unknown } | { ok: false; error: string }
     /** 执行工具 */
     execute: (input: unknown) => Promise<CallToolResult>
 }

@@ -25,7 +25,7 @@ describe('bash tool', () => {
 
     test('truncates oversized stdout to prevent context blow-up', async () => {
         const res = await bashTool.execute({
-            command: "node -e \"process.stdout.write('a'.repeat(6000))\"",
+            command: 'node -e "process.stdout.write(\'a\'.repeat(6000))"',
         })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
         assert.ok(text.includes('<system_hint>bash 输出已截断'), 'should append truncation hint')
