@@ -193,7 +193,7 @@ class AgentSessionImpl implements AgentSession {
         this.hooks = buildHookRunners(deps)
         this.historyFilePath = historyFilePath
         this.approvalManager = createApprovalManager({
-            dangerous: false, // 危险模式由外部控制
+            dangerous: options.dangerous ?? false,
             mode: 'auto',
         })
     }
