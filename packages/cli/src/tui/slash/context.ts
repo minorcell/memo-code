@@ -1,8 +1,9 @@
 import type { SlashCommand } from './types'
+import { getSlashDescription } from './specs'
 
 export const contextCommand: SlashCommand = {
     name: 'context',
-    description: 'Set context length limit (80k/120k/150k/200k)',
+    description: getSlashDescription('context'),
     run: ({ closeSuggestions, setInputValue }) => {
         closeSuggestions(false)
         setInputValue('/context ')

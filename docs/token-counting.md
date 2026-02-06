@@ -1,35 +1,35 @@
-# Memo Code CLI 的 Token 计数策略
+# Token Counting Strategy in Memo Code CLI
 
-本文说明 Memo Code CLI 如何估算与记录 token，用于提示词预算、超限防护和 usage 对账。
+This document describes how Memo Code CLI estimates and records tokens for prompt budgeting, context-limit protection, and usage reconciliation.
 
-## 计数实现
+## Counting Implementation
 
-- **底层编码器**：使用 `@dqbd/tiktoken`，默认 encoding `cl100k_base`；可通过 `tokenizerModel` 覆盖。
-- **纯文本计数**：`countText(text)` 直接对字符串编码，获得长度。
-- **消息数组计数（ChatML 近似）**：`countMessages(messages)` 采用 OpenAI ChatML 常用估算：
-    - 每条消息固定开销 4 tokens（role/name 封装等）。
-    - `content` 本身按 tiktoken 编码计数。
-    - 如果后续支持 `name` 字段，则额外加 1 token。
-    - 末尾补充 2 tokens 用于 assistant priming。
+- **Underlying encoder**: uses `@dqbd/tiktoken`, default encoding `cl100k_base`; override via `tokenizerModel`.
+- **Plain text count**: `countText(text)` encodes a string directly and returns token length.
+- **Message array count (ChatML approximation)**: `countMessages(messages)` uses a common OpenAI ChatML estimate:
+    - fixed overhead of 4 tokens per message (role/name wrappers, etc.)
+    - `content` counted via tiktoken encoding
+    - if `name` is supported later, adds 1 token
+    - adds 2 tokens at the end for assistant priming
 
-该策略比单纯串联文本更贴近实际 ChatML 开销，但仍是近似值。
+This is closer to actual ChatML overhead than naive text concatenation, but still an approximation.
 
-## 使用场景
+## Usage Scenarios
 
-- **提示词预算**：`runTurn` 会在每步前用 `countMessages` 估算 prompt tokens，触发：
-    - `warnPromptTokens`：打印警告。
-    - `maxPromptTokens`：超过时立即返回提示，避免向 LLM 发送超限请求。
-- **usage 对账**：每步会结合本地计数与模型返回的 `usage`（若提供），记录到 tokenUsage 与 JSONL 历史事件。
+- **Prompt budgeting**: before each step, `runTurn` estimates prompt tokens with `countMessages` and applies:
+    - `warnPromptTokens`: prints warning
+    - `maxPromptTokens`: returns early when exceeded, preventing over-limit LLM requests
+- **Usage reconciliation**: each step combines local count and model-returned `usage` (if available), records into token usage and JSONL history events.
 
-## 精度与局限
+## Precision and Limitations
 
-- ChatML 不同模型的固定开销略有差异，当前采用「每消息 4 + 末尾 2」的通用估算，可能与特定模型存在 ±几十 token 的偏差。
-- 未显式处理工具调用/函数调用的额外结构开销，如需精确对账可在未来针对具体模型定制 constants。
-- 若使用自定义 `callLLM`，建议传入对应模型的 encoding 名称或自定义 `tokenCounter` 以匹配真实开销。
+- Fixed ChatML overhead varies slightly by model. Current "4 per message + 2 ending" estimate may differ by dozens of tokens on specific models.
+- Extra structural overhead for tool/function calling is not explicitly modeled yet. For exact reconciliation, model-specific constants can be added later.
+- If using custom `callLLM`, pass matching model encoding or custom `tokenCounter` implementation to align with real usage.
 
-## 如何覆盖
+## How to Override
 
-- 创建 Session 时传入 `tokenizerModel` 或直接注入自定义 `tokenCounter`：
+- Pass `tokenizerModel` or inject custom `tokenCounter` when creating Session:
 
 ```ts
 import { createTokenCounter, createAgentSession } from '@memo/core'
@@ -38,4 +38,4 @@ const tokenCounter = createTokenCounter('gpt-4o-mini')
 const session = await createAgentSession({ tokenCounter }, { warnPromptTokens: 8_000 })
 ```
 
-- 自定义 counter 只需实现 `countText`、`countMessages`、`dispose` 接口。
+- A custom counter only needs `countText`, `countMessages`, and `dispose` methods.

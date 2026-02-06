@@ -22,4 +22,11 @@ describe('bash tool', () => {
         assert.strictEqual(res.isError, true, 'should mark timeout as error')
         assert.ok(text.includes('超时'), `expected timeout message, got "${text}"`)
     })
+
+    test('truncates oversized stdout to prevent context blow-up', async () => {
+        const res = await bashTool.execute({ command: "head -c 6000 /dev/zero | tr '\\0' 'a'" })
+        const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
+        assert.ok(text.includes('<system_hint>bash 输出已截断'), 'should append truncation hint')
+        assert.ok(!text.includes('a'.repeat(5000)), 'should not keep full stdout')
+    })
 })

@@ -1,34 +1,39 @@
-# Memo CLI `edit` 工具
+# Memo CLI `edit` Tool
 
-在文件中替换指定文本，支持单次或全局替换。
+Replaces target text in a file, with optional global replacement and batch edits.
 
-## 基本信息
+## Basic Info
 
-- 工具名称：`edit`
-- 描述：在文件中替换文本，支持 replace_all
-- 文件：`packages/tools/src/tools/edit.ts`
-- 确认：否
+- Tool name: `edit`
+- Description: replace text in file, supports `replace_all` and `edits`
+- File: `packages/tools/src/tools/edit.ts`
+- Confirmation: no
 
-## 参数
+## Parameters
 
-- `file_path`（字符串，必填）：目标文件路径（标准化为绝对路径）。
-- `old_string`（字符串，必填）：要替换的原文本。
-- `new_string`（字符串，必填）：替换后的文本。
-- `replace_all`（布尔，可选）：是否替换所有出现，默认为单次替换。
+- `file_path` (string, required): target file path (normalized to absolute path).
+- Single-edit mode:
+  - `old_string` (string, required): source text to replace.
+  - `new_string` (string, required): replacement text.
+  - `replace_all` (boolean, optional): whether to replace all occurrences; default is single replacement.
+- Batch mode:
+  - `edits` (array, required in batch mode): each item has `old_string`, `new_string`, and optional `replace_all`.
+  - `edits` cannot be used together with `old_string/new_string`.
 
-## 行为
+## Behavior
 
-- 若文件不存在返回错误。
-- 读取全文，检查是否包含 `old_string`；未找到则报错。
-- `replace_all=true` 时按分割重组替换所有出现，计数为出现次数；否则仅替换首次匹配，计数为 1。
-- 若替换后内容未变化返回提示；否则覆盖写回并返回计数与路径。
-- 异常时返回错误消息。
+- Returns error if file does not exist.
+- Reads full file and checks whether `old_string` exists; returns error if not found.
+- In single-edit mode: if `replace_all=true`, replaces all occurrences and counts replacements; otherwise only first occurrence, count = 1.
+- In batch mode: applies all edits in order in-memory and writes once. If any edit target is missing, the tool returns error and does not write partial changes.
+- If content is unchanged after replacement, returns notice; otherwise overwrites file and returns count/path.
+- Returns error message on exception.
 
-## 输出示例
+## Output Example
 
-`替换完成: file=/abs/path/file.ts count=2`
+`Replacement complete: file=/abs/path/file.ts edits=3 count=4`
 
-## 注意
+## Notes
 
-- 不校验唯一性，`replace_all=false` 也只替换首个匹配。
-- 不展示差异，也不处理编码/二进制文件。
+- Does not validate uniqueness; `replace_all=false` still replaces only the first match.
+- Does not show diff or handle encoding/binary specifics.

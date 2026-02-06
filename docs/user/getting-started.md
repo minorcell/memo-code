@@ -1,66 +1,66 @@
-# 快速开始
+# Getting Started
 
-本页覆盖：安装 → 配置 API Key → 启动使用（TUI / 单轮）→ 下一步阅读建议。
+Memo Code is a lightweight coding agent that runs in your terminal and assists coding workflows through natural language.
 
-## 1) 安装
+## 1) Install
 
-全局安装：
+Global installation:
 
 ```bash
 npm install -g @memo-code/memo
-# 或 pnpm / yarn / bun 任选其一
+# or use pnpm / yarn / bun
 ```
 
-验证安装（当前版本不提供 `memo --help`，帮助在 TUI 的 `/help` 里；`mcp` 子命令有独立帮助）：
+Verify installation (current version does not provide `memo --help`; help is available in TUI `/help`; `mcp` subcommand has standalone help):
 
 ```bash
 memo mcp help
 ```
 
-## 2) 配置 API Key（环境变量）
+## 2) Configure API Key (Environment Variable)
 
-Memo 默认会从 Provider 配置指定的环境变量读取 key（例如 `DEEPSEEK_API_KEY`），也兼容 `OPENAI_API_KEY`。
+Memo reads API keys from the environment variable defined by provider config (for example `DEEPSEEK_API_KEY`) and also supports `OPENAI_API_KEY`.
 
-示例（二选一即可）：
+Examples (choose one):
 
 ```bash
 export DEEPSEEK_API_KEY=your_key
-# 或
+# or
 export OPENAI_API_KEY=your_key
 ```
 
-## 3) 启动使用
+## 3) Start Using Memo
 
-### 交互式（推荐）
+### Interactive Mode (Recommended)
 
 ```bash
 memo
 ```
 
-首次运行若未找到配置文件，会进入 TUI 配置向导，生成 `~/.memo/config.toml`（可用 `MEMO_HOME` 改位置，见“配置”文档）。
+On first run, if no config file is found, Memo enters the TUI setup flow and creates `~/.memo/config.toml` (you can relocate it with `MEMO_HOME`; see the Configuration doc).
 
-### 单轮模式（适合脚本/管道）
-
-```bash
-memo "解释这个报错怎么修" --once
-```
-
-也可以从 stdin 读取（非 TTY 时自动走单轮模式）：
+### One-shot Mode (`--once`, good for scripts/pipelines)
 
 ```bash
-echo "总结一下这个仓库的结构" | memo --once
+memo "Explain how to fix this error" --once
 ```
 
-### 危险模式（跳过工具审批，谨慎）
+You can also read from stdin (non-TTY automatically uses one-shot mode):
+
+```bash
+echo "Summarize this repository structure" | memo --once
+```
+
+### Dangerous Mode (Skip tool approval, use carefully)
 
 ```bash
 memo --dangerous
-# 或
+# or
 memo -d
 ```
 
-## 下一步
+## Next
 
-- 想熟悉快捷键与命令：读 [CLI / TUI 使用](./cli-tui.md)
-- 想自定义 provider / base_url / 多模型：读 [配置](./configuration.md)
-- 想了解工具能力与边界：读 [工具](./tools.md)
+- Want shortcuts and commands: read [CLI / TUI Usage](./cli-tui.md)
+- Want custom provider/base_url/multi-model setup: read [Configuration](./configuration.md)
+- Want tool capability boundaries: read [Tools](./tools.md)

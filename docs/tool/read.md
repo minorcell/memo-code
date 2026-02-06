@@ -1,34 +1,34 @@
-# Memo CLI `read` 工具
+# Memo CLI `read` Tool
 
-读取指定文件内容，可按行号区间截取并附带行号输出。
+Reads target file content, with optional line slicing by range and numbered output.
 
-## 基本信息
+## Basic Info
 
-- 工具名称：`read`
-- 描述：读取指定文件内容，可按 offset/limit 截取并附带行号
-- 文件：`packages/tools/src/tools/read.ts`
-- 确认：否
+- Tool name: `read`
+- Description: read file content with optional offset/limit and line numbers
+- File: `packages/tools/src/tools/read.ts`
+- Confirmation: no
 
-## 参数
+## Parameters
 
-- `file_path`（字符串，必填）：目标文件路径（标准化为绝对路径）。
-- `offset`（正整数，可选）：起始行（1-based），默认 1。
-- `limit`（正整数，可选）：读取行数上限，默认读取至文件末尾。
+- `file_path` (string, required): target file path (normalized to absolute path).
+- `offset` (positive integer, optional): start line (1-based), default 1.
+- `limit` (positive integer, optional): max number of lines to read, default reads to file end.
 
-## 行为
+## Behavior
 
-- 通过 `normalizePath` 生成绝对路径；文件不存在时返回错误。
-- 读取文本内容，按 `\r?\n` 分行。
-- 从 `offset` 开始截取至 `offset + limit`（不超出文件末尾），每行前加行号（1-based）。
-- 将结果拼成文本返回；异常时返回错误消息。
+- Resolves absolute path with `normalizePath`; returns error if file does not exist.
+- Reads text content and splits by `\r?\n`.
+- Slices from `offset` to `offset + limit` (bounded by file end), prefixes each line with 1-based line number.
+- Returns joined text; on exception, returns error message.
 
-## 输出示例
+## Output Example
 
-```
+```text
 1: first line
 2: second line
 ```
 
-## 注意
+## Notes
 
-- 未做二进制文件检测，二进制内容读取后仍按文本分行。
+- No binary-file detection. Binary content is still processed as text lines.

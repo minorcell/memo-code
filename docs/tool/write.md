@@ -1,34 +1,34 @@
-# Memo CLI `write` 工具
+# Memo CLI `write` Tool
 
-创建或覆盖写入文件内容，必要时递归创建父目录。
+Creates or overwrites file content and recursively creates parent directories when needed.
 
-## 基本信息
+## Basic Info
 
-- 工具名称：`write`
-- 描述：创建或覆盖文件，传入 file_path 与 content
-- 文件：`packages/tools/src/tools/write.ts`
-- 确认：否
+- Tool name: `write`
+- Description: create or overwrite file using `file_path` and `content`
+- File: `packages/tools/src/tools/write.ts`
+- Confirmation: no
 
-## 参数
+## Parameters
 
-- `file_path`（字符串，必填）：要写入的目标路径（标准化为绝对路径）。
-- `content`（可选）：写入内容，支持字符串、数字、布尔、null、数组、对象、`Uint8Array`、`ArrayBuffer`。
+- `file_path` (string, required): target path to write (normalized to absolute path).
+- `content` (optional): content to write. Supports string, number, boolean, null, array, object, `Uint8Array`, `ArrayBuffer`.
 
-## 行为
+## Behavior
 
-- 通过 `normalizePath` 标准化路径；递归创建父目录。
-- 内容归一化：
-    - 字符串：按原文写入。
-    - `Uint8Array`/`ArrayBuffer`：按二进制写入。
-    - 其他类型：序列化为 JSON（带缩进）。
-- 调用 `fs.writeFile` 覆盖目标文件，返回写入信息（文本长度或字节数）。
-- 异常时返回错误消息。
+- Normalizes path via `normalizePath`; recursively creates parent directories.
+- Content normalization:
+    - string: write as-is
+    - `Uint8Array`/`ArrayBuffer`: write as binary
+    - other types: serialize to formatted JSON
+- Calls `fs.writeFile` to overwrite target file and returns write info (text length or byte size).
+- Returns error message on exception.
 
-## 输出示例
+## Output Example
 
-`已写入 /abs/path/file.txt (overwrite, text_length=12)`
+`Wrote /abs/path/file.txt (overwrite, text_length=12)`
 
-## 注意
+## Notes
 
-- 始终覆盖写入，不做差异检查。
-- `content` 省略时会写入序列化后的空字符串（JSON 结果）。
+- Always overwrites; no diff check.
+- If `content` is omitted, an empty string value is serialized.

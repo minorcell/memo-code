@@ -16,6 +16,13 @@ const BASH_INPUT_SCHEMA = z
     .strict()
 
 type BashInput = z.infer<typeof BASH_INPUT_SCHEMA>
+const MAX_STDOUT_CHARS = 4_000
+const MAX_STDERR_CHARS = 4_000
+
+function truncateOutput(text: string, maxChars: number) {
+    if (text.length <= maxChars) return { value: text, truncated: false }
+    return { value: text.slice(0, maxChars), truncated: true }
+}
 
 /**
  * 执行任意 bash 命令，将 exit/stdout/stderr 拼接返回。
@@ -72,7 +79,16 @@ export const bashTool: McpTool<BashInput> = {
 
             const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise])
 
-            return textResult(`exit=${exitCode} stdout="${stdout}" stderr="${stderr}"`)
+            const stdoutLimited = truncateOutput(stdout, MAX_STDOUT_CHARS)
+            const stderrLimited = truncateOutput(stderr, MAX_STDERR_CHARS)
+            const truncatedHint =
+                stdoutLimited.truncated || stderrLimited.truncated
+                    ? `\n<system_hint>bash 输出已截断（stdout_max=${MAX_STDOUT_CHARS} chars, stderr_max=${MAX_STDERR_CHARS} chars）。请缩小命令输出范围。</system_hint>`
+                    : ''
+
+            return textResult(
+                `exit=${exitCode} stdout="${stdoutLimited.value}" stderr="${stderrLimited.value}"${truncatedHint}`,
+            )
         } catch (err) {
             return textResult(`bash 执行失败: ${(err as Error).message}`, true)
         }

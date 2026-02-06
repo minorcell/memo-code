@@ -65,6 +65,7 @@ const DEFAULT_MEMORY_FILE = 'Agents.md'
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
     stream_output: false,
+    max_prompt_tokens: 120000,
     providers: [
         {
             name: 'deepseek',
@@ -171,10 +172,7 @@ function serializeConfig(config: MemoConfig) {
         `current_provider = "${config.current_provider}"`,
         `stream_output = ${config.stream_output ?? false}`,
     ]
-    if (
-        typeof config.max_prompt_tokens === 'number' &&
-        Number.isFinite(config.max_prompt_tokens)
-    ) {
+    if (typeof config.max_prompt_tokens === 'number' && Number.isFinite(config.max_prompt_tokens)) {
         mainLines.push(`max_prompt_tokens = ${Math.floor(config.max_prompt_tokens)}`)
     }
     const mainConfig = mainLines.join('\n')
@@ -211,7 +209,7 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
             stream_output: parsed.stream_output ?? DEFAULT_CONFIG.stream_output,
-            max_prompt_tokens: maxPromptTokens,
+            max_prompt_tokens: maxPromptTokens ?? DEFAULT_CONFIG.max_prompt_tokens,
             providers,
             mcp_servers: parsed.mcp_servers ?? {},
         }

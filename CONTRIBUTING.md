@@ -1,35 +1,35 @@
-# Contributing / 贡献指南
+# Contributing
 
-感谢你对 **Memo Code CLI** 的关注！为了让协作顺畅，请在提交 PR 前阅读以下约定。
+Thanks for your interest in **Memo Code CLI**. Please read these guidelines before opening a PR.
 
-## 快速开始 / Getting Started
+## Getting Started
 
-- 先安装 [Node.js](https://nodejs.org/) (>=18) 和 [pnpm](https://pnpm.io/)；部分工具/测试依赖 [ripgrep](https://github.com/BurntSushi/ripgrep)（命令 `rg`）。
-- 安装依赖：`pnpm install`
-- 运行 CLI：`pnpm start "你的问题" --once` 或交互式 `pnpm start`
-- 构建产物：`pnpm run build`
+- Install [Node.js](https://nodejs.org/) (>=18) and [pnpm](https://pnpm.io/). Some tools/tests depend on [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`).
+- Install dependencies: `pnpm install`
+- Run CLI: `pnpm start "your prompt" --once` or interactive mode with `pnpm start`
+- Build output: `pnpm run build`
 
-## 代码风格 / Code Style
+## Code Style
 
-- 采用 TypeScript + ESM；保持现有的目录与模块边界（Core/Tools/UI）。
-- 提交前请运行格式化：`pnpm run format`；CI 将使用 `pnpm run format:check`。
-- 变更公共接口或行为时同步更新文档（如 `README.md`、`docs/`）。
+- Use TypeScript + ESM. Keep current directory/module boundaries (Core/Tools/UI).
+- Run formatting before commit: `pnpm run format`; CI uses `pnpm run format:check`.
+- Update docs (`README.md`, `docs/`) when changing public interfaces or behavior.
 
-## 测试 / Testing
+## Testing
 
-- 全量测试：`pnpm test`
-- 定位单测：`pnpm test packages/tools/src/tools/bash.test.ts`
-- 如果引入新功能，请补充或更新相关测试，确保本地通过后再提交。
+- Full tests: `pnpm test`
+- Focused test: `pnpm test packages/tools/src/tools/bash.test.ts`
+- Add or update relevant tests for new features and ensure local pass before submitting.
 
 ## Issue & PR
 
-- 提交问题或需求时，请使用 GitHub Issue 模板并提供复现步骤、日志和环境信息。
-- 对于功能性改动，建议先开 issue 讨论或在 PR 中简述设计思路。
-- 建议使用分支命名：`feature/<topic>`、`fix/<topic>`、`docs/<topic>`。
-- PR 中注明变更范围、风险点以及验证方式，保持 commit 粒度清晰。
+- Use GitHub issue templates and include reproduction steps, logs, and environment details.
+- For feature changes, open an issue first or summarize design decisions in the PR.
+- Recommended branch names: `feature/<topic>`, `fix/<topic>`, `docs/<topic>`.
+- In PRs, state change scope, risk points, and validation methods; keep commits clean and focused.
 
-## 其他建议 / Tips
+## Tips
 
-- 优先关注 Core/Tools 契约和可复用性，UI 仅做薄封装（参考 `docs/dev-direction.md`）。
-- 对于涉及安全或文件系统的工具，注意路径白名单和错误信息一致性。
-- 任何不确定的地方，欢迎开 issue 或在 PR 中提问，维护者会尽快回应。
+- Prioritize Core/Tools contracts and reusability; keep UI as a thin wrapper (see `docs/dev-direction.md`).
+- For security/filesystem tools, enforce path allowlists and consistent error handling.
+- If anything is unclear, open an issue or ask directly in the PR.

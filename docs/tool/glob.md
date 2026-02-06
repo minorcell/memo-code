@@ -1,33 +1,33 @@
-# Memo CLI `glob` 工具
+# Memo CLI `glob` Tool
 
-按 glob 模式扫描目录并返回匹配的绝对路径列表。
+Scans directories by glob pattern and returns a list of matched absolute paths.
 
-## 基本信息
+## Basic Info
 
-- 工具名称：`glob`
-- 描述：按 glob 模式匹配文件，返回绝对路径列表
-- 文件：`packages/tools/src/tools/glob.ts`
-- 确认：否
+- Tool name: `glob`
+- Description: match files by glob pattern and return absolute paths
+- File: `packages/tools/src/tools/glob.ts`
+- Confirmation: no
 
-## 参数
+## Parameters
 
-- `pattern`（字符串，必填）：glob 模式（例如 `src/**/*.ts`）。
-- `path`（字符串，可选）：扫描起点目录；默认当前工作目录。
+- `pattern` (string, required): glob pattern (for example `src/**/*.ts`).
+- `path` (string, optional): scan root directory; defaults to current working directory.
 
-## 行为
+## Behavior
 
-- 使用 `fast-glob` 在指定 `cwd` 下扫描。
-- 将所有匹配项标准化为绝对路径，按发现顺序返回（以换行分隔）。
-- 无匹配时返回提示“未找到匹配文件”。
-- 执行异常时返回错误消息。
+- Uses `fast-glob` with specified `cwd`.
+- Normalizes all matches to absolute paths and returns newline-separated output in discovery order.
+- If no match, returns `No matching files found`.
+- Returns error message on exception.
 
-## 输出示例
+## Output Example
 
-```
+```text
 /abs/workspace/src/a.ts
 /abs/workspace/src/sub/b.ts
 ```
 
-## 注意
+## Notes
 
-- 不会自动忽略 `node_modules` 等目录，需要在 pattern 中自行过滤。
+- Does not automatically ignore directories like `node_modules`; filter through pattern if needed.

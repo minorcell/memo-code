@@ -42,6 +42,21 @@ describe('glob tool', () => {
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
         assert.strictEqual(text, '未找到匹配文件')
     })
+
+    test('truncates oversized match list', async () => {
+        const bulkDir = join(tempDir, 'glob-bulk')
+        await mkdir(bulkDir, { recursive: true })
+        await Promise.all(
+            Array.from({ length: 130 }, (_, i) =>
+                writeFile(join(bulkDir, `file-${String(i + 1).padStart(3, '0')}.txt`), 'x', 'utf8'),
+            ),
+        )
+
+        const res = await globTool.execute({ pattern: 'glob-bulk/*.txt', path: tempDir })
+        const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
+        assert.ok(text.includes('<system_hint>当前查找结果过多'), 'should include overflow hint')
+        assert.ok(!text.includes('file-130.txt'), 'should truncate late entries')
+    })
 })
 
 describe('grep tool', () => {
@@ -87,5 +102,21 @@ describe('grep tool', () => {
         }
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
         assert.strictEqual(text, '未找到匹配')
+    })
+
+    test('truncates oversized grep output', async () => {
+        const target = join(tempDir, 'grep-bulk.txt')
+        const content = Array.from({ length: 150 }, (_, i) => `token line-${i + 1}`).join('\n')
+        await writeFile(target, content, 'utf8')
+
+        const res = await grepTool.execute({ pattern: 'token', path: tempDir })
+        if (!rgAvailable) {
+            const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
+            assert.strictEqual(text, 'rg 未安装或不在 PATH')
+            return
+        }
+        const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
+        assert.ok(text.includes('<system_hint>当前查找结果过多'), 'should include overflow hint')
+        assert.ok(!text.includes('line-150'), 'should truncate late matches')
     })
 })

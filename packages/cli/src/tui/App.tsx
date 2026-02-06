@@ -74,6 +74,7 @@ export function App({
     const [systemMessages, setSystemMessages] = useState<SystemMessage[]>([])
     const [busy, setBusy] = useState(false)
     const currentTurnRef = useRef<number | null>(null)
+    const nextUserInputOverrideRef = useRef<string | null>(null)
     const [inputHistory, setInputHistory] = useState<string[]>([])
     const [sessionLogPath, setSessionLogPath] = useState<string | null>(null)
     const [historicalTurns, setHistoricalTurns] = useState<TurnView[]>([])
@@ -89,7 +90,7 @@ export function App({
     const [currentContextTokens, setCurrentContextTokens] = useState<number>(0)
     const localPackageInfo = useMemo(() => findLocalPackageInfoSync(), [])
 
-    // 审批系统状态
+    // Approval system state
     const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null)
     const approvalResolverRef = useRef<((decision: ApprovalDecision) => void) | null>(null)
 
@@ -142,7 +143,7 @@ export function App({
                     return { ...turn, steps }
                 })
             },
-            // 危险模式跳过审批
+            // Skip approval in dangerous mode
             requestApproval: dangerous
                 ? undefined
                 : (request: ApprovalRequest) => {
@@ -154,6 +155,11 @@ export function App({
             hooks: {
                 onTurnStart: ({ turn, input, promptTokens }) => {
                     currentTurnRef.current = turn
+                    const override = nextUserInputOverrideRef.current
+                    if (override) {
+                        nextUserInputOverrideRef.current = null
+                    }
+                    const displayInput = override ?? input
                     // Update the cumulative context tokens for display
                     if (promptTokens && promptTokens > 0) {
                         setCurrentContextTokens(promptTokens)
@@ -161,7 +167,7 @@ export function App({
                     updateTurn(turn, (existing) => ({
                         ...existing,
                         index: turn,
-                        userInput: input,
+                        userInput: displayInput,
                         steps: [],
                         startedAt: Date.now(),
                         contextPromptTokens: promptTokens ?? existing.contextPromptTokens,
@@ -189,7 +195,7 @@ export function App({
                     })
                 },
                 onObservation: ({ turn, step, observation }) => {
-                    // 保存 observation 供状态判断与后续用途
+                    // Save observation for status determination and future use
                     updateTurn(turn, (turnState) => {
                         const steps = turnState.steps.slice()
                         while (steps.length <= step) {
@@ -326,6 +332,22 @@ export function App({
         appendSystemMessage('New Session', 'Started a new session with fresh context.')
     }, [deps, sessionOptionsState, appendSystemMessage])
 
+    const persistContextLimit = useCallback(
+        async (limit: number) => {
+            try {
+                const loaded = await loadMemoConfig()
+                const nextConfig = { ...loaded.config, max_prompt_tokens: limit }
+                await writeMemoConfig(loaded.configPath, nextConfig)
+            } catch (err) {
+                appendSystemMessage(
+                    'Failed to save config',
+                    `Failed to save context limit: ${(err as Error).message}`,
+                )
+            }
+        },
+        [appendSystemMessage],
+    )
+
     const applyContextLimit = useCallback(
         (limit: number) => {
             setContextLimit(limit)
@@ -362,7 +384,7 @@ export function App({
                 setCurrentContextTokens(0) // Reset context tokens when loading history
                 currentTurnRef.current = null
                 sequenceRef.current = Math.max(sequenceRef.current, parsed.maxSequence)
-                // 重新拉起 session，避免旧上下文残留/计数错位
+                // Restart session to avoid old context residue/count misalignment
                 setSessionOptionsState((prev) => ({ ...prev, sessionId: randomUUID() }))
                 appendSystemMessage('History loaded', parsed.summary || entry.input)
             } catch (err) {
@@ -385,22 +407,6 @@ export function App({
                 appendSystemMessage(
                     'Failed to save config',
                     `Failed to save model selection: ${(err as Error).message}`,
-                )
-            }
-        },
-        [appendSystemMessage],
-    )
-
-    const persistContextLimit = useCallback(
-        async (limit: number) => {
-            try {
-                const loaded = await loadMemoConfig()
-                const nextConfig = { ...loaded.config, max_prompt_tokens: limit }
-                await writeMemoConfig(loaded.configPath, nextConfig)
-            } catch (err) {
-                appendSystemMessage(
-                    'Failed to save config',
-                    `Failed to save context limit: ${(err as Error).message}`,
                 )
             }
         },
@@ -530,6 +536,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 }
                 setBusy(true)
                 try {
+                    nextUserInputOverrideRef.current = '/init (generate AGENTS.md)'
                     await session.runTurn(initPrompt)
                 } catch (err) {
                     setBusy(false)
@@ -579,7 +586,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
 
     useEffect(() => {
         if (!session || !pendingHistoryMessages?.length) return
-        // 用历史对话覆盖当前 session 的用户上下文，保留系统提示词。
+        // Override current session's user context with historical dialogue, preserving system prompt.
         const systemMessage = session.history[0]
         if (!systemMessage) return
         session.history.splice(0, session.history.length, systemMessage, ...pendingHistoryMessages)
@@ -623,7 +630,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
     const contextPercent = calculateContextPercent(currentContextTokens, contextLimit)
     const displayTurns = useMemo(() => [...historicalTurns, ...turns], [historicalTurns, turns])
 
-    // 处理审批决策
+    // Handle approval decision
     const handleApprovalDecision = useCallback((decision: ApprovalDecision) => {
         const resolver = approvalResolverRef.current
         if (resolver) {
@@ -695,7 +702,7 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 contextLimit={contextLimit}
                 mcpServers={mcpServers}
             />
-            {/* 审批对话框显示在输入框下方 */}
+            {/* Approval dialog displayed below input */}
             {pendingApproval && (
                 <ApprovalModal request={pendingApproval} onDecision={handleApprovalDecision} />
             )}

@@ -3,7 +3,7 @@
     "version": "0.5.15",
     "private": false,
     "type": "module",
-    "description": "AI programming assistant with multi-turn conversations, tool calling, and concurrent execution",
+    "description": "A lightweight coding agent that runs in your terminal",
     "bin": {
         "memo": "./dist/index.js"
     },
@@ -20,6 +20,9 @@
         "start": "tsx packages/cli/src/index.tsx",
         "build": "tsup",
         "dev": "tsup --watch",
+        "web:dev": "pnpm --filter @memo-code/web dev",
+        "web:build": "pnpm --filter @memo-code/web build",
+        "web:start": "pnpm --filter @memo-code/web start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",

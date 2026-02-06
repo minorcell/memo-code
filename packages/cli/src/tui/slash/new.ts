@@ -1,8 +1,9 @@
 import type { SlashCommand } from './types'
+import { getSlashDescription } from './specs'
 
 export const newCommand: SlashCommand = {
     name: 'new',
-    description: 'Start a new session',
+    description: getSlashDescription('new'),
     run: ({ closeSuggestions, setInputValue, clearScreen, showSystemMessage, newSession }) => {
         closeSuggestions()
         setInputValue('')

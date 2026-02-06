@@ -107,8 +107,15 @@ export async function getIgnoreMatcher(startPath: string): Promise<IgnoreMatcher
 }
 
 export function appendLongResultHint(text: string, lineCount: number): string {
-    if (lineCount > MAX_RESULT_LINES || text.length > MAX_RESULT_CHARS) {
-        return `${text}\n\n${OVERFLOW_HINT}`
+    const lines = text.split(/\r?\n/)
+    const totalLines = Math.max(lineCount, lines.length)
+    let limited = lines.slice(0, MAX_RESULT_LINES).join('\n')
+    if (limited.length > MAX_RESULT_CHARS) {
+        limited = limited.slice(0, MAX_RESULT_CHARS)
     }
-    return text
+
+    if (totalLines > MAX_RESULT_LINES || text.length > MAX_RESULT_CHARS) {
+        return `${limited}\n\n${OVERFLOW_HINT}`
+    }
+    return limited
 }

@@ -1,37 +1,37 @@
-# @memo/core 概览
+# @memo/core Overview
 
-Core 提供 **Memo Code CLI** 的核心能力：ReAct 循环、会话状态管理、默认依赖装配（LLM/工具/提示词/历史记录）、配置加载，以及公共类型/工具。设计目标是"厚 Core、薄 UI"：UI 只做交互与回调，其他行为均由 Core 负责。
+Core provides the central capabilities of **Memo Code CLI**: the ReAct loop, session state management, default dependency wiring (LLM/tools/prompt/history), config loading, and shared types/utilities. The design goal is "thick Core, thin UI": UI handles interaction and callbacks, while Core owns behavior.
 
-## 目录结构
+## Directory Layout
 
 - `config/`
-    - `config.ts`：读取 `~/.memo/config.toml`（providers、sessions 路径），提供 provider 选择、会话路径构建、配置写入。
+    - `config.ts`: Reads `~/.memo/config.toml` (providers, sessions path), handles provider selection, session path building, and config writes.
 - `runtime/`
-    - `prompt.ts/xml`：系统提示词加载。
-    - `history.ts`：JSONL 历史 sink 与事件构造。
-    - `defaults.ts`：默认依赖补全（工具集、LLM、prompt、history sink、tokenizer）。
-    - `session.ts`：Session/Turn 运行时，执行 ReAct 循环、事件写入、token 统计。
-- `types.ts`：公共类型定义（AgentDeps、Session/Turn、TokenUsage、HistoryEvent 等）。
-- `utils/`：
-    - 工具函数（解析 assistant 输出、消息包装）。
-    - `tokenizer.ts`：基于 tiktoken 的 tokenizer 工具。
-- `index.ts`：包入口，导出核心模块与类型。
+    - `prompt.ts/xml`: System prompt loading.
+    - `history.ts`: JSONL history sink and event construction.
+    - `defaults.ts`: Default dependency completion (toolset, LLM, prompt, history sink, tokenizer).
+    - `session.ts`: Session/Turn runtime, executes ReAct loop, writes events, tracks token usage.
+- `types.ts`: Shared types (`AgentDeps`, `Session/Turn`, `TokenUsage`, `HistoryEvent`, etc.).
+- `utils/`
+    - Utility functions (assistant output parsing, message wrappers).
+    - `tokenizer.ts`: tiktoken-based tokenizer helpers.
+- `index.ts`: Package entry, exports core modules and types.
 
-## 关键流程
+## Key Flows
 
-- `createAgentSession(deps, options)`：创建 Session，补全默认依赖，加载 prompt，返回可 `runTurn` 的对象。
-- `withDefaultDeps`：根据配置与可选覆盖，注入默认工具集、LLM 客户端、prompt、history sink（写入 `~/.memo/sessions/YY/MM/DD/<uuid>.jsonl`）、tokenizer。
-- 会话记录：JSONL 事件（session_start/turn_start/assistant/action/observation/final/turn_end/session_end），包含 provider、模型、tokenizer、token 用量等元数据。
-- 配置：`~/.memo/config.toml`（可用 `MEMO_HOME` 自定义位置），缺省时会触发 UI 引导创建。
+- `createAgentSession(deps, options)`: Creates a Session, fills default dependencies, loads prompt, and returns an object with `runTurn`.
+- `withDefaultDeps`: Injects default toolset, LLM client, prompt, history sink (writes to `~/.memo/sessions/YY/MM/DD/<uuid>.jsonl`), and tokenizer based on config and overrides.
+- Session history: JSONL events (`session_start/turn_start/assistant/action/observation/final/turn_end/session_end`) with metadata like provider, model, tokenizer, and token usage.
+- Config: `~/.memo/config.toml` (overridable via `MEMO_HOME`). If missing, UI setup flow is triggered.
 
-## 使用方式（示意）
+## Usage Example
 
 ```ts
 import { createAgentSession } from '@memo/core'
 
 const session = await createAgentSession({ onAssistantStep: console.log }, { mode: 'once' })
-const turn = await session.runTurn('你好')
+const turn = await session.runTurn('Hello')
 await session.close()
 ```
 
-如果提供自定义工具/LLM/prompt/sink，可在 deps/options 中覆盖对应字段。默认配置会选择当前 provider 并写入用户目录的 sessions。
+If you provide custom tool/LLM/prompt/sink dependencies, override the related fields in `deps/options`. Defaults select the current provider and write sessions in the user directory.

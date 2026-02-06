@@ -1,30 +1,30 @@
-# Memo CLI `bash` 工具
+# Memo CLI `bash` Tool
 
-执行任意 bash 命令，返回 exit/stdout/stderr 结果，主要用于调试与脚本执行（安全性由上层控制）。
+Executes arbitrary bash commands and returns exit/stdout/stderr. Mainly for debugging and scripting (safety is controlled by upper layers).
 
-## 基本信息
+## Basic Info
 
-- 工具名称：`bash`
-- 描述：在 shell 中执行命令，返回 exit/stdout/stderr
-- 文件：`packages/tools/src/tools/bash.ts`
-- 确认：否
+- Tool name: `bash`
+- Description: run command in shell and return exit/stdout/stderr
+- File: `packages/tools/src/tools/bash.ts`
+- Confirmation: no
 
-## 参数
+## Parameters
 
-- `command`（字符串，必填）：要执行的完整命令。
+- `command` (string, required): full command to execute.
 
-## 行为
+## Behavior
 
-- 使用 `bash -lc <command>` 在当前环境中运行；继承进程 `env`。
-- 捕获 stdout/stderr，等待子进程退出。
-- 组装为单行文本返回：`exit=<code> stdout="<...>" stderr="<...>"`。
-- 任何异常（如 spawn 失败）返回错误消息，标记为 `isError=true`。
+- Runs `bash -lc <command>` in current environment and inherits process `env`.
+- Captures stdout/stderr and waits for child process exit.
+- Returns one-line text: `exit=<code> stdout="<...>" stderr="<...>"`.
+- Any exception (for example spawn failure) returns an error message with `isError=true`.
 
-## 输出示例
+## Output Example
 
 `exit=0 stdout="hello\n" stderr=""`
 
-## 注意
+## Notes
 
-- 不做命令安全校验，请在上层控制可执行内容。
-- `command` 为空白时直接报错，不会执行。
+- No command safety validation inside this tool; upper layers should control allowed commands.
+- Blank `command` is rejected and not executed.
