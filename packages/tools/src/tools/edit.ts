@@ -22,7 +22,8 @@ const EDIT_INPUT_SCHEMA = z
     })
     .superRefine((value, ctx) => {
         const hasBatch = Boolean(value.edits && value.edits.length > 0)
-        const hasSingle = typeof value.old_string === 'string' || typeof value.new_string === 'string'
+        const hasSingle =
+            typeof value.old_string === 'string' || typeof value.new_string === 'string'
 
         if (hasBatch && hasSingle) {
             ctx.addIssue({

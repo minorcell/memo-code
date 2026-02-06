@@ -13,12 +13,12 @@ Replaces target text in a file, with optional global replacement and batch edits
 
 - `file_path` (string, required): target file path (normalized to absolute path).
 - Single-edit mode:
-  - `old_string` (string, required): source text to replace.
-  - `new_string` (string, required): replacement text.
-  - `replace_all` (boolean, optional): whether to replace all occurrences; default is single replacement.
+    - `old_string` (string, required): source text to replace.
+    - `new_string` (string, required): replacement text.
+    - `replace_all` (boolean, optional): whether to replace all occurrences; default is single replacement.
 - Batch mode:
-  - `edits` (array, required in batch mode): each item has `old_string`, `new_string`, and optional `replace_all`.
-  - `edits` cannot be used together with `old_string/new_string`.
+    - `edits` (array, required in batch mode): each item has `old_string`, `new_string`, and optional `replace_all`.
+    - `edits` cannot be used together with `old_string/new_string`.
 
 ## Behavior
 
