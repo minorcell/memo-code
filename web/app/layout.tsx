@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+const logoPath = `${basePath}/logo.svg`
+
 export const metadata: Metadata = {
     title: {
         default: 'Memo 官方站点',
@@ -8,9 +11,9 @@ export const metadata: Metadata = {
     },
     description: 'Memo: 运行在终端里的轻量级编码代理。本站提供产品介绍与完整文档站。',
     icons: {
-        icon: '/logo.svg',
-        shortcut: '/logo.svg',
-        apple: '/logo.svg',
+        icon: logoPath,
+        shortcut: logoPath,
+        apple: logoPath,
     },
 }
 

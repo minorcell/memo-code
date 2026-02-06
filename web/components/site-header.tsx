@@ -5,6 +5,8 @@ import Link from 'next/link'
 const navItems = [{ href: '/docs', label: 'Docs' }]
 const GITHUB_URL = 'https://github.com/minorcell/memo-cli'
 const NPM_URL = 'https://www.npmjs.com/package/@memo-code/memo'
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+const logoPath = `${basePath}/logo.svg`
 
 export function SiteHeader() {
     return (
@@ -12,7 +14,7 @@ export function SiteHeader() {
             <div className="panel flex items-center justify-between rounded-2xl px-4 py-3 md:px-5">
                 <Link href="/" className="flex items-center gap-3">
                     <Image
-                        src="/logo.svg"
+                        src={logoPath}
                         width={36}
                         height={36}
                         alt="Memo Logo"

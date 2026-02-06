@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
     basePath: pageBasePath,
     assetPrefix: pageBasePath,
     trailingSlash: true,
+    env: {
+        NEXT_PUBLIC_BASE_PATH: pageBasePath,
+    },
     images: {
         unoptimized: true,
     },
