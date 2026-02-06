@@ -1,0 +1,4 @@
+interface:
+    display_name: 'Publish Memo Release'
+    short_description: 'Release memo from version bump to tag and notes'
+    default_prompt: 'Publish a new memo version with the standard dev-to-main flow, tag push, and detailed English release notes.'
