@@ -24,6 +24,8 @@ function getMainParam(toolInput: unknown): string | undefined {
     const input = toolInput as Record<string, any>
 
     const priorityKeys = [
+        'cmd',
+        'dir_path',
         'file_path',
         'path',
         'file',
@@ -31,7 +33,7 @@ function getMainParam(toolInput: unknown): string | undefined {
         'url',
         'command',
         'pattern',
-        'glob',
+        'include',
         'query',
         'content',
         'cwd',

@@ -19,14 +19,14 @@ Fix:
 - Or, if risk is controlled, use: `memo --dangerous`
 - Or convert task to read-only/advisory mode (no file writes, no command execution)
 
-## 3) `grep` Tool Error: `rg` Not Found
+## 3) `grep_files` Tool Error: `rg` Not Found
 
-Cause: `grep` tool depends on system ripgrep (`rg`).
+Cause: `grep_files` depends on system ripgrep (`rg`).
 
 Fix:
 
 - Install ripgrep (macOS: `brew install ripgrep`)
-- Or use alternatives (for example, narrow with `glob` first, then read targeted files)
+- Or use alternatives (for example, narrow with `list_dir`, then use `read_file` on specific files)
 
 ## 4) Remote Request Failure (`webfetch` / LLM calls)
 

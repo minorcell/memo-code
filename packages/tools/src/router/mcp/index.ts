@@ -2,6 +2,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 import type { McpTool, ToolRegistry, MCPServerConfig } from '../types'
 import { McpClientPool } from './pool'
+import { setActiveMcpPool } from './context'
 
 /** MCP 工具注册表 */
 export class McpToolRegistry {
@@ -11,6 +12,7 @@ export class McpToolRegistry {
 
     constructor() {
         this.pool = new McpClientPool()
+        setActiveMcpPool(this.pool)
         this.shouldLog =
             process.env.MEMO_MCP_LOG === '1' || !(process.stdout.isTTY && process.stdin.isTTY)
     }
@@ -102,6 +104,7 @@ export class McpToolRegistry {
     async dispose(): Promise<void> {
         await this.pool.closeAll()
         this.tools.clear()
+        setActiveMcpPool(null)
     }
 
     /** 获取内部 pool（用于测试或高级用法） */

@@ -522,10 +522,10 @@ The AGENTS.md should include:
 6. Any project-specific notes for AI assistants
 
 Steps:
-1. First explore the project structure using glob and bash tools
+1. First explore the project structure using list_dir and exec_command tools
 2. Read key configuration files (package.json, tsconfig.json, etc.)
 3. Understand the tech stack and conventions
-4. Create the AGENTS.md file using the write tool
+4. Create the AGENTS.md file using apply_patch
 
 Make the AGENTS.md concise but informative, following best practices for AI agent guidelines.`
                 setInputHistory((prev) => [...prev, '/init'])

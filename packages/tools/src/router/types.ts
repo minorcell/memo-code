@@ -23,6 +23,10 @@ export interface Tool {
     source: ToolSource
     /** 输入参数的 JSON Schema */
     inputSchema: JSONSchema
+    /** 是否支持并行调用（默认 false，保守串行）。 */
+    supportsParallelToolCalls?: boolean
+    /** 是否会修改外部状态（文件、进程、网络写操作等）。 */
+    isMutating?: boolean
     /** 可选的输入校验器（通常由 native/zod 适配层提供） */
     validateInput?: (input: unknown) => { ok: true; data: unknown } | { ok: false; error: string }
     /** 执行工具 */

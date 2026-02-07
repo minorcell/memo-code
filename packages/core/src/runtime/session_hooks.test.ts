@@ -199,7 +199,7 @@ describe('session hooks & middleware', () => {
 
     test('rejects native tool input via validateInput before execute', async () => {
         const outputs: LLMResponse[] = [
-            toolUseResponse('action-1', 'write', {}),
+            toolUseResponse('action-1', 'read_file', {}),
             endTurnResponse('done'),
         ]
         const session = await createAgentSession(
@@ -214,7 +214,7 @@ describe('session hooks & middleware', () => {
         try {
             const result = await session.runTurn('hi')
             assert.strictEqual(result.finalText, 'done')
-            assert.ok(result.steps[0]?.observation?.includes('write invalid input'))
+            assert.ok(result.steps[0]?.observation?.includes('read_file invalid input'))
         } finally {
             await session.close()
         }

@@ -49,9 +49,9 @@ if (toolUseBlocks.length > 1) {
 
 **Typical use cases**:
 
-- Read multiple files concurrently (`read + read + read`)
-- Run multiple git commands in parallel (`bash + bash + bash`)
-- Search and read simultaneously (`glob + grep + read`)
+- Read multiple files concurrently (`read_file + read_file + read_file`)
+- Run multiple git commands in parallel (`exec_command + exec_command + exec_command`)
+- Search and read simultaneously (`list_dir + grep_files + read_file`)
 
 ### 3. State Flow
 
@@ -201,7 +201,7 @@ Incorporates Claude Code best practices:
 
 1. **Strict output control**: `< 4` lines of text (excluding tool calls/code)
 2. **Concurrency requirement**: independent tools must run in parallel
-3. **Todo-driven flow**: complex tasks (>=3 steps) must use Todo tool
+3. **Plan-driven flow**: complex tasks (>=3 steps) should use `update_plan`
 4. **Engineering quality**: run lint/typecheck after completion
 5. **Precise references**: use `file:line` format for code references
 6. **Concise refusal**: 1-2 sentence refusal, no verbosity

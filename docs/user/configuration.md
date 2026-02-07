@@ -61,7 +61,7 @@ base_url = "https://api.openai.com/v1"
 
 When `stream_output=true`, Memo prefers a streaming response path. In the current implementation, tool definitions are not sent in that path, so tool calling can be limited (better for plain Q&A/summarization).
 
-If you need stable tool usage (`read`/`write`/`edit`/`bash`, etc.), keep:
+If you need stable tool usage (`read_file`/`list_dir`/`grep_files`/`apply_patch`/`exec_command`, etc.), keep:
 
 ```toml
 stream_output = false
@@ -76,4 +76,4 @@ You can define MCP servers in `config.toml` under `[mcp_servers.<name>]` or mana
 ## Related Paths
 
 - Session logs: `~/.memo/sessions/` by default (see [Sessions and Logs](./sessions-history.md))
-- Long-term memory: `~/.memo/Agents.md` by default (see [Long-term Memory](./memory.md))
+- Memory file: `~/.memo/Agents.md` by default (used by `get_memory`, see [Long-term Memory](./memory.md))

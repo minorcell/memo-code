@@ -5,14 +5,12 @@ import { createTokenCounter } from '@memo/core/utils/tokenizer'
 import {
     buildSessionPath,
     getSessionsDir,
-    getMemoryPath,
     loadMemoConfig,
     selectProvider,
 } from '@memo/core/config/config'
 import { JsonlHistorySink } from '@memo/core/runtime/history'
 import { loadSystemPrompt as defaultLoadPrompt } from '@memo/core/runtime/prompt'
 import { ToolRouter } from '@memo/tools/router'
-import { readFile, access } from 'node:fs/promises'
 import type {
     AgentSessionDeps,
     AgentSessionOptions,
@@ -115,18 +113,6 @@ export async function withDefaultDeps(
         const toolDescriptions = router.generateToolDescriptions()
         if (toolDescriptions) {
             basePrompt += `\n\n${toolDescriptions}`
-        }
-
-        // 注入长期记忆
-        const memoryPath = getMemoryPath(loaded)
-        try {
-            await access(memoryPath)
-            const memory = (await readFile(memoryPath, 'utf-8')).trim()
-            if (memory) {
-                basePrompt += `\n\n# Long-Term Memory\n${memory}`
-            }
-        } catch {
-            // Memory file doesn't exist, ignore
         }
 
         return basePrompt

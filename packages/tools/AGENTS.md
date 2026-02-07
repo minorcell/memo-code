@@ -18,8 +18,10 @@ logic.
 ## Package Structure
 
 - `src/tools/*`
-    - Native tool implementations (`bash`, `read`, `write`, `edit`, `glob`,
-      `grep`, `webfetch`, `todo`, `save_memory`).
+    - Native tool implementations (codex-style tools such as
+      `exec_command`, `write_stdin`, `apply_patch`, `read_file`, `list_dir`,
+      `grep_files`, `list_mcp_resources`, `read_mcp_resource`, `update_plan`,
+      `webfetch`, `get_memory`).
     - `types.ts` provides `defineMcpTool(...)` to build unified tool objects.
     - `mcp.ts` contains common `CallToolResult` helpers.
 - `src/router/*`

@@ -8,18 +8,18 @@ describe('tool orchestrator', () => {
         const calls: string[] = []
         const orchestrator = createToolOrchestrator({
             tools: {
-                bash: {
-                    name: 'bash',
+                shell_command: {
+                    name: 'shell_command',
                     execute: async () => {
-                        calls.push('bash')
+                        calls.push('shell_command')
                         return { content: [{ type: 'text', text: 'ok' }] }
                     },
                 },
-                read: {
-                    name: 'read',
+                read_file: {
+                    name: 'read_file',
                     execute: async () => {
-                        calls.push('read')
-                        return { content: [{ type: 'text', text: 'read' }] }
+                        calls.push('read_file')
+                        return { content: [{ type: 'text', text: 'read_file' }] }
                     },
                 },
             },
@@ -27,8 +27,8 @@ describe('tool orchestrator', () => {
 
         const result = await orchestrator.executeActions(
             [
-                { name: 'bash', input: { command: 'echo hi' } },
-                { name: 'read', input: { file_path: 'a.txt' } },
+                { name: 'shell_command', input: { cmd: 'echo hi' } },
+                { name: 'read_file', input: { file_path: '/tmp/a.txt' } },
             ],
             {
                 requestApproval: async () => 'deny',
@@ -38,7 +38,7 @@ describe('tool orchestrator', () => {
         assert.strictEqual(result.hasRejection, true)
         assert.deepStrictEqual(calls, [])
         assert.strictEqual(result.results.length, 1)
-        assert.strictEqual(result.results[0]?.tool, 'bash')
+        assert.strictEqual(result.results[0]?.tool, 'shell_command')
         assert.strictEqual(result.results[0]?.status, 'approval_denied')
         assert.strictEqual(result.results[0]?.errorType, 'approval_denied')
         assert.strictEqual(result.results[0]?.rejected, true)
@@ -49,10 +49,10 @@ describe('tool orchestrator', () => {
     test('executes tool when approval is granted', async () => {
         const orchestrator = createToolOrchestrator({
             tools: {
-                write: {
-                    name: 'write',
+                apply_patch: {
+                    name: 'apply_patch',
                     validateInput: (input) => {
-                        const schema = z.object({ file_path: z.string() })
+                        const schema = z.object({ input: z.string() })
                         const parsed = schema.safeParse(input)
                         return parsed.success
                             ? { ok: true, data: parsed.data }
@@ -66,7 +66,7 @@ describe('tool orchestrator', () => {
         })
 
         const result = await orchestrator.executeAction(
-            { name: 'write', input: { file_path: 'a.txt' } },
+            { name: 'apply_patch', input: { input: '*** Begin Patch\n*** End Patch\n' } },
             { requestApproval: async () => 'once' },
         )
 
@@ -92,8 +92,8 @@ describe('tool orchestrator', () => {
     test('classifies sandbox-like execution failures', async () => {
         const orchestrator = createToolOrchestrator({
             tools: {
-                bash: {
-                    name: 'bash',
+                exec_command: {
+                    name: 'exec_command',
                     execute: async () => {
                         throw new Error('Permission denied by sandbox')
                     },
@@ -101,12 +101,47 @@ describe('tool orchestrator', () => {
             },
         })
         const result = await orchestrator.executeAction(
-            { name: 'bash', input: { command: 'rm -rf /' } },
+            { name: 'exec_command', input: { cmd: 'rm -rf /' } },
             { requestApproval: async () => 'once' },
         )
         assert.strictEqual(result.success, false)
         assert.strictEqual(result.status, 'sandbox_denied')
         assert.strictEqual(result.errorType, 'sandbox_denied')
         assert.ok(result.observation.startsWith('Tool execution failed:'))
+    })
+
+    test('replaces oversized tool output with xml system hint', async () => {
+        const prevLimit = process.env.MEMO_TOOL_RESULT_MAX_CHARS
+        process.env.MEMO_TOOL_RESULT_MAX_CHARS = '64'
+        try {
+            const orchestrator = createToolOrchestrator({
+                tools: {
+                    read_file: {
+                        name: 'read_file',
+                        execute: async () => ({
+                            content: [{ type: 'text', text: 'x'.repeat(1000) }],
+                        }),
+                    },
+                },
+            })
+
+            const result = await orchestrator.executeAction(
+                { name: 'read_file', input: { file_path: '/tmp/a' } },
+                { requestApproval: async () => 'once' },
+            )
+
+            assert.strictEqual(result.success, true)
+            assert.strictEqual(result.status, 'success')
+            assert.ok(result.observation.startsWith('<system_hint '))
+            assert.ok(result.observation.includes('tool="read_file"'))
+            assert.ok(result.observation.includes('reason="too_long"'))
+            assert.ok(!result.observation.includes('x'.repeat(100)))
+        } finally {
+            if (prevLimit === undefined) {
+                delete process.env.MEMO_TOOL_RESULT_MAX_CHARS
+            } else {
+                process.env.MEMO_TOOL_RESULT_MAX_CHARS = prevLimit
+            }
+        }
     })
 })

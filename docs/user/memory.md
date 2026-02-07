@@ -1,6 +1,6 @@
 # Long-term Memory
 
-Memo can store user preferences/profile info in a local memory file and inject it into future system prompts for more consistent behavior.
+Memo keeps memory in a local file and exposes it through the read-only `get_memory` tool.
 
 ## Memory File Location
 
@@ -10,28 +10,26 @@ Default:
 
 You can relocate it with `MEMO_HOME` (see [Configuration](./configuration.md)).
 
-## What `save_memory` Should Store
+## Current Behavior
+
+- `get_memory` reads the memory file and returns its content as `memory_summary`.
+- Memory content is **not auto-injected** into the system prompt.
+- To change memory, edit `Agents.md` directly or use your own custom/MCP write tool.
+
+## What to Store
 
 Suitable:
 
-- Language preferences: for example, "User prefers Chinese responses"
-- Technical preferences: for example, "User prefers TypeScript" or "leans functional style"
-- Output preferences: for example, "Keep answers concise, conclusion first"
+- Language preferences (for example, "User prefers Chinese responses")
+- Technical preferences (for example, "User prefers TypeScript")
+- Output preferences (for example, "Keep answers concise")
 
-Not suitable (do not store):
+Not suitable:
 
-- Project structure/business logic/repo details (put these in project `AGENTS.md`)
+- Project structure or repo implementation details (use project `AGENTS.md` instead)
 - Secrets/tokens/personal sensitive information
-
-## How It Is Used in Practice
-
-Usually you only need to state your preference in chat; the model may call `save_memory` when appropriate.
-
-If you want explicit memory capture, say something like:
-
-- "Please remember: I want all responses in Chinese and as concise as possible."
 
 ## Related Docs
 
-- Tool details: `docs/tool/save_memory.md`
+- Tool details: `docs/tool/get_memory.md`
 - Project-level conventions: `AGENTS.md` inside the repository
