@@ -553,39 +553,32 @@ type HistoryLoadOptions = {
     limit?: number
 }
 
+type SessionFileCandidate = {
+    path: string
+    mtimeMs: number
+    source: 'legacy' | 'dated'
+}
+
+type HistoryEntryBuildOptions = {
+    requireCwdMatch: boolean
+}
+
 async function loadSessionHistoryEntries(
     options: HistoryLoadOptions,
 ): Promise<InputHistoryEntry[]> {
-    const logDir = getSessionLogDir(options.sessionsDir, options.cwd)
-    let dirEntries: import('node:fs').Dirent[]
-    try {
-        dirEntries = await readdir(logDir, { withFileTypes: true })
-    } catch (err) {
-        if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
-            return []
-        }
-        return []
-    }
     const normalizedActive = options.activeSessionFile ? resolve(options.activeSessionFile) : null
-    const candidates = await Promise.all(
-        dirEntries
-            .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
-            .map(async (entry) => {
-                const fullPath = join(logDir, entry.name)
-                if (normalizedActive && resolve(fullPath) === normalizedActive) {
-                    return null
-                }
-                try {
-                    const info = await stat(fullPath)
-                    return { path: fullPath, mtimeMs: info.mtimeMs }
-                } catch {
-                    return null
-                }
-            }),
-    )
-    const sorted = candidates
-        .filter((item): item is { path: string; mtimeMs: number } => Boolean(item))
-        .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    const [legacyCandidates, datedCandidates] = await Promise.all([
+        collectLegacySessionCandidates(options.sessionsDir, options.cwd),
+        collectDatePartitionedSessionCandidates(options.sessionsDir),
+    ])
+    const candidates = [...legacyCandidates, ...datedCandidates]
+        .filter((candidate) => !normalizedActive || resolve(candidate.path) !== normalizedActive)
+        .filter(
+            (candidate, index, list) =>
+                list.findIndex((other) => resolve(other.path) === resolve(candidate.path)) ===
+                index,
+        )
+    const sorted = candidates.sort((a, b) => b.mtimeMs - a.mtimeMs)
     const limit = options.limit ?? 10
     const keyword = options.keyword?.trim().toLowerCase()
     const entries: InputHistoryEntry[] = []
@@ -595,6 +588,7 @@ async function loadSessionHistoryEntries(
             candidate.path,
             options.cwd,
             candidate.mtimeMs,
+            { requireCwdMatch: candidate.source === 'dated' },
         )
         if (!entry) continue
         if (keyword && !entry.input.toLowerCase().includes(keyword)) {
@@ -610,10 +604,14 @@ async function buildHistoryEntryFromFile(
     filePath: string,
     cwd: string,
     ts: number,
+    options: HistoryEntryBuildOptions,
 ): Promise<InputHistoryEntry | null> {
     try {
         const raw = await readFile(filePath, 'utf8')
-        const firstPrompt = extractFirstTurnStart(raw)
+        const { firstPrompt, sessionCwd } = extractSessionSummary(raw)
+        if (!matchSessionCwd(cwd, sessionCwd, options)) {
+            return null
+        }
         const title = firstPrompt?.trim() || formatSessionFileName(filePath)
         return {
             id: filePath,
@@ -627,7 +625,12 @@ async function buildHistoryEntryFromFile(
     }
 }
 
-function extractFirstTurnStart(raw: string): string | null {
+function extractSessionSummary(raw: string): {
+    firstPrompt: string | null
+    sessionCwd: string | null
+} {
+    let firstPrompt: string | null = null
+    let sessionCwd: string | null = null
     for (const line of raw.split('\n')) {
         const trimmed = line.trim()
         if (!trimmed) continue
@@ -637,18 +640,129 @@ function extractFirstTurnStart(raw: string): string | null {
         } catch {
             continue
         }
-        if (event && typeof event === 'object' && event.type === 'turn_start') {
+        if (!event || typeof event !== 'object') {
+            continue
+        }
+        if (event.type === 'session_start' && !sessionCwd) {
+            const cwd = event.meta?.cwd
+            if (typeof cwd === 'string' && cwd.trim()) {
+                sessionCwd = cwd
+            }
+            continue
+        }
+        if (event.type === 'turn_start' && !firstPrompt) {
             const content = typeof event.content === 'string' ? event.content.trim() : ''
             if (content) {
-                return content
+                firstPrompt = content
             }
         }
     }
-    return null
+    return { firstPrompt, sessionCwd }
 }
 
 function formatSessionFileName(filePath: string) {
     return basename(filePath).replace(/\.jsonl$/i, '')
+}
+
+function normalizeCwd(input: string) {
+    const normalized = resolve(input)
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+}
+
+function matchSessionCwd(
+    cwd: string,
+    sessionCwd: string | null,
+    options: HistoryEntryBuildOptions,
+) {
+    if (!sessionCwd) {
+        return !options.requireCwdMatch
+    }
+    return normalizeCwd(cwd) === normalizeCwd(sessionCwd)
+}
+
+async function collectLegacySessionCandidates(
+    sessionsDir: string,
+    cwd: string,
+): Promise<SessionFileCandidate[]> {
+    const logDir = getSessionLogDir(sessionsDir, cwd)
+    let dirEntries: import('node:fs').Dirent[]
+    try {
+        dirEntries = await readdir(logDir, { withFileTypes: true })
+    } catch {
+        return []
+    }
+    const candidates = await Promise.all(
+        dirEntries
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
+            .map(async (entry) => {
+                const fullPath = join(logDir, entry.name)
+                try {
+                    const info = await stat(fullPath)
+                    return {
+                        path: fullPath,
+                        mtimeMs: info.mtimeMs,
+                        source: 'legacy' as const,
+                    }
+                } catch {
+                    return null
+                }
+            }),
+    )
+    return candidates.filter((item): item is SessionFileCandidate => Boolean(item))
+}
+
+async function collectDatePartitionedSessionCandidates(
+    sessionsDir: string,
+): Promise<SessionFileCandidate[]> {
+    const listDirectory = async (dirPath: string) => {
+        try {
+            return await readdir(dirPath, { withFileTypes: true })
+        } catch {
+            return [] as import('node:fs').Dirent[]
+        }
+    }
+
+    const yearDirs = (await listDirectory(sessionsDir)).filter(
+        (entry) => entry.isDirectory() && /^\d{4}$/.test(entry.name),
+    )
+    const filePaths: string[] = []
+    for (const yearDir of yearDirs) {
+        const yearPath = join(sessionsDir, yearDir.name)
+        const monthDirs = (await listDirectory(yearPath)).filter(
+            (entry) => entry.isDirectory() && /^\d{2}$/.test(entry.name),
+        )
+        for (const monthDir of monthDirs) {
+            const monthPath = join(yearPath, monthDir.name)
+            const dayDirs = (await listDirectory(monthPath)).filter(
+                (entry) => entry.isDirectory() && /^\d{2}$/.test(entry.name),
+            )
+            for (const dayDir of dayDirs) {
+                const dayPath = join(monthPath, dayDir.name)
+                const files = (await listDirectory(dayPath)).filter(
+                    (entry) => entry.isFile() && entry.name.endsWith('.jsonl'),
+                )
+                for (const file of files) {
+                    filePaths.push(join(dayPath, file.name))
+                }
+            }
+        }
+    }
+
+    const candidates = await Promise.all(
+        filePaths.map(async (filePath) => {
+            try {
+                const info = await stat(filePath)
+                return {
+                    path: filePath,
+                    mtimeMs: info.mtimeMs,
+                    source: 'dated' as const,
+                }
+            } catch {
+                return null
+            }
+        }),
+    )
+    return candidates.filter((item): item is SessionFileCandidate => Boolean(item))
 }
 
 function detectSuggestionTrigger(value: string): SuggestionTrigger | null {

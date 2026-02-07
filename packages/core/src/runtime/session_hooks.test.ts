@@ -259,6 +259,10 @@ describe('session hooks & middleware', () => {
             const result = await session.runTurn('meta')
             assert.strictEqual(result.finalText, 'done')
 
+            const sessionStart = events.find((event) => event.type === 'session_start')
+            assert.ok(sessionStart, 'session_start should exist')
+            assert.strictEqual(sessionStart?.meta?.cwd, process.cwd())
+
             const actionEvent = events.find((event) => event.type === 'action')
             assert.ok(actionEvent, 'action event should exist')
             assert.strictEqual(actionEvent.meta?.phase, 'dispatch')

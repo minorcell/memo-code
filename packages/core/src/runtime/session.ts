@@ -302,6 +302,7 @@ class AgentSessionImpl implements AgentSession {
             await this.emitEvent('session_start', {
                 meta: {
                     mode: this.mode,
+                    cwd: process.cwd(),
                     tokenizer: this.tokenCounter.model,
                     warnPromptTokens: this.options.warnPromptTokens,
                     maxPromptTokens: effectiveMaxPromptTokens,
