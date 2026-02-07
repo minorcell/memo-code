@@ -244,7 +244,9 @@ Step 4: Result processing
 
 - `MEMO_SHELL_TOOL_TYPE`: Choose shell tool variant (`unified_exec`, `shell`, `shell_command`)
 - `MEMO_EXPERIMENTAL_TOOLS`: CSV list of experimental tools to enable
-- `MEMO_ENABLE_COLLAB_TOOLS`: Enable collaborative agent tools
+- `MEMO_ENABLE_COLLAB_TOOLS`: Disable collaborative agent tools when set to `0` (enabled by default)
+- `MEMO_SUBAGENT_COMMAND`: Command executed for each subagent submission
+- `MEMO_SUBAGENT_MAX_AGENTS`: Max concurrent running subagents
 - `MEMO_ENABLE_MEMORY_TOOL`: Enable memory access tool
 
 ### Security Settings

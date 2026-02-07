@@ -1,29 +1,30 @@
-# Memo Code User Guide
+# Memo 用户文档
 
-This documentation set is intended for end users (different from implementation/proposal docs under `docs/`), split by module so you can read only what you need.
+本目录面向 **Memo CLI 的使用者**，聚焦“如何使用、如何配置、如何排障”，不讨论底层实现细节。
 
-Memo Code is a lightweight coding agent that runs in your terminal and helps you complete coding tasks with natural-language commands.
+## 推荐阅读顺序
 
-## Recommended Reading Order
+1. [快速开始](./getting-started.md)
+2. [CLI / TUI 使用说明](./cli-tui.md)
+3. [配置说明](./configuration.md)
+4. [工具总览](./tools.md)
+5. [Subagent 使用说明](./subagent.md)
+6. [审批与安全](./approval-safety.md)
 
-1. [Getting Started](./getting-started.md)
-2. [CLI / TUI Usage](./cli-tui.md)
-3. [Configuration (Provider / Config)](./configuration.md)
+## 文档索引
 
-## Documentation Index (By Module)
+- [快速开始](./getting-started.md)：安装、首启、基础运行方式。
+- [CLI / TUI 使用说明](./cli-tui.md)：交互命令、快捷键、输入增强。
+- [配置说明](./configuration.md)：`config.toml`、Provider、MCP、上下文上限。
+- [工具总览](./tools.md)：内置工具分组、启用开关、常见使用方式。
+- [Subagent 使用说明](./subagent.md)：多 agent 能力启用、生命周期、常见问题。
+- [审批与安全](./approval-safety.md)：审批机制、风险分级、`--dangerous` 使用边界。
+- [MCP 扩展](./mcp.md)：连接外部 MCP 服务与管理命令。
+- [会话与历史](./sessions-history.md)：JSONL 历史、恢复会话、排查辅助。
+- [故障排查](./troubleshooting.md)：常见问题与处理步骤。
 
-- [Getting Started](./getting-started.md)
-- [CLI / TUI Usage](./cli-tui.md)
-- [Configuration (Provider / Config)](./configuration.md)
-- [Tools (Built-in Tool Overview)](./tools.md)
-- [Tool Approval and Safety](./approval-safety.md)
-- [MCP Extensions (External Tools/Services)](./mcp.md)
-- [Sessions and Logs (History / Sessions)](./sessions-history.md)
-- [Long-term Memory](./memory.md)
-- [Troubleshooting](./troubleshooting.md)
+## 相关参考
 
-## Other References
-
-- Project intro and installation: `README.md`
-- Detailed tool parameter docs: `docs/tool/*`
-- Core implementation and architecture: `docs/core.md`
+- 项目总览：`README.md`
+- 工具参数细节：`docs/tool/*`
+- 核心架构说明：`docs/core.md`

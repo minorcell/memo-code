@@ -1,88 +1,83 @@
-# CLI / TUI Usage
+# CLI / TUI 使用说明
 
-Memo has two primary usage modes: interactive TUI (default) and plain mode for non-TTY input.
+Memo 主要有两种使用方式：交互式 TUI 与非交互 plain 模式。
 
-## Run Modes
+## 运行模式
 
-### Interactive TUI (Default)
+### 1) 交互式 TUI
 
 ```bash
 memo
 ```
 
-Best for multi-turn chat, visualized tool calls, approval dialogs, and session resume.
+适合多轮对话、工具审批、会话恢复、模型切换。
 
-### Plain Mode (Non-TTY)
+### 2) Plain 模式（管道 / 脚本）
 
 ```bash
 echo "your prompt" | memo
 ```
 
-Best for scripts, CI, and pipelines. Note: plain mode cannot run interactive approvals (see Tool Approval and Safety).
+适合 CI 或脚本流水线。注意 plain 模式无法弹出交互审批框。
 
-### Version (`--version`)
+## 输入增强
 
-```bash
-memo --version
+### `@` 文件引用
+
+输入 `@` + 路径片段可触发文件建议，按 `Tab` 接受。
+
+示例：
+
+- `阅读 @package.json 并解释 scripts`
+- `比较 @packages/core/src/runtime/session.ts 与 @packages/tools/src/index.ts`
+
+### `resume` 历史恢复
+
+在输入框中输入：
+
+- `resume`
+- `resume 关键词`
+
+会显示历史会话建议，选中后加载历史上下文。
+
+### Slash 命令
+
+常用命令：
+
+- `/help`：查看帮助和快捷键
+- `/new`：新建会话并清屏
+- `/exit`：退出
+- `/models`：查看/切换配置中的模型
+- `/context`：设置上下文上限（80k/120k/150k/200k，会新建会话）
+- `/mcp`：查看当前加载的 MCP 服务器
+- `/init`：触发生成项目 `AGENTS.md`
+
+此外，直接输入 `exit`（不加 `/`）也可退出。
+
+### 本地 Shell 命令
+
+输入以 `$` 开头的命令会在本地 `cwd` 执行：
+
+```text
+$ git status
+$ rg "createAgentSession" -n
 ```
 
-## Input Enhancements and Common Workflows
+这是用户主动执行，不走模型工具审批流程。
 
-### 1) File Reference (`@`)
+## 快捷键
 
-Type `@` followed by a path fragment to trigger file suggestions (Tab accepts). Useful when telling the model exactly which files to inspect.
+- `Enter`：发送
+- `Shift+Enter`：换行
+- `Tab`：接受建议
+- `Up/Down`：切换建议或浏览输入历史
+- `Esc`：关闭建议面板
+- `Esc Esc`：运行中取消；空闲时清空输入
+- `Ctrl+L`：新建会话并清屏
+- `Ctrl+C`：退出
 
-Examples:
+## 相关文档
 
-- `Read @package.json and explain scripts`
-- `Compare approval logic in @packages/core/src/runtime/session.ts`
-
-### 2) Session Resume (`resume`)
-
-Type `resume` (optionally with keywords) in the input box to show historical sessions. Selecting one loads the previous context into the current session.
-
-Examples:
-
-- `resume` (list recent sessions)
-- `resume approval` (filter by keyword)
-
-### 3) Slash Commands (`/`)
-
-Type `/` to see command suggestions; you can also type commands directly and press Enter.
-
-Common commands:
-
-- `/help`: help and shortcut hints
-- `/new`: start a new session (and clear screen)
-- `/exit` or typing `exit`: exit
-- `/models`: view/switch models (loaded from provider config)
-- `/context`: set context cap (80k/120k/150k/200k)
-- `/mcp`: view configured MCP servers
-
-### 4) Local Shell Execution (`$ <cmd>`)
-
-Commands starting with `$` run directly in local `cwd` and show output as system messages. This is user-initiated local execution, not model tool approval flow.
-
-Examples:
-
-- `$ git status`
-- `$ rg "createAgentSession" -n`
-
-## TUI Shortcuts
-
-Current implementation:
-
-- `Enter`: send
-- `Shift+Enter`: newline
-- `Tab`: accept current suggestion (file/command/history/model/context)
-- `Up/Down`: move in suggestions or browse input history
-- `Esc`: close suggestion list
-- `Esc Esc`: cancel running task (busy) or clear input (idle)
-- `Ctrl+L`: new session + clear screen
-- `Ctrl+C`: exit
-
-## Related Docs
-
-- Approval dialog and `--dangerous`: [Tool Approval and Safety](./approval-safety.md)
-- `/models` and provider config: [Configuration](./configuration.md)
-- History files and `resume`: [Sessions and Logs](./sessions-history.md)
+- 审批规则： [审批与安全](./approval-safety.md)
+- 模型与配置： [配置说明](./configuration.md)
+- 历史日志与恢复： [会话与历史](./sessions-history.md)

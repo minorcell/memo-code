@@ -1,55 +1,60 @@
-# Tool Approval and Safety
+# 审批与安全
 
-Memo enables tool approval by default. When the model tries potentially risky actions (file writes, command execution, etc.), Memo asks for permission first.
+Memo 默认启用工具审批。模型尝试执行高风险操作时，会先请求你的许可。
 
-## What Triggers Approval?
+## 一、默认审批策略
 
-Current default policy:
+当前默认策略等价于 `auto`：
 
-- **Read-only tools**: usually auto-approved (`read_file`, `list_dir`, `grep_files`, `webfetch`, `get_memory`, `wait`, MCP resource readers)
-- **Write tools**: approval required (`apply_patch`)
-- **Execution tools**: approval required (`exec_command`, `write_stdin`, `shell`, `shell_command`, collaboration execute tools)
+- 只读工具：通常自动放行
+- 写入工具：需要审批
+- 执行工具：需要审批
+- Subagent 工具族（`spawn_agent` / `send_input` / `resume_agent` / `wait` / `close_agent`）默认免审批
 
-> MCP tools use conservative risk inference by name. Unknown tools are treated like write-level risk by default.
+风险级别由工具名和内置映射共同判定。
 
-## Approval Options
+## 二、审批选项
 
-TUI dialog usually offers:
+在 TUI 审批弹窗中通常有：
 
-- `Allow once`: allow only this call (cleared after current turn)
-- `Allow all session`: auto-allow matching call fingerprint for current session
-- `Reject`: deny execution
+- `Allow once`：仅放行本次调用（当前 turn 结束后失效）
+- `Allow all session`：当前会话内同指纹请求自动放行
+- `Reject`：拒绝
 
-Fingerprint is based on `tool name + arguments`. Different arguments usually trigger approval again.
+“指纹”由 `工具名 + 参数` 计算；参数变化后通常会再次触发审批。
 
-## When to Use `--dangerous` (Skip Approvals)
+## 三、`--dangerous` 模式
 
 ```bash
 memo --dangerous
-# or memo -d
+# 或 memo -d
 ```
 
-Suitable when:
+行为：跳过审批，直接执行工具。
 
-- You strongly trust the prompt and operations.
-- You need fast batch edits in a controlled directory and will review diffs.
+适用场景：
 
-Not suitable when:
+- 你已明确操作范围，且愿意自行承担风险。
+- 需要高频批量改动，并且会自行审查 diff。
 
-- You are unsure which commands/files will be touched.
-- You are in a critical repository or a directory with sensitive data.
+不建议场景：
 
-## Plain Mode (Non-TTY) and Approval
+- 不确定模型将访问哪些文件/命令。
+- 当前目录包含敏感数据或关键生产代码。
 
-Plain mode cannot show interactive approval dialogs, so tool calls requiring approval are denied by default.
+## 四、Plain 模式与审批
 
-If you need write/exec actions in plain mode:
+Plain 模式（非 TTY）无法显示交互审批，因此需审批的工具会被默认拒绝。
 
-- Option A: use interactive TUI (`memo`)
-- Option B: use `--dangerous` (you assume the risk; confirm cwd and targets carefully)
+可选方案：
 
-## Safety Practices
+1. 改用 TUI：`memo`
+2. 明确接受风险后使用 `--dangerous`
+3. 将任务改成纯只读分析
 
-- Ask for a dry run first: let Memo list planned files/operations before approving writes.
-- For execution tools: prefer read-only commands (`git status`, `rg`, `ls`), avoid high-risk commands like `rm`/`sudo`/`chmod`.
-- For writes: constrain changes to explicitly named files and ask for a change summary.
+## 五、安全实践建议
+
+- 先 dry-run：先让模型列出计划改动，再批准写入。
+- 执行命令优先读操作：如 `git status`、`ls`、`rg`。
+- 明确文件白名单：减少误改范围。
+- 敏感目录谨慎使用 `--dangerous`。
