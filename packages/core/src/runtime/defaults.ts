@@ -121,7 +121,6 @@ export async function withDefaultDeps(
     // 7. 生成工具定义（用于 Tool Use API）
     const toolDefinitions = router.generateToolDefinitions()
 
-    const streamOutput = options.stream ?? config.stream_output ?? false
     const sessionsDir = getSessionsDir(loaded, options)
     const historyFilePath = buildSessionPath(sessionsDir, sessionId)
     const defaultHistorySink = new JsonlHistorySink(historyFilePath)
@@ -134,7 +133,7 @@ export async function withDefaultDeps(
         },
         callLLM:
             deps.callLLM ??
-            (async (messages, onChunk, callOptions) => {
+            (async (messages, _onChunk, callOptions) => {
                 const provider = selectProvider(config, options.providerName)
                 const apiKey =
                     process.env[provider.env_api_key] ??
@@ -164,100 +163,75 @@ export async function withDefaultDeps(
                           }))
                         : undefined
 
-                if (streamOutput) {
-                    // 流式模式暂不支持 Tool Use（OpenAI 限制）
-                    const stream = await client.chat.completions.create(
-                        {
-                            model: provider.model,
-                            messages: openAIMessages,
-                            stream: true,
-                        },
-                        { signal: callOptions?.signal },
-                    )
-                    let content = ''
-                    for await (const part of stream) {
-                        const delta = part.choices?.[0]?.delta?.content
-                        if (delta) {
-                            content += delta
-                            onChunk?.(delta)
-                        }
+                const data = await client.chat.completions.create(
+                    {
+                        model: provider.model,
+                        messages: openAIMessages,
+                        tools,
+                        tool_choice: tools ? 'auto' : undefined,
+                    },
+                    { signal: callOptions?.signal },
+                )
+
+                const message = data.choices?.[0]?.message
+
+                // 检查是否有工具调用
+                if (message?.tool_calls && message.tool_calls.length > 0) {
+                    const content: Array<
+                        | { type: 'text'; text: string }
+                        | { type: 'tool_use'; id: string; name: string; input: unknown }
+                    > = []
+
+                    // 添加文本内容（如果有）
+                    if (message.content) {
+                        content.push({ type: 'text', text: message.content })
                     }
-                    return {
-                        content: content ? [{ type: 'text' as const, text: content }] : [],
-                        stop_reason: 'end_turn' as const,
-                        streamed: true,
-                    }
-                } else {
-                    const data = await client.chat.completions.create(
-                        {
-                            model: provider.model,
-                            messages: openAIMessages,
-                            tools,
-                            tool_choice: tools ? 'auto' : undefined,
-                        },
-                        { signal: callOptions?.signal },
-                    )
 
-                    const message = data.choices?.[0]?.message
-
-                    // 检查是否有工具调用
-                    if (message?.tool_calls && message.tool_calls.length > 0) {
-                        const content: Array<
-                            | { type: 'text'; text: string }
-                            | { type: 'tool_use'; id: string; name: string; input: unknown }
-                        > = []
-
-                        // 添加文本内容（如果有）
-                        if (message.content) {
-                            content.push({ type: 'text', text: message.content })
-                        }
-
-                        // 添加工具调用
-                        for (const toolCall of message.tool_calls) {
-                            if (toolCall.type === 'function') {
-                                const parsedArgs = parseToolArguments(toolCall.function.arguments)
-                                if (parsedArgs.ok) {
-                                    content.push({
-                                        type: 'tool_use',
-                                        id: toolCall.id,
-                                        name: toolCall.function.name,
-                                        input: parsedArgs.data,
-                                    })
-                                } else {
-                                    content.push({
-                                        type: 'text',
-                                        text: `[tool_use parse error] ${parsedArgs.error}; raw: ${parsedArgs.raw}`,
-                                    })
-                                }
+                    // 添加工具调用
+                    for (const toolCall of message.tool_calls) {
+                        if (toolCall.type === 'function') {
+                            const parsedArgs = parseToolArguments(toolCall.function.arguments)
+                            if (parsedArgs.ok) {
+                                content.push({
+                                    type: 'tool_use',
+                                    id: toolCall.id,
+                                    name: toolCall.function.name,
+                                    input: parsedArgs.data,
+                                })
+                            } else {
+                                content.push({
+                                    type: 'text',
+                                    text: `[tool_use parse error] ${parsedArgs.error}; raw: ${parsedArgs.raw}`,
+                                })
                             }
                         }
-
-                        const hasToolUse = content.some((c) => c.type === 'tool_use')
-                        return {
-                            content,
-                            stop_reason: hasToolUse ? 'tool_use' : 'end_turn',
-                            usage: {
-                                prompt: data.usage?.prompt_tokens ?? undefined,
-                                completion: data.usage?.completion_tokens ?? undefined,
-                                total: data.usage?.total_tokens ?? undefined,
-                            },
-                        }
                     }
 
-                    // 普通文本响应
-                    const content = message?.content
-                    if (typeof content !== 'string') {
-                        throw new Error('OpenAI-compatible API returned empty content')
-                    }
+                    const hasToolUse = content.some((c) => c.type === 'tool_use')
                     return {
-                        content: [{ type: 'text', text: content }],
-                        stop_reason: 'end_turn',
+                        content,
+                        stop_reason: hasToolUse ? 'tool_use' : 'end_turn',
                         usage: {
                             prompt: data.usage?.prompt_tokens ?? undefined,
                             completion: data.usage?.completion_tokens ?? undefined,
                             total: data.usage?.total_tokens ?? undefined,
                         },
                     }
+                }
+
+                // 普通文本响应
+                const content = message?.content
+                if (typeof content !== 'string') {
+                    throw new Error('OpenAI-compatible API returned empty content')
+                }
+                return {
+                    content: [{ type: 'text', text: content }],
+                    stop_reason: 'end_turn',
+                    usage: {
+                        prompt: data.usage?.prompt_tokens ?? undefined,
+                        completion: data.usage?.completion_tokens ?? undefined,
+                        total: data.usage?.total_tokens ?? undefined,
+                    },
                 }
             }),
         loadPrompt,

@@ -17,7 +17,6 @@ Memo 使用 `config.toml` 管理 Provider、模型、MCP 服务器与上下文�
 
 ```toml
 current_provider = "deepseek"
-stream_output = false
 max_prompt_tokens = 120000
 
 [[providers.deepseek]]
@@ -36,22 +35,11 @@ base_url = "https://api.openai.com/v1"
 字段说明：
 
 - `current_provider`：当前默认 provider 名称
-- `stream_output`：是否启用流式输出
 - `max_prompt_tokens`：上下文上限（与 `/context` 联动）
 - `providers.*`：Provider 列表（可多组）
     - `env_api_key`：读取 API Key 的环境变量名
     - `model`：模型标识
     - `base_url`：OpenAI 兼容 API 地址（可选）
-
-## `stream_output` 注意事项
-
-当前实现下，`stream_output=true` 时会走流式路径，工具调用能力会受限。
-
-如果你希望稳定使用工具（如 `read_file`、`apply_patch`、`exec_command` 等），建议保持：
-
-```toml
-stream_output = false
-```
 
 ## MCP 配置示例
 

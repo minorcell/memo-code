@@ -59,7 +59,6 @@ function normalizeLLMResponse(raw: LLMResponse): {
     toolUseBlocks: Array<{ id: string; name: string; input: unknown }>
     stopReason?: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
     usage?: Partial<TokenUsage>
-    streamed?: boolean
 } {
     const textBlocks = raw.content.filter((block): block is TextBlock => block.type === 'text')
     const toolBlocks = raw.content.filter(
@@ -75,7 +74,6 @@ function normalizeLLMResponse(raw: LLMResponse): {
         })),
         stopReason: raw.stop_reason,
         usage: raw.usage,
-        streamed: raw.streamed,
     }
 }
 
@@ -351,7 +349,6 @@ class AgentSessionImpl implements AgentSession {
                 let assistantText = ''
                 let toolUseBlocks: Array<{ id: string; name: string; input: unknown }> = []
                 let usageFromLLM: Partial<TokenUsage> | undefined
-                let streamed = false
                 let stopReason: string | undefined
                 try {
                     const llmResult = await this.deps.callLLM(
@@ -364,7 +361,6 @@ class AgentSessionImpl implements AgentSession {
                     toolUseBlocks = normalized.toolUseBlocks
                     stopReason = normalized.stopReason
                     usageFromLLM = normalized.usage
-                    streamed = Boolean(normalized.streamed)
                 } catch (err) {
                     if (this.cancelling && isAbortError(err)) {
                         status = 'cancelled'
@@ -408,9 +404,7 @@ class AgentSessionImpl implements AgentSession {
                     break
                 }
 
-                if (!streamed) {
-                    this.deps.onAssistantStep?.(assistantText, step)
-                }
+                this.deps.onAssistantStep?.(assistantText, step)
 
                 const textToolCall =
                     toolUseBlocks.length === 0 && assistantText

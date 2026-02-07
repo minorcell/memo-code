@@ -47,7 +47,7 @@ memo
 
 ## 使用方式
 
-- 交互式：`memo`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
+- 交互式：`memo`（默认 TUI，支持多轮、工具可视化、快捷键）。
 - 非交互纯文本模式（非 TTY）：`echo "你的问题" | memo`（适合脚本）。
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 - 查看版本：`memo --version` 或 `memo -v`。
@@ -60,7 +60,6 @@ memo
 
 ```toml
 current_provider = "deepseek"
-stream_output = false
 
 [[providers.deepseek]]
 name = "deepseek"

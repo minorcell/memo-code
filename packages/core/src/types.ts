@@ -115,8 +115,6 @@ export type LLMResponse = {
     stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
     /** 模型返回的 token usage（可选）。 */
     usage?: Partial<TokenUsage>
-    /** 若为流式增量输出，标记已通过 onChunk 传递过部分内容。 */
-    streamed?: boolean
 }
 
 /** 将 LLM 输出解析成 action/final 结构后的表示。 */
@@ -139,7 +137,7 @@ export type ToolDefinition = {
     input_schema: Record<string, unknown>
 }
 
-/** LLM 调用接口：输入历史消息，返回模型回复文本或携带 usage，可选流式回调。 */
+/** LLM 调用接口：输入历史消息，返回结构化回复，并可通过 onChunk 推送文本片段。 */
 export type CallLLMOptions = {
     signal?: AbortSignal
     /** 可用工具列表（Tool Use API 模式）*/
@@ -157,7 +155,7 @@ export type CallLLM = (
  * - tools: 可用的工具集合。
  * - callLLM: 具体的模型调用函数。
  * - loadPrompt: 自定义加载系统提示词。
- * - onAssistantStep: 每轮模型输出的回调（便于流式打印）。
+ * - onAssistantStep: 每轮模型输出的回调（便于 UI 展示）。
  */
 export type AgentDeps = {
     /** 工具名称到实现的映射（未提供则使用默认工具集）。 */
@@ -197,8 +195,6 @@ export type AgentSessionOptions = {
     warnPromptTokens?: number
     /** 提示词硬上限，超出直接拒绝。 */
     maxPromptTokens?: number
-    /** 是否启用 LLM 流式输出。 */
-    stream?: boolean
     /** 危险模式：跳过审批（不等于关闭沙箱）。 */
     dangerous?: boolean
 }
