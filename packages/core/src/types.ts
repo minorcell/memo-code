@@ -186,14 +186,14 @@ export type AgentDeps = {
     requestApproval?: (request: ApprovalRequest) => Promise<ApprovalDecision>
 }
 
-/** Session 模式：一次性或交互式。 */
-export type SessionMode = 'interactive' | 'once'
+/** Session 模式：当前仅支持交互式。 */
+export type SessionMode = 'interactive'
 
 /** Session 级别的配置项。 */
 export type AgentSessionOptions = {
     /** 自定义 Session ID（默认随机）。 */
     sessionId?: string
-    /** 运行模式：交互式/单次。 */
+    /** 运行模式：当前仅支持 interactive。 */
     mode?: SessionMode
     /** 历史 JSONL 输出目录（默认 history/）。 */
     historyDir?: string

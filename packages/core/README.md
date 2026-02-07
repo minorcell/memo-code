@@ -29,7 +29,7 @@ Core provides the central capabilities of **Memo Code CLI**: the ReAct loop, ses
 ```ts
 import { createAgentSession } from '@memo/core'
 
-const session = await createAgentSession({ onAssistantStep: console.log }, { mode: 'once' })
+const session = await createAgentSession({ onAssistantStep: console.log }, { mode: 'interactive' })
 const turn = await session.runTurn('Hello')
 await session.close()
 ```

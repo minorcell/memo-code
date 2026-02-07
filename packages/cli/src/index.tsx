@@ -18,9 +18,9 @@ import { runMcpCommand } from './mcp'
 import { findLocalPackageInfoSync } from './tui/version'
 
 type CliOptions = {
-    once: boolean
     dangerous: boolean
     showVersion: boolean
+    removedOnceFlag: boolean
 }
 
 type ParsedArgs = {
@@ -28,12 +28,12 @@ type ParsedArgs = {
     options: CliOptions
 }
 
-/** Minimal argv parsing, supports --once and --dangerous. */
+/** Minimal argv parsing, supports --dangerous. */
 function parseArgs(argv: string[]): ParsedArgs {
     const options: CliOptions = {
-        once: false,
         dangerous: false,
         showVersion: false,
+        removedOnceFlag: false,
     }
     const questionParts: string[] = []
 
@@ -47,7 +47,7 @@ function parseArgs(argv: string[]): ParsedArgs {
             continue
         }
         if (arg === '--once') {
-            options.once = true
+            options.removedOnceFlag = true
             continue
         }
         if (arg === '--dangerous' || arg === '-d') {
@@ -126,7 +126,7 @@ async function runPlainMode(parsed: ParsedArgs) {
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
         sessionId,
-        mode: 'once',
+        mode: 'interactive',
         stream: loaded.config.stream_output ?? false,
         maxPromptTokens: loaded.config.max_prompt_tokens,
         dangerous: parsed.options.dangerous,
@@ -169,9 +169,6 @@ async function runPlainMode(parsed: ParsedArgs) {
     let question = parsed.question
     if (!question && !process.stdin.isTTY) {
         question = await readStdin()
-    }
-    if (!question && parsed.options.once) {
-        question = 'Give me a quick self-introduction.'
     }
     if (!question) {
         console.error('No input provided. Pass a question or use stdin.')
@@ -244,6 +241,13 @@ async function main() {
         return
     }
     const parsed = parseArgs(argv)
+    if (parsed.options.removedOnceFlag) {
+        console.error(
+            '`--once` has been removed. Use `memo` (interactive) or pipe input to `memo`.',
+        )
+        process.exitCode = 1
+        return
+    }
     if (parsed.options.showVersion) {
         const info = findLocalPackageInfoSync()
         const version = info?.version ?? 'unknown'
@@ -251,7 +255,7 @@ async function main() {
         return
     }
     const isInteractive = process.stdin.isTTY && process.stdout.isTTY
-    if (!isInteractive || parsed.options.once) {
+    if (!isInteractive) {
         await runPlainMode(parsed)
         return
     }

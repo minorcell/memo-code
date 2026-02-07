@@ -78,7 +78,7 @@ if (toolUseBlocks.length > 1) {
 
 ## Entry API: Session/Turn (`createAgentSession`)
 
-- `createAgentSession(deps, options)` returns a Session; `runTurn` runs one ReAct turn. UI controls turn count (for example `--once` runs one turn).
+- `createAgentSession(deps, options)` returns a Session; `runTurn` runs one ReAct turn. UI controls turn count.
 - Default deps can be omitted: `tools` (built-in set), `callLLM` (provider-based OpenAI client, **auto-sends tool definitions**), `loadPrompt`, `historySinks` (writes to `~/.memo/sessions/...`), `tokenCounter`.
 - Config source: `~/.memo/config.toml` (overridable via `MEMO_HOME`), keys include `current_provider` and `providers` list. Missing config triggers interactive UI setup.
 - Callbacks:
@@ -90,7 +90,7 @@ Example:
 ```ts
 import { createAgentSession } from '@memo/core'
 
-const session = await createAgentSession({ onAssistantStep: console.log }, { mode: 'once' })
+const session = await createAgentSession({ onAssistantStep: console.log }, { mode: 'interactive' })
 const turn = await session.runTurn('Hello')
 await session.close()
 ```
@@ -98,7 +98,7 @@ await session.close()
 ## History and Logs (`runtime/history.ts`)
 
 - Events: `session_start/turn_start/assistant/action/observation/final/turn_end/session_end`.
-- Default output path: `~/.memo/sessions/<sanitized-cwd>/<yyyy-mm-dd>_<HHMMss>_<id>.jsonl`, with provider/model/tokenizer/token-usage metadata.
+- Default output path: `~/.memo/sessions/<YYYY>/<MM>/<DD>/rollout-<timestamp>-<id>.jsonl`, with provider/model/tokenizer/token-usage metadata.
 - For concurrent calls, each tool observation is logged individually, and merged observation is also recorded.
 
 ## LLM Adapter (`runtime/defaults.ts`)

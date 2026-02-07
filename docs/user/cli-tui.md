@@ -1,6 +1,6 @@
 # CLI / TUI Usage
 
-Memo has two primary usage modes: interactive TUI (default) and one-shot mode (`--once`).
+Memo has two primary usage modes: interactive TUI (default) and plain mode for non-TTY input.
 
 ## Run Modes
 
@@ -12,13 +12,13 @@ memo
 
 Best for multi-turn chat, visualized tool calls, approval dialogs, and session resume.
 
-### One-shot Mode (`--once`)
+### Plain Mode (Non-TTY)
 
 ```bash
-memo "your prompt" --once
+echo "your prompt" | memo
 ```
 
-Best for scripts, CI, and pipelines. Note: one-shot mode usually cannot run interactive approvals (see Tool Approval and Safety).
+Best for scripts, CI, and pipelines. Note: plain mode cannot run interactive approvals (see Tool Approval and Safety).
 
 ### Version (`--version`)
 

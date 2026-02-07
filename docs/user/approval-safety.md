@@ -39,11 +39,11 @@ Not suitable when:
 - You are unsure which commands/files will be touched.
 - You are in a critical repository or a directory with sensitive data.
 
-## One-shot Mode (`--once`) and Approval
+## Plain Mode (Non-TTY) and Approval
 
-One-shot mode usually cannot show interactive approval dialogs, so tool calls requiring approval are denied by default.
+Plain mode cannot show interactive approval dialogs, so tool calls requiring approval are denied by default.
 
-If you need write/exec actions in one-shot mode:
+If you need write/exec actions in plain mode:
 
 - Option A: use interactive TUI (`memo`)
 - Option B: use `--dangerous` (you assume the risk; confirm cwd and targets carefully)
