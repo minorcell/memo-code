@@ -104,6 +104,11 @@ describe('collab tools', () => {
         const waited = JSON.parse(textPayload(waitResult))
         assert.strictEqual(waited.timed_out, false)
         assert.strictEqual(waited.status[spawned.agent_id], 'completed')
+        assert.strictEqual(waited.details[spawned.agent_id].status, 'completed')
+        assert.ok(
+            typeof waited.details[spawned.agent_id].last_output === 'string' &&
+                waited.details[spawned.agent_id].last_output.includes('hello'),
+        )
     })
 
     test('send_input requires interrupt when agent is busy and supports interruption', async () => {
@@ -170,6 +175,8 @@ describe('collab tools', () => {
         const waited = JSON.parse(textPayload(waitResult))
         assert.strictEqual(waited.timed_out, false)
         assert.strictEqual(waited.status['missing-agent-id'], 'not_found')
+        assert.strictEqual(waited.details['missing-agent-id'].status, 'not_found')
+        assert.strictEqual(waited.details['missing-agent-id'].last_output, null)
     })
 
     test('spawn_agent respects MEMO_SUBAGENT_MAX_AGENTS limit', async () => {

@@ -7,6 +7,14 @@ import { textResult } from '@memo/tools/tools/mcp'
 
 type AgentStatus = 'running' | 'completed' | 'errored' | 'closed'
 type WaitStatus = AgentStatus | 'not_found'
+type WaitDetail = {
+    status: WaitStatus
+    last_message: string | null
+    last_output: string | null
+    last_error: string | null
+    last_submission_id: string | null
+    updated_at: string | null
+}
 
 type RunningSubmission = {
     id: string
@@ -183,6 +191,28 @@ function getWaitStatus(id: string): WaitStatus {
     const record = agents.get(id)
     if (!record) return 'not_found'
     return record.status
+}
+
+function getWaitDetail(id: string): WaitDetail {
+    const record = agents.get(id)
+    if (!record) {
+        return {
+            status: 'not_found',
+            last_message: null,
+            last_output: null,
+            last_error: null,
+            last_submission_id: null,
+            updated_at: null,
+        }
+    }
+    return {
+        status: record.status,
+        last_message: record.lastMessage,
+        last_output: record.lastOutput,
+        last_error: record.lastError,
+        last_submission_id: record.lastSubmissionId,
+        updated_at: record.updatedAt,
+    }
 }
 
 function buildAgentSummary(record: AgentRecord) {
@@ -456,21 +486,24 @@ export const waitTool = defineMcpTool<WaitInput>({
 
         const collectFinals = () => {
             const status: Record<string, WaitStatus> = {}
+            const details: Record<string, WaitDetail> = {}
             for (const id of ids) {
                 const current = getWaitStatus(id)
                 if (isFinalStatus(current)) {
                     status[id] = current
+                    details[id] = getWaitDetail(id)
                 }
             }
-            return status
+            return { status, details }
         }
 
-        let finalStatuses = collectFinals()
-        if (Object.keys(finalStatuses).length > 0) {
+        let finalSnapshots = collectFinals()
+        if (Object.keys(finalSnapshots.status).length > 0) {
             return textResult(
                 JSON.stringify(
                     {
-                        status: finalStatuses,
+                        status: finalSnapshots.status,
+                        details: finalSnapshots.details,
                         timed_out: false,
                     },
                     null,
@@ -482,12 +515,13 @@ export const waitTool = defineMcpTool<WaitInput>({
         const deadline = Date.now() + resolvedTimeout
         while (Date.now() < deadline) {
             await sleep(100)
-            finalStatuses = collectFinals()
-            if (Object.keys(finalStatuses).length > 0) {
+            finalSnapshots = collectFinals()
+            if (Object.keys(finalSnapshots.status).length > 0) {
                 return textResult(
                     JSON.stringify(
                         {
-                            status: finalStatuses,
+                            status: finalSnapshots.status,
+                            details: finalSnapshots.details,
                             timed_out: false,
                         },
                         null,
@@ -501,6 +535,7 @@ export const waitTool = defineMcpTool<WaitInput>({
             JSON.stringify(
                 {
                     status: {},
+                    details: {},
                     timed_out: true,
                 },
                 null,

@@ -57,7 +57,7 @@ export MEMO_SUBAGENT_MAX_AGENTS=4
 ## 五、关键行为说明
 
 - `send_input` 在 agent 忙碌时，默认会报 busy；设置 `interrupt=true` 会先中断当前提交再发送新任务。
-- `wait` 会等待“任一目标进入终态”，返回终态映射与是否超时。
+- `wait` 会等待“任一目标进入终态”，返回终态映射、每个终态 agent 的输出详情（`details.last_output`）以及是否超时。
 - `close_agent` 会终止运行中的提交，并将状态置为 `closed`。
 - `resume_agent` 只恢复状态，不会自动触发新提交。
 - subagent 工具默认免审批，请按危险操作对待并严格控制范围。
