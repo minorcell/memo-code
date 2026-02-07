@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto'
 import { createHistoryEvent } from '@memo/core/runtime/history'
 import { withDefaultDeps } from '@memo/core/runtime/defaults'
-import { buildThinking, parseAssistant } from '@memo/core/utils/utils'
+import { buildThinking } from '@memo/core/utils/utils'
 import type {
     ChatMessage,
     AgentSession,
@@ -388,7 +388,7 @@ class AgentSessionImpl implements AgentSession {
                     this.deps.onAssistantStep?.(assistantText, step)
                 }
 
-                // 优先使用 Tool Use API 的结果，降级到 JSON 解析
+                // 优先使用 Tool Use API 的结果；文本仅作为最终回答处理。
                 let parsed: ParsedAssistant
                 if (toolUseBlocks.length > 0) {
                     // Tool Use API 模式：使用结构化的工具调用
@@ -407,8 +407,7 @@ class AgentSessionImpl implements AgentSession {
                         parsed = {}
                     }
                 } else if (assistantText) {
-                    // 降级到 JSON 解析模式（兼容不支持 Tool Use 的模型）
-                    parsed = parseAssistant(assistantText)
+                    parsed = { final: assistantText }
                 } else {
                     // 没有内容，视为空响应
                     parsed = {}

@@ -2,7 +2,7 @@
 import assert from 'node:assert'
 import { describe, test } from 'vitest'
 import { createAgentSession, createTokenCounter } from '@memo/core'
-import type { HistoryEvent } from '@memo/core'
+import type { HistoryEvent, LLMResponse } from '@memo/core'
 import type { Tool } from '@memo/tools/router'
 
 const echoTool: Tool = {
@@ -18,16 +18,39 @@ const echoTool: Tool = {
     },
 }
 
+function toolUseResponse(id: string, name: string, input: unknown, text?: string): LLMResponse {
+    return {
+        content: [
+            ...(text ? [{ type: 'text' as const, text }] : []),
+            {
+                type: 'tool_use' as const,
+                id,
+                name,
+                input,
+            },
+        ],
+        stop_reason: 'tool_use',
+    }
+}
+
+function endTurnResponse(text: string = 'done'): LLMResponse {
+    return {
+        content: [{ type: 'text' as const, text }],
+        stop_reason: 'end_turn',
+    }
+}
+
 describe('session hooks & middleware', () => {
     test('invokes hooks and middlewares in order', async () => {
-        const outputs = ['```json\n{"tool":"echo","input":{"text":"foo"}}\n```', '{"final":"done"}']
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'foo' }),
+            endTurnResponse('done'),
+        ]
         const hookLog: string[] = []
         const session = await createAgentSession(
             {
                 tools: { echo: echoTool },
-                callLLM: async () => ({
-                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
-                }),
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
                 // 自动批准所有工具调用
@@ -83,18 +106,16 @@ describe('session hooks & middleware', () => {
         }
     })
 
-    test('executes action even when message looks like final text', async () => {
-        const outputs = [
-            '<think>demo</think>\n\n{"tool":"echo","input":{"text":"hi"}}',
-            '{"final":"done"}',
+    test('executes action from structured tool_use with accompanying text', async () => {
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'hi' }, '<think>demo</think>'),
+            endTurnResponse('done'),
         ]
         const hookLog: string[] = []
         const session = await createAgentSession(
             {
                 tools: { echo: echoTool },
-                callLLM: async () => ({
-                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
-                }),
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
                 // 自动批准所有工具调用
@@ -120,18 +141,16 @@ describe('session hooks & middleware', () => {
     })
 
     test('warns after three identical tool calls', async () => {
-        const outputs = [
-            '{"tool":"echo","input":{"text":"loop"}}',
-            '{"tool":"echo","input":{"text":"loop"}}',
-            '{"tool":"echo","input":{"text":"loop"}}',
-            '{"final":"done"}',
+        const outputs: LLMResponse[] = [
+            toolUseResponse('loop-1', 'echo', { text: 'loop' }),
+            toolUseResponse('loop-2', 'echo', { text: 'loop' }),
+            toolUseResponse('loop-3', 'echo', { text: 'loop' }),
+            endTurnResponse('done'),
         ]
         const session = await createAgentSession(
             {
                 tools: { echo: echoTool },
-                callLLM: async () => ({
-                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
-                }),
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
                 // 自动批准所有工具调用
@@ -155,13 +174,14 @@ describe('session hooks & middleware', () => {
     })
 
     test('bypasses approval in dangerous mode', async () => {
-        const outputs = ['{"tool":"echo","input":{"text":"safe"}}', '{"final":"done"}']
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'safe' }),
+            endTurnResponse('done'),
+        ]
         const session = await createAgentSession(
             {
                 tools: { echo: echoTool },
-                callLLM: async () => ({
-                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
-                }),
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
                 requestApproval: async () => 'deny',
@@ -178,12 +198,13 @@ describe('session hooks & middleware', () => {
     })
 
     test('rejects native tool input via validateInput before execute', async () => {
-        const outputs = ['{"tool":"write","input":{}}', '{"final":"done"}']
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'write', {}),
+            endTurnResponse('done'),
+        ]
         const session = await createAgentSession(
             {
-                callLLM: async () => ({
-                    content: outputs.shift() ?? JSON.stringify({ final: 'done' }),
-                }),
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
                 requestApproval: async () => 'once',
@@ -221,11 +242,7 @@ describe('session hooks & middleware', () => {
         const session = await createAgentSession(
             {
                 tools: { echo: echoTool },
-                callLLM: async () =>
-                    outputs.shift() ?? {
-                        content: [{ type: 'text', text: 'done' }],
-                        stop_reason: 'end_turn',
-                    },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
                 historySinks: [
                     {
                         append: async (event) => {
@@ -278,11 +295,7 @@ describe('session hooks & middleware', () => {
         const session = await createAgentSession(
             {
                 tools: { echo: echoTool },
-                callLLM: async () =>
-                    outputs.shift() ?? {
-                        content: [{ type: 'text', text: 'done' }],
-                        stop_reason: 'end_turn',
-                    },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
                 historySinks: [
                     {
                         append: async (event) => {
