@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, access } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { z } from 'zod'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
 const SAVE_MEMORY_INPUT_SCHEMA = z
@@ -41,7 +41,7 @@ function formatContent(header: string, items: string[]) {
  * Note: Only stores user-related information (language habits, identity traits, etc.),
  * not project-specific content.
  */
-export const saveMemoryTool: McpTool<SaveMemoryInput> = {
+export const saveMemoryTool = defineMcpTool<SaveMemoryInput>({
     name: 'save_memory',
     description:
         'Save user-related identity traits or preferences (e.g., language habits, tech preferences) for cross-session reuse. Do not save project-specific technical details or file structures.',
@@ -85,4 +85,4 @@ export const saveMemoryTool: McpTool<SaveMemoryInput> = {
             return textResult(`Failed to write memory: ${(err as Error).message}`, true)
         }
     },
-}
+})

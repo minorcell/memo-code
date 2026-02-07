@@ -50,7 +50,6 @@
         "@modelcontextprotocol/sdk": "^1.24.3",
         "fast-glob": "^3.3.3",
         "ink": "^5.0.0",
-        "jsonrepair": "^3.13.2",
         "marked": "^17.0.1",
         "openai": "^6.10.0",
         "react": "^18.2.0",

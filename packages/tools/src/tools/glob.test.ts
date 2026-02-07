@@ -29,8 +29,8 @@ afterAll(async () => {
 
 describe('glob tool', () => {
     test('validates input', async () => {
-        const res = globTool.inputSchema.safeParse({})
-        assert.strictEqual(res.success, false)
+        const res = globTool.validateInput?.({})
+        assert.ok(res && !res.ok)
     })
 
     test('matches pattern under provided path', async () => {

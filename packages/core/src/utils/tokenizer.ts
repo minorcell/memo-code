@@ -22,6 +22,16 @@ function safeEncodingFactory(model?: string): { model: string; factory: Encoding
     }
 }
 
+function messagePayloadForCounting(message: ChatMessage): string {
+    if (message.role === 'assistant' && message.tool_calls?.length) {
+        return `${message.content}\n${JSON.stringify(message.tool_calls)}`
+    }
+    if (message.role === 'tool') {
+        return `${message.content}\n${message.tool_call_id}\n${message.name ?? ''}`
+    }
+    return message.content
+}
+
 /** Create a reusable tokenizer counter for prompt estimation and usage reconciliation. */
 export function createTokenCounter(model?: string): TokenCounter {
     const { model: resolvedModel, factory } = safeEncodingFactory(model)
@@ -43,7 +53,7 @@ export function createTokenCounter(model?: string): TokenCounter {
         let total = 0
         for (const message of messages) {
             total += TOKENS_PER_MESSAGE
-            total += countText(message.content)
+            total += countText(messagePayloadForCounting(message))
             // Currently not using message.name, but add overhead when name field is reserved
             if ((message as any).name) {
                 total += TOKENS_PER_NAME

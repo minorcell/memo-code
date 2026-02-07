@@ -12,11 +12,11 @@
 ## Build, Test, and Development
 
 - Install dependencies: `pnpm install`.
-- Run locally (auto-selects TUI/one-shot mode): `pnpm start` or `pnpm start "prompt" --once`.
+- Run locally: `pnpm start` (interactive TUI). Non-TTY stdin uses plain mode automatically.
 - Build distributable package: `pnpm run build` (outputs `dist/index.js` and `dist/prompt.md` for npm publish).
 - Format: `pnpm run format` (write) / `pnpm run format:check` (CI check only).
 - Test: `pnpm test` for all; per package: `pnpm run test:core`, `pnpm run test:tools`, `pnpm run test:cli`. CI runs `pnpm run ci` for format check, core/tools tests, and build.
-- Common local issues: missing `OPENAI_API_KEY`/`DEEPSEEK_API_KEY` triggers interactive prompt; non-TTY environments automatically fall back to one-shot mode.
+- Common local issues: missing `OPENAI_API_KEY`/`DEEPSEEK_API_KEY` triggers interactive prompt; non-TTY environments automatically use plain mode.
 - For faster dev loops: `pnpm test -- --watch path/to/file.test.ts`.
 
 ## Code Style and Naming

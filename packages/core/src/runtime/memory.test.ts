@@ -45,7 +45,7 @@ describe('memory injection', () => {
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
             },
-            { mode: 'once' },
+            { mode: 'interactive' },
         )
         try {
             const systemPrompt = session.history[0]?.content ?? ''
@@ -69,7 +69,7 @@ describe('memory injection', () => {
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
             },
-            { mode: 'once' },
+            { mode: 'interactive' },
         )
         try {
             const systemPrompt = session.history[0]?.content ?? ''

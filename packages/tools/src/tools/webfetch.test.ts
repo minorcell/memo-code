@@ -4,8 +4,8 @@ import { webfetchTool } from '@memo/tools/tools/webfetch'
 
 describe('webfetch tool', () => {
     test('requires url', async () => {
-        const res = await webfetchTool.inputSchema.safeParse({ url: '' })
-        assert.strictEqual(res.success, false)
+        const res = webfetchTool.validateInput?.({ url: '' })
+        assert.ok(res && !res.ok)
     })
 
     test('fetches data url content', async () => {

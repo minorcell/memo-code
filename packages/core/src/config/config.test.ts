@@ -56,43 +56,38 @@ afterAll(async () => {
 })
 
 describe('buildSessionPath', () => {
-    test('embeds sanitized cwd into history path with timestamped filename', async () => {
+    test('uses date-partitioned directories with rollout filename', async () => {
         const projectDir = join(tempBase, 'My Project:Demo with spaces')
         await mkdir(projectDir, { recursive: true })
         process.chdir(projectDir)
 
         const path = buildSessionPath('/history-base', 'session123')
-        const filename = path.split(/[/\\]/).pop()!
-        const dirName = path.split(/[/\\]/).slice(-2, -1)[0]!
+        const segments = path.split(/[/\\]/).filter(Boolean)
+        const filename = segments[segments.length - 1] ?? ''
+        const day = segments[segments.length - 2] ?? ''
+        const month = segments[segments.length - 3] ?? ''
+        const year = segments[segments.length - 4] ?? ''
 
         assert.ok(path.startsWith('/history-base'), 'should prefix base dir')
+        assert.ok(/^\d{4}$/.test(year), 'year directory should be numeric')
+        assert.ok(/^\d{2}$/.test(month), 'month directory should be numeric')
+        assert.ok(/^\d{2}$/.test(day), 'day directory should be numeric')
         assert.ok(
-            /\d{4}-\d{2}-\d{2}_\d{6}_session123\.jsonl$/.test(filename),
-            'filename should contain date/time and session id',
-        )
-        assert.ok(
-            dirName.includes('My-Project-Demo-with-spaces'),
-            'cwd part should be sanitized with separators',
+            /^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-session123\.jsonl$/.test(filename),
+            'filename should include rollout timestamp and session id',
         )
     })
 
-    test('truncates overly long path parts to avoid excessive length', async () => {
+    test('does not encode cwd in generated path', async () => {
         const longSegment = 'x'.repeat(150)
-        const longDir = join(tempBase, longSegment)
-        await mkdir(longDir, { recursive: true })
+        const longDir = join(tempBase, `workspace-${longSegment}`)
+        await mkdir(join(longDir, longSegment), { recursive: true })
         const prev = process.cwd()
-        process.chdir(longDir)
+        process.chdir(join(longDir, longSegment))
 
         const path = buildSessionPath('/history-base', 's')
-        const dirName = path.split(/[/\\]/).slice(-2, -1)[0]!
-        const segments = dirName.split('-')
-
         process.chdir(prev)
-        assert.ok(dirName.length <= 180, 'directory part should be truncated to max length')
-        assert.ok(
-            segments.every((p) => p.length > 0 && p.length <= 100),
-            'each segment should respect per-part limit',
-        )
+        assert.ok(!path.includes(longSegment), 'path should not contain cwd segments')
     })
 })
 

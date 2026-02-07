@@ -16,9 +16,8 @@ import {
     type ChatMessage,
     type ProviderConfig,
     type MCPServerConfig,
-    type ApprovalRequest,
-    type ApprovalDecision,
 } from '@memo/core'
+import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 import type { InputHistoryEntry } from './suggestions'
 import type { StepView, SystemMessage, TurnView } from './types'
 import { TokenBar } from './components/layout/TokenBar'

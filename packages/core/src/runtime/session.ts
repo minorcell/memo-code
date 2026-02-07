@@ -2,10 +2,10 @@
 import { randomUUID } from 'node:crypto'
 import { createHistoryEvent } from '@memo/core/runtime/history'
 import { withDefaultDeps } from '@memo/core/runtime/defaults'
-import { buildThinking, parseAssistant } from '@memo/core/utils/utils'
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
+import { buildThinking } from '@memo/core/utils/utils'
 import type {
     ChatMessage,
+    AssistantToolCall,
     AgentSession,
     AgentSessionDeps,
     AgentSessionOptions,
@@ -29,11 +29,17 @@ import {
     snapshotHistory,
     type HookRunnerMap,
 } from '@memo/core/runtime/hooks'
-import { createApprovalManager, type ApprovalManager } from '@memo/core/approval'
-import type { ApprovalRequest, ApprovalDecision } from '@memo/core/approval'
+import {
+    createToolOrchestrator,
+    type ToolApprovalHooks,
+    type ToolOrchestrator,
+    type ToolActionResult,
+} from '@memo/tools/orchestrator'
+import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 const DEFAULT_SESSION_MODE: SessionMode = 'interactive'
 const DEFAULT_MAX_PROMPT_TOKENS = 120_000
+const MAX_PROTOCOL_VIOLATION_RETRIES = 1
 
 function emptyUsage(): TokenUsage {
     return { prompt: 0, completion: 0, total: 0 }
@@ -104,51 +110,13 @@ async function emitEventToSinks(event: HistoryEvent, sinks: HistorySink[]) {
     }
 }
 
-function flattenCallToolResult(result: CallToolResult): string {
-    const texts =
-        result.content?.flatMap((item) => {
-            if (item.type === 'text') return [item.text]
-            return []
-        }) ?? []
-    return texts.join('\n')
-}
-
-function parseToolInput(tool: ToolRegistry[string], rawInput: unknown) {
-    let candidate: unknown = rawInput
-    if (typeof rawInput === 'string') {
-        const trimmed = rawInput.trim()
-        if (trimmed) {
-            try {
-                candidate = JSON.parse(trimmed)
-            } catch {
-                candidate = trimmed
-            }
-        } else {
-            candidate = {}
-        }
-    }
-
-    // 新版 Tool 类型使用 JSON Schema，验证逻辑简化
-    // 实际验证由工具内部（内置工具）或 MCP Server 处理
-    // 这里只做基本的类型检查
-    if (typeof candidate !== 'object' || candidate === null) {
-        return { ok: false as const, error: `${tool.name} invalid input: expected object` }
-    }
-
-    if (typeof tool.validateInput === 'function') {
-        return tool.validateInput(candidate)
-    }
-
-    return { ok: true as const, data: candidate }
-}
-
 function isAbortError(err: unknown): err is Error {
     return err instanceof Error && err.name === 'AbortError'
 }
 
 // 稳定序列化用于重复动作检测（确保键顺序一致）
 function stableStringify(value: unknown): string {
-    if (value === null || typeof value !== 'object') return JSON.stringify(value)
+    if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
     if (Array.isArray(value)) {
         return `[${value.map((v) => stableStringify(v)).join(',')}]`
     }
@@ -156,6 +124,49 @@ function stableStringify(value: unknown): string {
         a.localeCompare(b),
     )
     return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`
+}
+
+function buildAssistantToolCalls(
+    toolUseBlocks: Array<{ id: string; name: string; input: unknown }>,
+): AssistantToolCall[] {
+    return toolUseBlocks.map((block) => ({
+        id: block.id,
+        type: 'function',
+        function: {
+            name: block.name,
+            arguments: stableStringify(block.input),
+        },
+    }))
+}
+
+function parseTextToolCall(
+    text: string,
+    tools: ToolRegistry,
+): { tool: string; input: unknown } | null {
+    const trimmed = text.trim()
+    if (!trimmed) return null
+
+    const candidates = [trimmed]
+    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+    if (fenced?.[1]) {
+        candidates.push(fenced[1].trim())
+    }
+
+    for (const candidate of candidates) {
+        if (!candidate.startsWith('{') || !candidate.endsWith('}')) continue
+        try {
+            const parsed = JSON.parse(candidate)
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
+            const obj = parsed as Record<string, unknown>
+            const tool = typeof obj.tool === 'string' ? obj.tool.trim() : ''
+            if (!tool || !Object.prototype.hasOwnProperty.call(tools, tool)) continue
+            return { tool, input: obj.input ?? {} }
+        } catch {
+            // ignore invalid json
+        }
+    }
+
+    return null
 }
 
 /** 进程内的对话 Session，实现多轮运行与日志写入。 */
@@ -177,7 +188,7 @@ class AgentSessionImpl implements AgentSession {
     private cancelling = false
     private lastActionSignature: string | null = null
     private repeatedActionCount = 0
-    private approvalManager: ApprovalManager
+    private toolOrchestrator: ToolOrchestrator
 
     constructor(
         private deps: AgentSessionDeps & {
@@ -196,9 +207,12 @@ class AgentSessionImpl implements AgentSession {
         this.sinks = deps.historySinks ?? []
         this.hooks = buildHookRunners(deps)
         this.historyFilePath = historyFilePath
-        this.approvalManager = createApprovalManager({
-            dangerous: options.dangerous ?? false,
-            mode: 'auto',
+        this.toolOrchestrator = createToolOrchestrator({
+            tools: deps.tools,
+            approval: {
+                dangerous: options.dangerous ?? false,
+                mode: 'auto',
+            },
         })
     }
 
@@ -230,96 +244,46 @@ class AgentSessionImpl implements AgentSession {
         }
     }
 
-    /** 执行工具并处理审批流程 */
-    private async executeToolWithApproval(
+    private buildToolApprovalHooks(turn: number, step: number): ToolApprovalHooks {
+        return {
+            onApprovalRequest: async (request: ApprovalRequest) => {
+                await runHook(this.hooks, 'onApprovalRequest', {
+                    sessionId: this.id,
+                    turn,
+                    step,
+                    request,
+                })
+            },
+            requestApproval: async (request: ApprovalRequest): Promise<ApprovalDecision> => {
+                if (this.deps.requestApproval) {
+                    return this.deps.requestApproval(request)
+                }
+                return 'deny'
+            },
+            onApprovalResponse: async ({ fingerprint, decision }) => {
+                await runHook(this.hooks, 'onApprovalResponse', {
+                    sessionId: this.id,
+                    turn,
+                    step,
+                    fingerprint,
+                    decision,
+                })
+            },
+        }
+    }
+
+    /** 通过工具编排器执行工具调用。 */
+    private async executeToolAction(
+        actionId: string,
         toolName: string,
         toolInput: unknown,
         turn: number,
         step: number,
-    ): Promise<{ success: boolean; observation: string; rejected?: boolean }> {
-        const check = this.approvalManager.check(toolName, toolInput)
-
-        // 不需要审批，直接执行
-        if (!check.needApproval) {
-            return this.doExecuteTool(toolName, toolInput)
-        }
-
-        // 需要审批，触发审批请求
-        const request: ApprovalRequest = {
-            toolName: check.toolName,
-            params: check.params,
-            fingerprint: check.fingerprint,
-            riskLevel: check.riskLevel,
-            reason: check.reason,
-        }
-
-        // 触发审批请求 hook
-        await runHook(this.hooks, 'onApprovalRequest', {
-            sessionId: this.id,
-            turn,
-            step,
-            request,
-        })
-
-        // 请求用户决策
-        let decision: ApprovalDecision = 'deny'
-        if (this.deps.requestApproval) {
-            decision = await this.deps.requestApproval(request)
-        } else {
-            // 没有审批处理器，默认拒绝（安全优先）
-            decision = 'deny'
-        }
-
-        // 记录决策
-        this.approvalManager.recordDecision(check.fingerprint, decision)
-
-        // 触发审批响应 hook
-        await runHook(this.hooks, 'onApprovalResponse', {
-            sessionId: this.id,
-            turn,
-            step,
-            fingerprint: check.fingerprint,
-            decision,
-        })
-
-        // 触发响应 hook
-        if (decision === 'deny') {
-            return {
-                success: false,
-                observation: `用户拒绝了工具执行: ${toolName}`,
-                rejected: true,
-            }
-        }
-
-        // 执行工具
-        return this.doExecuteTool(toolName, toolInput)
-    }
-
-    /** 实际执行工具 */
-    private async doExecuteTool(
-        toolName: string,
-        toolInput: unknown,
-    ): Promise<{ success: boolean; observation: string }> {
-        const tool = this.deps.tools[toolName]
-        if (!tool) {
-            return { success: false, observation: `Unknown tool: ${toolName}` }
-        }
-
-        try {
-            const parsedInput = parseToolInput(tool, toolInput)
-            if (!parsedInput.ok) {
-                return { success: false, observation: parsedInput.error }
-            }
-
-            const result = await tool.execute(parsedInput.data)
-            const observation = flattenCallToolResult(result) || '(no tool output)'
-            return { success: true, observation }
-        } catch (err) {
-            return {
-                success: false,
-                observation: `Tool execution failed: ${(err as Error).message}`,
-            }
-        }
+    ): Promise<ToolActionResult> {
+        return this.toolOrchestrator.executeAction(
+            { id: actionId, name: toolName, input: toolInput },
+            this.buildToolApprovalHooks(turn, step),
+        )
     }
 
     /** 执行一次 Turn：接受用户输入，走 ReAct 循环，返回最终结果与步骤轨迹。 */
@@ -338,6 +302,7 @@ class AgentSessionImpl implements AgentSession {
             await this.emitEvent('session_start', {
                 meta: {
                     mode: this.mode,
+                    cwd: process.cwd(),
                     tokenizer: this.tokenCounter.model,
                     warnPromptTokens: this.options.warnPromptTokens,
                     maxPromptTokens: effectiveMaxPromptTokens,
@@ -367,14 +332,14 @@ class AgentSessionImpl implements AgentSession {
             let finalText = ''
             let status: TurnStatus = 'ok'
             let errorMessage: string | undefined
+            let protocolViolationCount = 0
 
             // ReAct 主循环
             for (let step = 0; ; step++) {
                 const estimatedPrompt = this.tokenCounter.countMessages(this.history)
                 if (estimatedPrompt > effectiveMaxPromptTokens) {
                     const limitMessage = `Context tokens (${estimatedPrompt}) exceed the limit. Please shorten the input or restart the session.`
-                    const finalPayload = JSON.stringify({ final: limitMessage })
-                    this.history.push({ role: 'assistant', content: finalPayload })
+                    this.history.push({ role: 'assistant', content: limitMessage })
                     status = 'prompt_limit'
                     finalText = limitMessage
                     errorMessage = limitMessage
@@ -446,8 +411,7 @@ class AgentSessionImpl implements AgentSession {
                         break
                     }
                     const msg = `LLM call failed: ${(err as Error).message}`
-                    const finalPayload = JSON.stringify({ final: msg })
-                    this.history.push({ role: 'assistant', content: finalPayload })
+                    this.history.push({ role: 'assistant', content: msg })
                     status = 'error'
                     finalText = msg
                     errorMessage = msg
@@ -469,8 +433,14 @@ class AgentSessionImpl implements AgentSession {
                     this.deps.onAssistantStep?.(assistantText, step)
                 }
 
-                // 优先使用 Tool Use API 的结果，降级到 JSON 解析
+                const textToolCall =
+                    toolUseBlocks.length === 0 && assistantText
+                        ? parseTextToolCall(assistantText, this.deps.tools)
+                        : null
+
+                // 优先使用 Tool Use API 的结果；文本仅作为最终回答处理。
                 let parsed: ParsedAssistant
+                let assistantHistoryMessage: ChatMessage | null = null
                 if (toolUseBlocks.length > 0) {
                     // Tool Use API 模式：使用结构化的工具调用
                     // 如果有多个工具，只取第一个（保持向后兼容）
@@ -484,26 +454,21 @@ class AgentSessionImpl implements AgentSession {
                             },
                             thinking,
                         }
+                        assistantHistoryMessage = {
+                            role: 'assistant',
+                            content: assistantText,
+                            tool_calls: buildAssistantToolCalls(toolUseBlocks),
+                        }
                     } else {
                         parsed = {}
                     }
                 } else if (assistantText) {
-                    // 降级到 JSON 解析模式（兼容不支持 Tool Use 的模型）
-                    parsed = parseAssistant(assistantText)
+                    parsed = { final: assistantText }
+                    assistantHistoryMessage = { role: 'assistant', content: assistantText }
                 } else {
                     // 没有内容，视为空响应
                     parsed = {}
                 }
-
-                const historyContent = parsed.action
-                    ? JSON.stringify({
-                          tool: parsed.action.tool,
-                          input: parsed.action.input,
-                      })
-                    : parsed.final
-                      ? JSON.stringify({ final: parsed.final })
-                      : assistantText
-                this.history.push({ role: 'assistant', content: historyContent })
 
                 // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。
                 const completionTokens = this.tokenCounter.countText(assistantText)
@@ -530,8 +495,70 @@ class AgentSessionImpl implements AgentSession {
                     step,
                     content: assistantText,
                     role: 'assistant',
-                    meta: { tokens: stepUsage },
+                    meta: {
+                        tokens: stepUsage,
+                        protocol_violation: Boolean(textToolCall),
+                        protocol_violation_count: textToolCall
+                            ? protocolViolationCount + 1
+                            : protocolViolationCount || undefined,
+                    },
                 })
+
+                if (textToolCall) {
+                    protocolViolationCount += 1
+
+                    if (protocolViolationCount <= MAX_PROTOCOL_VIOLATION_RETRIES) {
+                        const repairMessage = `系统提醒：你刚刚以纯文本 JSON 形式请求调用工具「${textToolCall.tool}」。请改为结构化 tool call，不要输出 {"tool": ...} 文本。`
+                        this.history.push({ role: 'system', content: repairMessage })
+                        await this.emitEvent('observation', {
+                            turn,
+                            step,
+                            content: repairMessage,
+                            meta: {
+                                phase: 'protocol_repair',
+                                tool: textToolCall.tool,
+                                protocol_violation: true,
+                                protocol_violation_count: protocolViolationCount,
+                            },
+                        })
+                        continue
+                    }
+
+                    const protocolError = `Model protocol error: returned plain-text tool JSON for "${textToolCall.tool}" ${protocolViolationCount} times. Structured tool calls are required.`
+                    status = 'error'
+                    finalText = protocolError
+                    errorMessage = protocolError
+                    this.history.push({ role: 'assistant', content: protocolError })
+                    await this.emitEvent('final', {
+                        turn,
+                        step,
+                        content: protocolError,
+                        role: 'assistant',
+                        meta: {
+                            error_type: 'model_protocol_error',
+                            tool: textToolCall.tool,
+                            protocol_violation: true,
+                            protocol_violation_count: protocolViolationCount,
+                            tokens: stepUsage,
+                        },
+                    })
+                    await runHook(this.hooks, 'onFinal', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        finalText,
+                        status,
+                        errorMessage,
+                        tokenUsage: stepUsage,
+                        turnUsage: { ...turnUsage },
+                        steps,
+                    })
+                    break
+                }
+
+                if (assistantHistoryMessage) {
+                    this.history.push(assistantHistoryMessage)
+                }
 
                 // 处理工具调用（支持并发执行多个工具）
                 if (toolUseBlocks.length > 1) {
@@ -546,10 +573,14 @@ class AgentSessionImpl implements AgentSession {
                         step,
                         meta: {
                             tools: toolUseBlocks.map((b) => b.name),
+                            action_ids: toolUseBlocks.map((b) => b.id),
+                            action_id: toolUseBlocks[0]?.id,
                             parallel: true,
+                            phase: 'dispatch',
                             thinking: parsed.thinking,
                             // 保存所有工具的完整信息
                             toolBlocks: toolUseBlocks.map((b) => ({
+                                id: b.id,
                                 name: b.name,
                                 input: b.input,
                             })),
@@ -575,42 +606,43 @@ class AgentSessionImpl implements AgentSession {
                         })
                     }
 
-                    // 串行执行所有工具（确保审批流程按顺序进行）
-                    const observations: string[] = []
-                    let hasRejection = false
-                    for (const [idx, toolBlock] of toolUseBlocks.entries()) {
-                        const result = await this.executeToolWithApproval(
-                            toolBlock.name,
-                            toolBlock.input,
-                            turn,
-                            step,
-                        )
-                        // 如果有任何工具被拒绝，停止执行后续工具
-                        if (result.rejected) {
-                            hasRejection = true
-                            observations.push(`[${toolBlock.name}]: ${result.observation}`)
-                            await this.emitEvent('observation', {
-                                turn,
-                                step,
-                                content: result.observation,
-                                meta: { tool: toolBlock.name, index: idx },
-                            })
-                            break
-                        }
-                        observations.push(`[${toolBlock.name}]: ${result.observation}`)
+                    const execution = await this.toolOrchestrator.executeActions(
+                        toolUseBlocks.map((block) => ({
+                            id: block.id,
+                            name: block.name,
+                            input: block.input,
+                        })),
+                        {
+                            ...this.buildToolApprovalHooks(turn, step),
+                            executionMode: 'sequential',
+                            failurePolicy: 'fail_fast',
+                        },
+                    )
+
+                    for (const [idx, result] of execution.results.entries()) {
+                        this.history.push({
+                            role: 'tool',
+                            content: result.observation,
+                            tool_call_id: result.actionId,
+                            name: result.tool,
+                        })
                         await this.emitEvent('observation', {
                             turn,
                             step,
                             content: result.observation,
-                            meta: { tool: toolBlock.name, index: idx },
+                            meta: {
+                                tool: result.tool,
+                                index: idx,
+                                action_id: result.actionId,
+                                phase: 'result',
+                                status: result.status,
+                                error_type: result.errorType,
+                                duration_ms: result.durationMs,
+                            },
                         })
                     }
 
-                    const combinedObservation = observations.join('\n\n')
-                    this.history.push({
-                        role: 'user',
-                        content: JSON.stringify({ observation: combinedObservation }),
-                    })
+                    const combinedObservation = execution.combinedObservation
                     const lastStep = steps[steps.length - 1]
                     if (lastStep) {
                         lastStep.observation = combinedObservation
@@ -626,7 +658,8 @@ class AgentSessionImpl implements AgentSession {
                     })
 
                     // 如果被拒绝，停止本轮次
-                    if (hasRejection) {
+                    if (execution.hasRejection) {
+                        const rejectionResult = execution.results.find((result) => result.rejected)
                         status = 'cancelled'
                         finalText = '用户拒绝了工具执行，已停止当前操作。'
                         await this.emitEvent('final', {
@@ -634,7 +667,13 @@ class AgentSessionImpl implements AgentSession {
                             step,
                             content: finalText,
                             role: 'assistant',
-                            meta: { rejected: true },
+                            meta: {
+                                rejected: true,
+                                phase: 'result',
+                                action_id: rejectionResult?.actionId,
+                                error_type: rejectionResult?.errorType ?? 'approval_denied',
+                                duration_ms: rejectionResult?.durationMs,
+                            },
                         })
                         await runHook(this.hooks, 'onFinal', {
                             sessionId: this.id,
@@ -655,12 +694,16 @@ class AgentSessionImpl implements AgentSession {
                 // 注意：当 toolUseBlocks.length > 1 时，已在上面处理，这里跳过
                 else if (parsed.action) {
                     this.maybeWarnRepeatedAction(parsed.action.tool, parsed.action.input)
+                    const actionId =
+                        toolUseBlocks[0]?.id ?? `${turn}:${step}:single:${parsed.action.tool}`
                     await this.emitEvent('action', {
                         turn,
                         step,
                         meta: {
                             tool: parsed.action.tool,
                             input: parsed.action.input,
+                            action_id: actionId,
+                            phase: 'dispatch',
                             thinking: parsed.thinking,
                         },
                     })
@@ -674,7 +717,8 @@ class AgentSessionImpl implements AgentSession {
                     })
 
                     // 使用审批流程执行工具
-                    const result = await this.executeToolWithApproval(
+                    const result = await this.executeToolAction(
+                        actionId,
                         parsed.action.tool,
                         parsed.action.input,
                         turn,
@@ -690,7 +734,13 @@ class AgentSessionImpl implements AgentSession {
                             step,
                             content: finalText,
                             role: 'assistant',
-                            meta: { rejected: true },
+                            meta: {
+                                rejected: true,
+                                phase: 'result',
+                                action_id: result.actionId,
+                                error_type: result.errorType ?? 'approval_denied',
+                                duration_ms: result.durationMs,
+                            },
                         })
                         await runHook(this.hooks, 'onFinal', {
                             sessionId: this.id,
@@ -708,8 +758,10 @@ class AgentSessionImpl implements AgentSession {
                     const observation = result.observation
 
                     this.history.push({
-                        role: 'user',
-                        content: JSON.stringify({ observation, tool: parsed.action.tool }),
+                        role: 'tool',
+                        content: observation,
+                        tool_call_id: result.actionId,
+                        name: parsed.action.tool,
                     })
                     const lastStep = steps[steps.length - 1]
                     if (lastStep) {
@@ -719,7 +771,14 @@ class AgentSessionImpl implements AgentSession {
                         turn,
                         step,
                         content: observation,
-                        meta: { tool: parsed.action.tool },
+                        meta: {
+                            tool: parsed.action.tool,
+                            action_id: result.actionId,
+                            phase: 'result',
+                            status: result.status,
+                            error_type: result.errorType,
+                            duration_ms: result.durationMs,
+                        },
                     })
                     await runHook(this.hooks, 'onObservation', {
                         sessionId: this.id,
@@ -770,8 +829,7 @@ class AgentSessionImpl implements AgentSession {
                 }
                 finalText = 'Unable to produce a final answer. Please retry or adjust the request.'
                 errorMessage = finalText
-                const payload = JSON.stringify({ final: finalText })
-                this.history.push({ role: 'assistant', content: payload })
+                this.history.push({ role: 'assistant', content: finalText })
                 await this.emitEvent('final', {
                     turn,
                     content: finalText,
@@ -795,6 +853,7 @@ class AgentSessionImpl implements AgentSession {
                     stepCount: steps.length,
                     durationMs: Date.now() - turnStartedAt,
                     tokens: turnUsage,
+                    protocol_violation_count: protocolViolationCount || undefined,
                 },
             })
 
@@ -809,7 +868,7 @@ class AgentSessionImpl implements AgentSession {
             this.currentAbortController = null
             this.cancelling = false
             // 清除单次授权（每次 turn 结束后）
-            this.approvalManager.clearOnceApprovals()
+            this.toolOrchestrator.clearOnceApprovals()
         }
     }
 
@@ -843,7 +902,7 @@ class AgentSessionImpl implements AgentSession {
         }
         this.tokenCounter.dispose()
         // 清理所有授权
-        this.approvalManager.dispose()
+        this.toolOrchestrator.dispose()
         if (this.deps.dispose) {
             await this.deps.dispose()
         }

@@ -39,16 +39,16 @@ memo
 
 On first run, if no config file is found, Memo enters the TUI setup flow and creates `~/.memo/config.toml` (you can relocate it with `MEMO_HOME`; see the Configuration doc).
 
-### One-shot Mode (`--once`, good for scripts/pipelines)
+### Plain Mode (non-TTY, good for scripts/pipelines)
 
 ```bash
-memo "Explain how to fix this error" --once
+echo "Explain how to fix this error" | memo
 ```
 
-You can also read from stdin (non-TTY automatically uses one-shot mode):
+When stdin is non-TTY, Memo automatically uses plain mode:
 
 ```bash
-echo "Summarize this repository structure" | memo --once
+echo "Summarize this repository structure" | memo
 ```
 
 ### Dangerous Mode (Skip tool approval, use carefully)

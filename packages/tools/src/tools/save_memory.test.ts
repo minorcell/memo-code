@@ -43,13 +43,13 @@ afterAll(async () => {
 
 describe('memory tool', () => {
     test('rejects empty note', async () => {
-        const parsed = saveMemoryTool.inputSchema.safeParse({ fact: '' })
-        assert.strictEqual(parsed.success, false)
+        const parsed = saveMemoryTool.validateInput?.({ fact: '' })
+        assert.ok(parsed && !parsed.ok)
     })
 
     test('rejects too long note', async () => {
-        const parsed = saveMemoryTool.inputSchema.safeParse({ fact: 'a'.repeat(140) })
-        assert.strictEqual(parsed.success, false)
+        const parsed = saveMemoryTool.validateInput?.({ fact: 'a'.repeat(140) })
+        assert.ok(parsed && !parsed.ok)
     })
 
     test('appends sanitized note to memory file', async () => {

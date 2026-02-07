@@ -7,6 +7,18 @@ import type { MCPServerConfig, McpClientConnection } from '../types'
 
 type ClientTransport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport
 
+function mergeProcessEnv(env?: Record<string, string>): Record<string, string> | undefined {
+    if (!env) return undefined
+    const merged: Record<string, string | undefined> = {
+        ...process.env,
+        ...env,
+    }
+    const entries = Object.entries(merged).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+    )
+    return Object.fromEntries(entries)
+}
+
 /** 创建标准化的 MCP Client */
 function createMcpClient(): Client {
     return new Client(
@@ -96,7 +108,7 @@ async function connectWithConfig(
     } = {
         command: config.command,
         args: config.args,
-        env: config.env ? { ...process.env, ...config.env } : undefined,
+        env: mergeProcessEnv(config.env),
         stderr:
             config.stderr ?? (process.stdout.isTTY && process.stdin.isTTY ? 'ignore' : undefined),
     }

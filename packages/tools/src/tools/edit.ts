@@ -1,6 +1,6 @@
 import { access, readFile, writeFile } from 'node:fs/promises'
 import { normalizePath, writePathDenyReason } from '@memo/tools/tools/helpers'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 import { z } from 'zod'
 
@@ -70,7 +70,7 @@ type EditInput = z.infer<typeof EDIT_INPUT_SCHEMA>
  * 根据入参在目标文件中替换文本，支持单次或全局替换。
  * 返回替换数量及文件路径，若未找到或未变更会返回提示语。
  */
-export const editTool: McpTool<EditInput> = {
+export const editTool = defineMcpTool<EditInput>({
     name: 'edit',
     description: '在文件中替换文本，支持 replace_all 和批量 edits',
     inputSchema: EDIT_INPUT_SCHEMA,
@@ -138,4 +138,4 @@ export const editTool: McpTool<EditInput> = {
             return textResult(`edit 失败: ${(err as Error).message}`, true)
         }
     },
-}
+})

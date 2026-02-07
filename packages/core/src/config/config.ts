@@ -264,9 +264,8 @@ export function buildSessionPath(baseDir: string, sessionId: string) {
     const HH = String(now.getHours()).padStart(2, '0')
     const MM = String(now.getMinutes()).padStart(2, '0')
     const SS = String(now.getSeconds()).padStart(2, '0')
-    const dirName = buildSessionDirName(process.cwd())
-    const fileName = `${yyyy}-${mm}-${dd}_${HH}${MM}${SS}_${sessionId}.jsonl`
-    return join(baseDir, dirName, fileName)
+    const fileName = `rollout-${yyyy}-${mm}-${dd}T${HH}-${MM}-${SS}-${sessionId}.jsonl`
+    return join(baseDir, yyyy, mm, dd, fileName)
 }
 
 function buildSessionDirName(cwd: string) {
@@ -277,6 +276,7 @@ function buildSessionDirName(cwd: string) {
 
 /** 获取某个 cwd 对应的 session 日志目录。 */
 export function getSessionLogDir(baseDir: string, cwd: string) {
+    // Legacy support for old path layout: sessions/<sanitized-cwd>/<timestamp>_<id>.jsonl
     return join(baseDir, buildSessionDirName(cwd))
 }
 

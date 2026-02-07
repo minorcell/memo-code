@@ -52,7 +52,7 @@ memo
 ## Usage
 
 - Interactive mode: `memo` (default TUI; supports multi-turn chat, streaming, tool visualization, shortcuts).
-- One-shot mode: `memo "your prompt" --once` (plain text output; useful for scripts).
+- Plain mode (non-TTY): `echo "your prompt" | memo` (plain text output; useful for scripts).
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
 
@@ -137,15 +137,15 @@ Memo includes a tool-approval mechanism to reduce risky operations:
 
 ## Session History
 
-All sessions are saved to `~/.memo/sessions/`, grouped by working directory and date:
+All sessions are saved to `~/.memo/sessions/`, grouped by date:
 
 ```text
 ~/.memo/sessions/
-  ├── workspace-name/
-  │   ├── 2026-02-01_143020_abc123.jsonl
-  │   └── 2026-02-01_150315_def456.jsonl
-  └── another-project/
-      └── 2026-02-01_160000_xyz789.jsonl
+  └── 2026/
+      └── 02/
+          └── 08/
+              ├── rollout-2026-02-08T02-21-18-abc123.jsonl
+              └── rollout-2026-02-08T02-42-09-def456.jsonl
 ```
 
 JSONL format is useful for analysis and debugging.
@@ -157,8 +157,6 @@ JSONL format is useful for analysis and debugging.
 ```bash
 pnpm install
 pnpm start
-# or
-pnpm start "prompt" --once
 ```
 
 ### Build

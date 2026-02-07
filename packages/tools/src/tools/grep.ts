@@ -2,7 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { z } from 'zod'
 import { normalizePath, getIgnoreMatcher, appendLongResultHint } from '@memo/tools/tools/helpers'
 import { isAbsolute, resolve } from 'node:path'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
 type OutputMode = 'content' | 'files_with_matches' | 'count'
@@ -25,7 +25,7 @@ type GrepInput = z.infer<typeof GREP_INPUT_SCHEMA>
 /**
  * 基于 ripgrep 查找文本，支持内容/文件列表/计数三种输出。
  */
-export const grepTool: McpTool<GrepInput> = {
+export const grepTool = defineMcpTool<GrepInput>({
     name: 'grep',
     description: '基于 ripgrep 查找文本，支持输出匹配内容、文件列表或计数',
     inputSchema: GREP_INPUT_SCHEMA,
@@ -114,4 +114,4 @@ export const grepTool: McpTool<GrepInput> = {
             return textResult(`grep 执行失败: ${(err as Error).message}`, true)
         }
     },
-}
+})

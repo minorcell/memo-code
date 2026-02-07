@@ -48,7 +48,7 @@ memo
 ## 使用方式
 
 - 交互式：`memo`（默认 TUI，支持多轮、流式、工具可视化、快捷键）。
-- 单轮：`memo "你的问题" --once`（纯文本输出，适合脚本）。
+- 非交互纯文本模式（非 TTY）：`echo "你的问题" | memo`（适合脚本）。
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 - 查看版本：`memo --version` 或 `memo -v`。
 
@@ -133,15 +133,15 @@ memo mcp remove remote
 
 ## 会话历史
 
-所有会话自动保存到 `~/.memo/sessions/`，按工作目录和日期组织：
+所有会话自动保存到 `~/.memo/sessions/`，按日期分层组织：
 
 ```
 ~/.memo/sessions/
-  ├── workspace-name/
-  │   ├── 2026-02-01_143020_abc123.jsonl
-  │   └── 2026-02-01_150315_def456.jsonl
-  └── another-project/
-      └── 2026-02-01_160000_xyz789.jsonl
+  └── 2026/
+      └── 02/
+          └── 08/
+              ├── rollout-2026-02-08T02-21-18-abc123.jsonl
+              └── rollout-2026-02-08T02-42-09-def456.jsonl
 ```
 
 JSONL 格式便于分析和调试。
@@ -153,8 +153,6 @@ JSONL 格式便于分析和调试。
 ```bash
 pnpm install
 pnpm start
-# 或
-pnpm start "prompt" --once
 ```
 
 ### 构建

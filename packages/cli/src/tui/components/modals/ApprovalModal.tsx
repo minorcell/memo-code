@@ -1,7 +1,7 @@
 /** @file 工具审批对话框 */
 import { Box, Text, useInput } from 'ink'
 import { useState, useCallback } from 'react'
-import type { ApprovalRequest, ApprovalDecision } from '@memo/core'
+import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 type ApprovalModalProps = {
     request: ApprovalRequest

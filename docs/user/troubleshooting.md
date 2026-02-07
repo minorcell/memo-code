@@ -9,14 +9,14 @@ Fix:
 - Ensure required env var is exported (`DEEPSEEK_API_KEY` / `OPENAI_API_KEY`).
 - Ensure `env_api_key` in `config.toml` matches the actual env var you use (see [Configuration](./configuration.md)).
 
-## 2) Tools Keep Getting Rejected/Canceled in One-shot Mode
+## 2) Tools Keep Getting Rejected/Canceled in Plain Mode
 
-Cause: one-shot mode usually cannot run interactive approvals, so write/exec tools are denied by default.
+Cause: plain mode cannot run interactive approvals, so write/exec tools are denied by default.
 
 Fix:
 
 - Use TUI mode: `memo`
-- Or, if risk is controlled, use: `memo --dangerous --once`
+- Or, if risk is controlled, use: `memo --dangerous`
 - Or convert task to read-only/advisory mode (no file writes, no command execution)
 
 ## 3) `grep` Tool Error: `rg` Not Found

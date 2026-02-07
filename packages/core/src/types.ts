@@ -1,20 +1,54 @@
 /** @file Core 与 Runtime 共享的公共类型声明（会被 UI/Tools 复用）。 */
-import type { McpTool } from '@memo/tools/tools/types'
-import type { ApprovalRequest, ApprovalDecision } from './approval/types'
+import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 /**
  * Agent 层的基础类型声明，涵盖对话消息、解析结果与依赖注入接口。
  * 每个类型尽量保持精简，方便在 UI/工具等层复用。
  */
-export type Role = 'system' | 'user' | 'assistant'
+export type Role = 'system' | 'user' | 'assistant' | 'tool'
 
-/** 模型侧的单条聊天消息（OpenAI 兼容）。 */
-export type ChatMessage = {
-    /** 消息角色：system/user/assistant。 */
-    role: Role
-    /** 消息正文。 */
-    content: string
+/** Assistant 的结构化工具调用（OpenAI tool_calls 兼容形态）。 */
+export type AssistantToolCall = {
+    id: string
+    type: 'function'
+    function: {
+        name: string
+        arguments: string
+    }
 }
+
+/** 模型侧消息：兼容普通文本与结构化工具调用/结果。 */
+export type ChatMessage =
+    | {
+          /** 系统消息。 */
+          role: 'system'
+          /** 消息正文。 */
+          content: string
+      }
+    | {
+          /** 用户消息。 */
+          role: 'user'
+          /** 消息正文。 */
+          content: string
+      }
+    | {
+          /** Assistant 文本或结构化工具调用。 */
+          role: 'assistant'
+          /** Assistant 文本；纯工具调用时允许为空字符串。 */
+          content: string
+          /** 结构化工具调用列表（若有）。 */
+          tool_calls?: AssistantToolCall[]
+      }
+    | {
+          /** 工具结果消息（对应某次 tool_call）。 */
+          role: 'tool'
+          /** 工具输出文本。 */
+          content: string
+          /** 对应 assistant.tool_calls[*].id。 */
+          tool_call_id: string
+          /** 可选工具名，便于调试。 */
+          name?: string
+      }
 
 /** 单步调试记录，便于回放与可观测。 */
 export type AgentStepTrace = {
@@ -104,7 +138,7 @@ export type ParsedAssistant = {
 }
 
 /** 工具注册表，键为工具名称，值为工具定义。 */
-export type ToolRegistry = Record<string, import('./toolRouter/types').Tool>
+export type ToolRegistry = Record<string, import('@memo/tools/router/types').Tool>
 
 /** 工具定义结构（用于传递给 LLM API）*/
 export type ToolDefinition = {
@@ -152,14 +186,14 @@ export type AgentDeps = {
     requestApproval?: (request: ApprovalRequest) => Promise<ApprovalDecision>
 }
 
-/** Session 模式：一次性或交互式。 */
-export type SessionMode = 'interactive' | 'once'
+/** Session 模式：当前仅支持交互式。 */
+export type SessionMode = 'interactive'
 
 /** Session 级别的配置项。 */
 export type AgentSessionOptions = {
     /** 自定义 Session ID（默认随机）。 */
     sessionId?: string
-    /** 运行模式：交互式/单次。 */
+    /** 运行模式：当前仅支持 interactive。 */
     mode?: SessionMode
     /** 历史 JSONL 输出目录（默认 history/）。 */
     historyDir?: string

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { z } from 'zod'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 import { normalizePath, isWritePathAllowed } from '@memo/tools/tools/helpers'
 
@@ -46,7 +46,7 @@ function findOutOfSandboxAbsolutePaths(command: string) {
  * 执行任意 bash 命令，将 exit/stdout/stderr 拼接返回。
  * 主要用于调试/脚本执行，注意命令安全性需由上层控制。
  */
-export const bashTool: McpTool<BashInput> = {
+export const bashTool = defineMcpTool<BashInput>({
     name: 'bash',
     description: '在 shell 中执行命令，返回 exit/stdout/stderr',
     inputSchema: BASH_INPUT_SCHEMA,
@@ -118,4 +118,4 @@ export const bashTool: McpTool<BashInput> = {
             return textResult(`bash 执行失败: ${(err as Error).message}`, true)
         }
     },
-}
+})
