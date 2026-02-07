@@ -6,21 +6,24 @@ Memo has a built-in toolset and also supports external tools via MCP. In most ca
 
 ### Read-only Tools (Usually no approval needed)
 
-- `read`: read file content (supports offset/limit)
-- `glob`: find file paths by pattern (for example `src/**/*.ts`)
-- `grep`: search content with `rg` (regex/file list/count)
+- `read_file`: read local files with offset/limit
+- `list_dir`: list directory entries
+- `grep_files`: content search (ripgrep-backed)
 - `webfetch`: restricted HTTP GET with cleaned text preview
-- `todo`: in-process task list (not persisted)
+- `get_memory`: read `Agents.md` memory payload
+- `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource`: inspect MCP-provided resources
+- `update_plan`: maintain structured plan state in-session
+- `wait`: read status snapshots for collaboration agents (feature-gated)
 
 ### Write Tools (Approval required)
 
-- `write`: write files
-- `edit`: patch file content
-- `save_memory`: write long-term memory (store only user preferences/profile, not project details)
+- `apply_patch`: patch-based file edits
 
 ### Execution Tools (High risk, approval required)
 
-- `bash`: run shell commands and return stdout/stderr/exit code
+- `exec_command` / `write_stdin`: run and continue shell sessions
+- `shell` / `shell_command`: compatibility shell variants (enabled by env/feature flags)
+- `spawn_agent` / `send_input` / `resume_agent` / `close_agent`: collaboration-agent controls (feature-gated)
 
 ## How to Help Memo Use Tools Effectively
 
@@ -32,15 +35,25 @@ Memo has a built-in toolset and also supports external tools via MCP. In most ca
 
 Use these pages when you need exact parameter/behavior details:
 
-- `read`: `docs/tool/read.md`
-- `glob`: `docs/tool/glob.md`
-- `grep`: `docs/tool/grep.md`
+- `read_file`: `docs/tool/read_file.md`
+- `list_dir`: `docs/tool/list_dir.md`
+- `grep_files`: `docs/tool/grep_files.md`
 - `webfetch`: `docs/tool/webfetch.md`
-- `write`: `docs/tool/write.md`
-- `edit`: `docs/tool/edit.md`
-- `bash`: `docs/tool/bash.md`
-- `todo`: `docs/tool/todo.md`
-- `save_memory`: `docs/tool/save_memory.md`
+- `get_memory`: `docs/tool/get_memory.md`
+- `apply_patch`: `docs/tool/apply_patch.md`
+- `exec_command`: `docs/tool/exec_command.md`
+- `write_stdin`: `docs/tool/write_stdin.md`
+- `shell`: `docs/tool/shell.md`
+- `shell_command`: `docs/tool/shell_command.md`
+- `update_plan`: `docs/tool/update_plan.md`
+- `list_mcp_resources`: `docs/tool/list_mcp_resources.md`
+- `list_mcp_resource_templates`: `docs/tool/list_mcp_resource_templates.md`
+- `read_mcp_resource`: `docs/tool/read_mcp_resource.md`
+- `spawn_agent`: `docs/tool/spawn_agent.md`
+- `send_input`: `docs/tool/send_input.md`
+- `resume_agent`: `docs/tool/resume_agent.md`
+- `wait`: `docs/tool/wait.md`
+- `close_agent`: `docs/tool/close_agent.md`
 
 ## Related Docs
 

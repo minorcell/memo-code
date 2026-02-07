@@ -111,15 +111,14 @@ memo mcp remove remote
 
 ## Built-in Tools
 
-- `bash`: execute shell commands
-- `read`: read files
-- `write`: write files
-- `edit`: edit files
-- `glob`: find files by pattern
-- `grep`: search content by regex
+- `exec_command` / `write_stdin`: execute shell commands (default shell family)
+- `shell` / `shell_command`: compatibility shell variants (feature/env controlled)
+- `apply_patch`: structured file edits
+- `read_file` / `list_dir` / `grep_files`: file read and retrieval
+- `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource`: MCP resource access
+- `update_plan`: structured task plan updates
 - `webfetch`: fetch webpages
-- `save_memory`: save long-term memory
-- `todo`: manage a task list
+- `get_memory`: read memory payload from `~/.memo/Agents.md` (or `MEMO_HOME`)
 
 More tools can be added through MCP.
 
@@ -127,8 +126,8 @@ More tools can be added through MCP.
 
 Memo includes a tool-approval mechanism to reduce risky operations:
 
-- **Auto-approve**: safe tools (`read`, `glob`, `grep`, etc.)
-- **Manual approval**: risky tools (`bash`, `write`, `edit`, etc.)
+- **Auto-approve**: safe read tools (`read_file`, `list_dir`, `grep_files`, `webfetch`, `get_memory`, etc.)
+- **Manual approval**: risky tools (`apply_patch`, `exec_command`, etc.)
 - **Approval options**:
     - `once`: approve current operation only
     - `session`: approve all matching operations for this session

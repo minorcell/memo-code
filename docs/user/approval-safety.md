@@ -6,9 +6,9 @@ Memo enables tool approval by default. When the model tries potentially risky ac
 
 Current default policy:
 
-- **Read-only tools**: usually auto-approved (`read`, `glob`, `grep`, `webfetch`)
-- **Write tools**: approval required (`write`, `edit`, `save_memory`)
-- **Execution tools**: approval required (`bash`)
+- **Read-only tools**: usually auto-approved (`read_file`, `list_dir`, `grep_files`, `webfetch`, `get_memory`, `wait`, MCP resource readers)
+- **Write tools**: approval required (`apply_patch`)
+- **Execution tools**: approval required (`exec_command`, `write_stdin`, `shell`, `shell_command`, collaboration execute tools)
 
 > MCP tools use conservative risk inference by name. Unknown tools are treated like write-level risk by default.
 
@@ -51,5 +51,5 @@ If you need write/exec actions in plain mode:
 ## Safety Practices
 
 - Ask for a dry run first: let Memo list planned files/operations before approving writes.
-- For `bash`: prefer read-only commands (`git status`, `rg`, `ls`), avoid high-risk commands like `rm`/`sudo`/`chmod`.
+- For execution tools: prefer read-only commands (`git status`, `rg`, `ls`), avoid high-risk commands like `rm`/`sudo`/`chmod`.
 - For writes: constrain changes to explicitly named files and ask for a change summary.

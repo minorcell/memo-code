@@ -59,8 +59,10 @@ packages/core/src/  ─┤            │   - React/Ink UI
   └─ ...             │            │   - Token counting
                      │            │
 packages/tools/src/ ─┤            │   ← all dependencies inlined
-  ├─ bash.ts         │            │
-  ├─ read/write/     │            │
+  ├─ exec_command.ts │            │
+  ├─ read_file.ts    │            │
+  ├─ list_dir.ts     │            │
+  ├─ grep_files.ts   │            │
   └─ ...             │            │
                      │            │
 packages/core/src/   │            │
@@ -266,7 +268,7 @@ memo --doctor
 
 ### 8.2 Runtime Security
 
-- approve risky tools before execution (`bash`, `write`, `edit`)
+- approve risky tools before execution (`exec_command`, `shell`, `apply_patch`)
 - enforce path allowlists
 - run external commands in controlled environments
 

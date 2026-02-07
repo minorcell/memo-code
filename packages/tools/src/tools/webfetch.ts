@@ -73,6 +73,8 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
     name: 'webfetch',
     description: 'HTTP GET 请求，返回处理后的纯文本正文（自动剥离 HTML 标签）',
     inputSchema: WEBFETCH_INPUT_SCHEMA,
+    supportsParallelToolCalls: true,
+    isMutating: false,
     execute: async (input) => {
         let url: URL
         try {

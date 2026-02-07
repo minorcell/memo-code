@@ -5,19 +5,29 @@ import type { RiskLevel } from './types'
 /** 内置工具的风险等级映射 */
 export const DEFAULT_TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
     // 只读工具 - 无需审批
-    read: 'read',
-    glob: 'read',
-    grep: 'read',
+    list_mcp_resources: 'read',
+    list_mcp_resource_templates: 'read',
+    read_mcp_resource: 'read',
+    update_plan: 'read',
+    get_memory: 'read',
     webfetch: 'read',
-    todo: 'read',
-    save_memory: 'write',
+    read_file: 'read',
+    list_dir: 'read',
+    grep_files: 'read',
+    wait: 'read',
 
     // 写入工具 - 需要审批
-    write: 'write',
-    edit: 'write',
+    apply_patch: 'write',
 
     // 执行工具 - 最高风险，需要审批
-    bash: 'execute',
+    shell: 'execute',
+    shell_command: 'execute',
+    exec_command: 'execute',
+    write_stdin: 'execute',
+    spawn_agent: 'execute',
+    send_input: 'execute',
+    resume_agent: 'execute',
+    close_agent: 'execute',
 }
 
 /** 风险等级描述 */

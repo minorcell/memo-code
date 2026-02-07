@@ -38,15 +38,15 @@ export function createToolClassifier(config?: ToolClassifierConfig): ToolClassif
                 lowerName.includes('exec') ||
                 lowerName.includes('run') ||
                 lowerName.includes('shell') ||
-                lowerName.includes('bash') ||
-                lowerName.includes('command')
+                lowerName.includes('command') ||
+                lowerName.includes('stdin')
             ) {
                 return 'execute'
             }
 
             if (
                 lowerName.includes('write') ||
-                lowerName.includes('edit') ||
+                lowerName.includes('patch') ||
                 lowerName.includes('create') ||
                 lowerName.includes('delete') ||
                 lowerName.includes('modify') ||

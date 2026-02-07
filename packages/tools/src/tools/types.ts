@@ -16,6 +16,8 @@ export function defineMcpTool<Input>(tool: {
     name: ToolName
     description: string
     inputSchema: ZodTypeAny
+    supportsParallelToolCalls?: boolean
+    isMutating?: boolean
     execute: (input: Input) => Promise<CallToolResult>
 }): McpTool {
     const { inputSchema, execute, ...rest } = tool

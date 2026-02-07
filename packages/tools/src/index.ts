@@ -1,26 +1,94 @@
 import type { McpTool, ToolName } from '@memo/tools/tools/types'
-import { bashTool } from '@memo/tools/tools/bash'
-import { editTool } from '@memo/tools/tools/edit'
+import { shellTool } from '@memo/tools/tools/shell'
+import { shellCommandTool } from '@memo/tools/tools/shell_command'
+import { execCommandTool } from '@memo/tools/tools/exec_command'
+import { writeStdinTool } from '@memo/tools/tools/write_stdin'
+import { applyPatchTool } from '@memo/tools/tools/apply_patch'
+import { readFileTool } from '@memo/tools/tools/read_file'
+import { listDirTool } from '@memo/tools/tools/list_dir'
+import { grepFilesTool } from '@memo/tools/tools/grep_files'
+import {
+    listMcpResourceTemplatesTool,
+    listMcpResourcesTool,
+    readMcpResourceTool,
+} from '@memo/tools/tools/mcp_resources'
+import { updatePlanTool } from '@memo/tools/tools/update_plan'
+import { getMemoryTool } from '@memo/tools/tools/get_memory'
 import { webfetchTool } from '@memo/tools/tools/webfetch'
-import { globTool } from '@memo/tools/tools/glob'
-import { grepTool } from '@memo/tools/tools/grep'
-import { saveMemoryTool } from '@memo/tools/tools/save_memory'
-import { todoTool } from '@memo/tools/tools/todo'
-import { readTool } from '@memo/tools/tools/read'
-import { writeTool } from '@memo/tools/tools/write'
+import {
+    closeAgentTool,
+    resumeAgentTool,
+    sendInputTool,
+    spawnAgentTool,
+    waitTool,
+} from '@memo/tools/tools/collab'
+
+function parseCsvEnv(name: string): Set<string> {
+    const raw = process.env[name]?.trim()
+    if (!raw) return new Set()
+    return new Set(
+        raw
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean),
+    )
+}
+
+function buildCodexTools(): McpTool[] {
+    const tools: McpTool[] = []
+    const shellMode = process.env.MEMO_SHELL_TOOL_TYPE?.trim() || 'unified_exec'
+    const experimental = parseCsvEnv('MEMO_EXPERIMENTAL_TOOLS')
+    const enableAllExperimental = experimental.size === 0
+    const collabEnabled = process.env.MEMO_ENABLE_COLLAB_TOOLS === '1'
+    const memoryToolEnabled = process.env.MEMO_ENABLE_MEMORY_TOOL !== '0'
+
+    if (shellMode === 'shell') {
+        tools.push(shellTool)
+    } else if (shellMode === 'shell_command') {
+        tools.push(shellCommandTool)
+    } else if (shellMode === 'unified_exec') {
+        tools.push(execCommandTool, writeStdinTool)
+    } else if (shellMode !== 'disabled') {
+        tools.push(execCommandTool, writeStdinTool)
+    }
+
+    tools.push(listMcpResourcesTool, listMcpResourceTemplatesTool, readMcpResourceTool)
+    tools.push(updatePlanTool)
+    tools.push(applyPatchTool)
+
+    if (enableAllExperimental || experimental.has('grep_files')) {
+        tools.push(grepFilesTool)
+    }
+    if (enableAllExperimental || experimental.has('read_file')) {
+        tools.push(readFileTool)
+    }
+    if (enableAllExperimental || experimental.has('list_dir')) {
+        tools.push(listDirTool)
+    }
+
+    if (memoryToolEnabled) {
+        tools.push(getMemoryTool)
+    }
+
+    tools.push(webfetchTool)
+
+    if (collabEnabled) {
+        tools.push(spawnAgentTool, sendInputTool, resumeAgentTool, waitTool, closeAgentTool)
+    }
+
+    return tools
+}
+
+function indexByName(tools: McpTool[]): Record<ToolName, McpTool> {
+    const toolkit: Record<ToolName, McpTool> = {}
+    for (const tool of tools) {
+        toolkit[tool.name] = tool
+    }
+    return toolkit
+}
 
 /** 对外暴露的工具集合，供 Agent 通过 tool name 查找。 */
-export const TOOLKIT: Record<ToolName, McpTool> = {
-    bash: bashTool,
-    read: readTool,
-    write: writeTool,
-    edit: editTool,
-    glob: globTool,
-    grep: grepTool,
-    webfetch: webfetchTool,
-    save_memory: saveMemoryTool,
-    todo: todoTool,
-}
+export const TOOLKIT: Record<ToolName, McpTool> = indexByName(buildCodexTools())
 
 /** 工具数组形式，便于直接注册到 MCP Server 等场景。 */
 export const TOOL_LIST: McpTool[] = Object.values(TOOLKIT)

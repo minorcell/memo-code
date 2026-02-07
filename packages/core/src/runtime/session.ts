@@ -567,6 +567,17 @@ class AgentSessionImpl implements AgentSession {
                         })
                     }
 
+                    const allSupportParallel = toolUseBlocks.every((block) => {
+                        const tool = this.deps.tools[block.name]
+                        return Boolean(tool?.supportsParallelToolCalls)
+                    })
+                    const hasMutatingTool = toolUseBlocks.some((block) => {
+                        const tool = this.deps.tools[block.name]
+                        return Boolean(tool?.isMutating)
+                    })
+                    const executionMode =
+                        allSupportParallel && !hasMutatingTool ? 'parallel' : 'sequential'
+
                     const execution = await this.toolOrchestrator.executeActions(
                         toolUseBlocks.map((block) => ({
                             id: block.id,
@@ -575,7 +586,7 @@ class AgentSessionImpl implements AgentSession {
                         })),
                         {
                             ...this.buildToolApprovalHooks(turn, step),
-                            executionMode: 'sequential',
+                            executionMode,
                             failurePolicy: 'fail_fast',
                         },
                     )
@@ -599,6 +610,7 @@ class AgentSessionImpl implements AgentSession {
                                 status: result.status,
                                 error_type: result.errorType,
                                 duration_ms: result.durationMs,
+                                execution_mode: executionMode,
                             },
                         })
                     }

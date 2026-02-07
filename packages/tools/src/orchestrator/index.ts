@@ -12,6 +12,61 @@ import type {
     OrchestratorTool,
 } from './types'
 
+const DEFAULT_MAX_TOOL_RESULT_CHARS = 12_000
+
+function getMaxToolResultChars() {
+    const raw = process.env.MEMO_TOOL_RESULT_MAX_CHARS?.trim()
+    if (!raw) return DEFAULT_MAX_TOOL_RESULT_CHARS
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return DEFAULT_MAX_TOOL_RESULT_CHARS
+    }
+    return Math.floor(parsed)
+}
+
+function escapeXmlAttr(value: string) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+}
+
+function estimateCallToolResultChars(result: CallToolResult) {
+    let total = 0
+    for (const item of result.content ?? []) {
+        if (item.type === 'text') {
+            total += item.text.length
+            continue
+        }
+        try {
+            total += JSON.stringify(item).length
+        } catch {
+            total += 100
+        }
+    }
+    return total
+}
+
+function buildOversizeHintXml(toolName: string, actualChars: number, maxChars: number) {
+    return `<system_hint type="tool_output_omitted" tool="${escapeXmlAttr(toolName)}" reason="too_long" actual_chars="${actualChars}" max_chars="${maxChars}">工具返回内容过长，已自动省略。请缩小范围或增加限制参数后重试。</system_hint>`
+}
+
+function guardToolResultSize(toolName: string, result: CallToolResult): CallToolResult {
+    const maxChars = getMaxToolResultChars()
+    const actualChars = estimateCallToolResultChars(result)
+    if (actualChars <= maxChars) return result
+    return {
+        content: [
+            {
+                type: 'text',
+                text: buildOversizeHintXml(toolName, actualChars, maxChars),
+            },
+        ],
+        isError: false,
+    }
+}
+
 function flattenCallToolResult(result: CallToolResult): string {
     const texts =
         result.content?.flatMap((item) => {
@@ -137,7 +192,8 @@ class ToolOrchestratorImpl implements ToolOrchestrator {
                 }
             }
 
-            const result = await tool.execute(parsedInput.data)
+            const rawResult = await tool.execute(parsedInput.data)
+            const result = guardToolResultSize(action.name, rawResult)
             return {
                 actionId,
                 tool: action.name,

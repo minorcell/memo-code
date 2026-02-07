@@ -10,6 +10,8 @@ export type ToolValidateResult = { ok: true; data: unknown } | { ok: false; erro
 
 export type OrchestratorTool = {
     name: string
+    supportsParallelToolCalls?: boolean
+    isMutating?: boolean
     validateInput?: (input: unknown) => ToolValidateResult
     execute: (input: unknown) => Promise<CallToolResult>
 }

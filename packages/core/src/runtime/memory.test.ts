@@ -1,4 +1,4 @@
-/** @file 长期记忆注入系统提示词的回归测试。 */
+/** @file 运行时上下文注入系统提示词的回归测试。 */
 import assert from 'node:assert'
 import { join } from 'node:path'
 import { tmpdir, userInfo } from 'node:os'
@@ -34,8 +34,8 @@ afterAll(async () => {
     await removeDir(tempHome)
 })
 
-describe('memory injection', () => {
-    test('loads memory into system prompt when file exists', async () => {
+describe('runtime prompt injection', () => {
+    test('does not auto-inject Agents.md memory into system prompt', async () => {
         const memoryPath = join(tempHome, 'Agents.md')
         await writeFile(memoryPath, '## Memo Added Memories\n\n- 用户偏好：中文回答\n', 'utf-8')
 
@@ -52,14 +52,8 @@ describe('memory injection', () => {
         )
         try {
             const systemPrompt = session.history[0]?.content ?? ''
-            assert.ok(
-                systemPrompt.includes('Long-Term Memory'),
-                'system prompt should include memory section',
-            )
-            assert.ok(
-                systemPrompt.includes('用户偏好：中文回答'),
-                'memory content should be injected',
-            )
+            assert.ok(!systemPrompt.includes('Long-Term Memory'))
+            assert.ok(!systemPrompt.includes('用户偏好：中文回答'))
         } finally {
             await session.close()
         }
