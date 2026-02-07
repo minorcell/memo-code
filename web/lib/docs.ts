@@ -75,21 +75,21 @@ const DOC_SPECS: DocSpec[] = [
         category: 'Capabilities',
     },
     {
-        slug: 'sessions-history',
-        fileName: 'sessions-history.md',
+        slug: 'subagent',
+        fileName: 'subagent.md',
         order: 7,
-        category: 'Operations',
+        category: 'Capabilities',
     },
     {
-        slug: 'memory',
-        fileName: 'memory.md',
-        order: 8,
+        slug: 'sessions-history',
+        fileName: 'sessions-history.md',
+        order: 9,
         category: 'Operations',
     },
     {
         slug: 'troubleshooting',
         fileName: 'troubleshooting.md',
-        order: 9,
+        order: 10,
         category: 'Operations',
     },
 ]
