@@ -68,14 +68,6 @@ export type MCPServerConfig =
     | {
           type?: 'streamable_http'
           url: string
-          fallback_to_sse?: boolean
-          headers?: Record<string, string>
-          http_headers?: Record<string, string>
-          bearer_token_env_var?: string
-      }
-    | {
-          type: 'sse'
-          url: string
           headers?: Record<string, string>
           http_headers?: Record<string, string>
           bearer_token_env_var?: string
@@ -88,6 +80,5 @@ export interface McpClientConnection {
     transport:
         | import('@modelcontextprotocol/sdk/client/stdio.js').StdioClientTransport
         | import('@modelcontextprotocol/sdk/client/streamableHttp.js').StreamableHTTPClientTransport
-        | import('@modelcontextprotocol/sdk/client/sse.js').SSEClientTransport
     tools: McpTool[]
 }

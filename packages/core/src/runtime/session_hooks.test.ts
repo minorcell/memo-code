@@ -381,48 +381,9 @@ describe('session hooks & middleware', () => {
         }
     })
 
-    test('retries once when model emits plain-text tool json, then recovers via structured tool_use', async () => {
-        const outputs: LLMResponse[] = [
-            endTurnResponse('{"tool":"echo","input":{"text":"recover"}}'),
-            toolUseResponse('action-2', 'echo', { text: 'recover' }),
-            endTurnResponse('done'),
-        ]
-        const session = await createAgentSession(
-            {
-                tools: { echo: echoTool },
-                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
-                historySinks: [],
-                tokenCounter: createTokenCounter('cl100k_base'),
-                requestApproval: async () => 'once',
-            },
-            {},
-        )
-        try {
-            const result = await session.runTurn('recover')
-            assert.strictEqual(result.status, 'ok')
-            assert.strictEqual(result.finalText, 'done')
-            assert.ok(
-                result.steps.some((step) => step.observation === 'echo:recover'),
-                'should recover and execute the structured tool call',
-            )
-            assert.ok(
-                session.history.some(
-                    (m) =>
-                        m.role === 'system' && m.content.includes('纯文本 JSON 形式请求调用工具'),
-                ),
-                'should insert protocol repair message after first violation',
-            )
-        } finally {
-            await session.close()
-        }
-    })
-
-    test('fails with model_protocol_error after repeated plain-text tool json violations', async () => {
+    test('fails with model_protocol_error when model emits plain-text tool json', async () => {
         const events: HistoryEvent[] = []
-        const outputs: LLMResponse[] = [
-            endTurnResponse('{"tool":"echo","input":{"text":"x"}}'),
-            endTurnResponse('{"tool":"echo","input":{"text":"x"}}'),
-        ]
+        const outputs: LLMResponse[] = [endTurnResponse('{"tool":"echo","input":{"text":"x"}}')]
         const session = await createAgentSession(
             {
                 tools: { echo: echoTool },
@@ -447,12 +408,12 @@ describe('session hooks & middleware', () => {
             const finalEvent = [...events].reverse().find((event) => event.type === 'final')
             assert.ok(finalEvent, 'final event should exist')
             assert.strictEqual(finalEvent?.meta?.error_type, 'model_protocol_error')
-            assert.strictEqual(finalEvent?.meta?.protocol_violation_count, 2)
+            assert.strictEqual(finalEvent?.meta?.protocol_violation_count, 1)
 
             const turnEnd = [...events].reverse().find((event) => event.type === 'turn_end')
             assert.ok(turnEnd, 'turn_end should exist')
             assert.strictEqual(turnEnd?.meta?.status, 'error')
-            assert.strictEqual(turnEnd?.meta?.protocol_violation_count, 2)
+            assert.strictEqual(turnEnd?.meta?.protocol_violation_count, 1)
         } finally {
             await session.close()
         }

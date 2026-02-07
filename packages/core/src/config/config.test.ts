@@ -13,24 +13,13 @@ import {
 } from '@memo/core/config/config'
 
 type HttpServerConfig = Extract<MCPServerConfig, { url: string; type?: 'streamable_http' }>
-type SseServerConfig = Extract<MCPServerConfig, { url: string; type: 'sse' }>
 
 function expectHttpServer(
     server: MCPServerConfig | undefined,
     message = 'expected streamable_http server',
 ): asserts server is HttpServerConfig {
     expect(server).toBeDefined()
-    if (!server || !('url' in server) || server.type === 'sse') {
-        throw new Error(message)
-    }
-}
-
-function expectSseServer(
-    server: MCPServerConfig | undefined,
-    message = 'expected sse server',
-): asserts server is SseServerConfig {
-    expect(server).toBeDefined()
-    if (!server || !('url' in server) || server.type !== 'sse') {
+    if (!server || !('url' in server)) {
         throw new Error(message)
     }
 }
@@ -109,7 +98,6 @@ describe('mcp config serialization', () => {
                     type: 'streamable_http',
                     url: 'https://example.com/mcp',
                     headers: { Authorization: 'Bearer token', 'X-Trace': '1' },
-                    fallback_to_sse: false,
                     bearer_token_env_var: 'MCP_TOKEN',
                 },
                 local: {
@@ -126,7 +114,6 @@ describe('mcp config serialization', () => {
         expect(text).toContain('[mcp_servers.remote]')
         expect(text).toContain('type = "streamable_http"')
         expect(text).toContain('url = "https://example.com/mcp"')
-        expect(text).toContain('fallback_to_sse = false')
         expect(text).toContain('bearer_token_env_var = "MCP_TOKEN"')
         expect(text).toContain('headers = { "Authorization" = "Bearer token", "X-Trace" = "1" }')
         expect(text).toContain('[mcp_servers.local]')
@@ -136,7 +123,7 @@ describe('mcp config serialization', () => {
         expect(text).toContain('"FOO" = "bar"')
     })
 
-    test('loadMemoConfig parses http and sse servers with headers', async () => {
+    test('loadMemoConfig parses streamable_http servers with headers', async () => {
         const home = join(tempBase, 'memo-home-load')
         process.env.MEMO_HOME = home
         await mkdir(home, { recursive: true })
@@ -154,11 +141,9 @@ model = "deepseek-chat"
 type = "streamable_http"
 url = "https://example.com/mcp"
 headers = { Authorization = "Bearer abc" }
-fallback_to_sse = true
 
-[mcp_servers.legacy]
-type = "sse"
-url = "https://legacy.example.com/mcp"
+[mcp_servers.remote2]
+url = "https://example.com/mcp-2"
 `
         await writeFile(join(home, 'config.toml'), configText, 'utf-8')
 
@@ -170,11 +155,10 @@ url = "https://legacy.example.com/mcp"
         expect(remote.type ?? 'streamable_http').toBe('streamable_http')
         expect(remote.url).toBe('https://example.com/mcp')
         expect(remote.headers?.Authorization).toBe('Bearer abc')
-        expect(remote.fallback_to_sse).toBe(true)
-
-        const legacy = servers.legacy
-        expectSseServer(legacy)
-        expect(legacy.url).toBe('https://legacy.example.com/mcp')
+        const remote2 = servers.remote2
+        expectHttpServer(remote2)
+        expect(remote2.type ?? 'streamable_http').toBe('streamable_http')
+        expect(remote2.url).toBe('https://example.com/mcp-2')
     })
 
     test('loadMemoConfig ignores legacy providers array', async () => {

@@ -196,7 +196,11 @@ export async function withDefaultDeps(
                             onChunk?.(delta)
                         }
                     }
-                    return { content, streamed: true }
+                    return {
+                        content: content ? [{ type: 'text' as const, text: content }] : [],
+                        stop_reason: 'end_turn' as const,
+                        streamed: true,
+                    }
                 } else {
                     const data = await client.chat.completions.create(
                         {

@@ -5,7 +5,7 @@ Core focuses on "Tool Use API + concurrent execution + state machine". Session/T
 ## Directory and Modules
 
 - `config/`: config and paths
-    - `config.ts`: reads/writes `~/.memo/config.toml`, provider selection (`name/env_api_key/model/base_url`), session path generation (`sessions/<sanitized-cwd>/<yyyy-mm-dd>_<HHMMss>_<id>.jsonl`), and session ID generation.
+    - `config.ts`: reads/writes `~/.memo/config.toml`, provider selection (`name/env_api_key/model/base_url`), session path generation (`sessions/<YYYY>/<MM>/<DD>/rollout-...jsonl`), and session ID generation.
 - `runtime/`: runtime and logging
     - `prompt.md/prompt.ts`: system prompt loading (integrates Claude Code best practices).
     - `history.ts`: JSONL sink and event builders.
@@ -17,9 +17,9 @@ Core focuses on "Tool Use API + concurrent execution + state machine". Session/T
 - `types.ts`: shared types (**extended for Tool Use API support**).
 - `index.ts`: package entry exporting the modules above.
 
-## Core Mechanism: Tool Use API First, JSON Fallback
+## Core Mechanism: Structured Tool Use API
 
-### 1. Tool Calling Protocol (Three-Layer Strategy)
+### 1. Tool Calling Protocol
 
 **Primary: Tool Use API** (stable and efficient)
 
@@ -27,18 +27,6 @@ Core focuses on "Tool Use API + concurrent execution + state machine". Session/T
 - Model returns structured `tool_use` blocks.
 - Supports concurrent calls (`Promise.allSettled`).
 - Format: `{ content: [{ type: 'tool_use', id, name, input }, ...], stop_reason: 'tool_use' }`.
-
-**Fallback: JSON parsing** (compatibility for legacy models)
-
-- If model does not support Tool Use, parse JSON from text.
-- Formats:
-    - `{"action":{"tool":"name","input":{...}}}`
-    - `{"final":"..."}`
-- Parsed by `parseAssistant` (`utils/utils.ts`).
-
-**Last resort: plain text**
-
-- If both fail, entire output is treated as final response.
 
 ### 2. Concurrent Tool Execution
 
@@ -71,7 +59,7 @@ if (toolUseBlocks.length > 1) {
 2. Model response is classified:
     - **tool_use**: execute tools (single or concurrent), collect observation
     - **end_turn**: finish and return final response
-    - no clear directive: break and use fallback
+    - no actionable block: end current step
 3. Observation write-back:
     - single tool: `{"observation":"...","tool":"name"}`
     - concurrent tools: `{"observation":"[tool1]: result1\n\n[tool2]: result2"}`
@@ -134,7 +122,7 @@ await client.chat.completions.create({
 - **`ToolRouter` responsibilities**:
     - register built-in and MCP tools
     - generate Tool Use API definitions
-    - generate prompt-format tool descriptions (fallback mode)
+    - generate prompt-format tool descriptions
     - execute tool calls
 - Unknown tools return `"Unknown tool: name"`.
 
@@ -142,7 +130,7 @@ await client.chat.completions.create({
 
 - `loadMemoConfig`: reads `~/.memo/config.toml`, returns config/path + `needsSetup` flag.
 - `writeMemoConfig`: writes config back.
-- `buildSessionPath`: builds cwd-bucketed, timestamped JSONL path.
+- `buildSessionPath`: builds date-partitioned, timestamped JSONL path.
 - `selectProvider`: selects provider by name with fallback.
 
 ## Key Updates (v2 Architecture)
@@ -167,16 +155,18 @@ export type TextBlock = {
 
 export type ContentBlock = TextBlock | ToolUseBlock
 
-// LLMResponse supports three modes
-export type LLMResponse =
-    | string // legacy string
-    | { content: string; usage?; streamed? } // legacy object
-    | { content: ContentBlock[]; stop_reason; usage? } // Tool Use API
+// LLMResponse: single structured mode
+export type LLMResponse = {
+    content: ContentBlock[]
+    stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
+    usage?: Partial<TokenUsage>
+    streamed?: boolean
+}
 ```
 
 ### Response Normalization
 
-`normalizeLLMResponse` unifies all three response formats:
+`normalizeLLMResponse` extracts text/tool blocks from one structured response:
 
 ```typescript
 {
@@ -220,8 +210,6 @@ Incorporates Claude Code best practices:
 
 ### Backward Compatibility
 
-- ✅ keeps `parseAssistant` fallback function
-- ✅ supports legacy string/object responses
 - ✅ existing tool interfaces unchanged
 - ✅ existing config format unchanged
 
@@ -230,7 +218,6 @@ Incorporates Claude Code best practices:
 - ✅ OpenAI GPT-4/GPT-3.5 (native Tool Use)
 - ✅ DeepSeek v3 (native Tool Use)
 - ✅ Claude (native Tool Use)
-- ✅ Other compatible models (JSON fallback)
 
 ## Performance Metrics
 
@@ -242,11 +229,10 @@ Incorporates Claude Code best practices:
 
 ## Summary
 
-Core provides a "Tool Use API first + concurrent execution + pluggable deps" architecture, so UI can stay interaction-focused. Config/logs stay in user directories to avoid repository pollution, with support for multi-provider and token budget control.
+Core provides a "structured Tool Use API + concurrent execution + pluggable deps" architecture, so UI can stay interaction-focused. Config/logs stay in user directories to avoid repository pollution, with support for multi-provider and token budget control.
 
 **Key advantages**:
 
 - 5x performance gain (concurrent tool calls)
 - 95% format stability (native Tool Use API)
-- Cross-model compatibility (automatic fallback)
-- Zero migration cost (fully backward-compatible)
+- Cross-model compatibility (native Tool Use capable models)

@@ -39,7 +39,6 @@ import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 const DEFAULT_SESSION_MODE: SessionMode = 'interactive'
 const DEFAULT_MAX_PROMPT_TOKENS = 120_000
-const MAX_PROTOCOL_VIOLATION_RETRIES = 1
 
 function emptyUsage(): TokenUsage {
     return { prompt: 0, completion: 0, total: 0 }
@@ -62,42 +61,22 @@ function normalizeLLMResponse(raw: LLMResponse): {
     usage?: Partial<TokenUsage>
     streamed?: boolean
 } {
-    // 处理传统字符串响应
-    if (typeof raw === 'string') {
-        return { textContent: raw, toolUseBlocks: [] }
+    const textBlocks = raw.content.filter((block): block is TextBlock => block.type === 'text')
+    const toolBlocks = raw.content.filter(
+        (block): block is ToolUseBlock => block.type === 'tool_use',
+    )
+
+    return {
+        textContent: textBlocks.map((b) => b.text).join('\n'),
+        toolUseBlocks: toolBlocks.map((b) => ({
+            id: b.id,
+            name: b.name,
+            input: b.input,
+        })),
+        stopReason: raw.stop_reason,
+        usage: raw.usage,
+        streamed: raw.streamed,
     }
-
-    // 处理传统对象响应（content 是字符串）
-    if ('content' in raw && typeof raw.content === 'string') {
-        return {
-            textContent: raw.content,
-            toolUseBlocks: [],
-            usage: 'usage' in raw ? raw.usage : undefined,
-            streamed: 'streamed' in raw ? raw.streamed : undefined,
-        }
-    }
-
-    // 处理 Tool Use API 响应（content 是数组）
-    if ('content' in raw && Array.isArray(raw.content)) {
-        const textBlocks = raw.content.filter((block): block is TextBlock => block.type === 'text')
-        const toolBlocks = raw.content.filter(
-            (block): block is ToolUseBlock => block.type === 'tool_use',
-        )
-
-        return {
-            textContent: textBlocks.map((b) => b.text).join('\n'),
-            toolUseBlocks: toolBlocks.map((b) => ({
-                id: b.id,
-                name: b.name,
-                input: b.input,
-            })),
-            stopReason: 'stop_reason' in raw ? raw.stop_reason : undefined,
-            usage: 'usage' in raw ? raw.usage : undefined,
-        }
-    }
-
-    // 降级处理
-    return { textContent: '', toolUseBlocks: [] }
 }
 
 async function emitEventToSinks(event: HistoryEvent, sinks: HistorySink[]) {
@@ -442,8 +421,8 @@ class AgentSessionImpl implements AgentSession {
                 let parsed: ParsedAssistant
                 let assistantHistoryMessage: ChatMessage | null = null
                 if (toolUseBlocks.length > 0) {
-                    // Tool Use API 模式：使用结构化的工具调用
-                    // 如果有多个工具，只取第一个（保持向后兼容）
+                    // Tool Use API 模式：使用结构化的工具调用。
+                    // parsed.action 复用单 action 结构，取首个工具作为主 action 语义。
                     const firstTool = toolUseBlocks[0]
                     if (firstTool) {
                         const thinking = assistantText ? buildThinking([assistantText]) : undefined
@@ -507,23 +486,6 @@ class AgentSessionImpl implements AgentSession {
                 if (textToolCall) {
                     protocolViolationCount += 1
 
-                    if (protocolViolationCount <= MAX_PROTOCOL_VIOLATION_RETRIES) {
-                        const repairMessage = `系统提醒：你刚刚以纯文本 JSON 形式请求调用工具「${textToolCall.tool}」。请改为结构化 tool call，不要输出 {"tool": ...} 文本。`
-                        this.history.push({ role: 'system', content: repairMessage })
-                        await this.emitEvent('observation', {
-                            turn,
-                            step,
-                            content: repairMessage,
-                            meta: {
-                                phase: 'protocol_repair',
-                                tool: textToolCall.tool,
-                                protocol_violation: true,
-                                protocol_violation_count: protocolViolationCount,
-                            },
-                        })
-                        continue
-                    }
-
                     const protocolError = `Model protocol error: returned plain-text tool JSON for "${textToolCall.tool}" ${protocolViolationCount} times. Structured tool calls are required.`
                     status = 'error'
                     finalText = protocolError
@@ -567,7 +529,7 @@ class AgentSessionImpl implements AgentSession {
                         this.maybeWarnRepeatedAction(block.name, block.input)
                     }
 
-                    // 触发 action hooks（并发调用时，为第一个工具调用 onAction）
+                    // 触发 action hooks（action 字段取首个工具，parallelActions 包含全量）
                     await this.emitEvent('action', {
                         turn,
                         step,
@@ -586,7 +548,6 @@ class AgentSessionImpl implements AgentSession {
                             })),
                         },
                     })
-                    // 为了 TUI 兼容性，触发第一个工具的 onAction hook
                     const firstTool = toolUseBlocks[0]
                     if (firstTool) {
                         await runHook(this.hooks, 'onAction', {
@@ -690,7 +651,7 @@ class AgentSessionImpl implements AgentSession {
                     continue
                 }
 
-                // 单个工具调用（向后兼容模式）
+                // 单个工具调用
                 // 注意：当 toolUseBlocks.length > 1 时，已在上面处理，这里跳过
                 else if (parsed.action) {
                     this.maybeWarnRepeatedAction(parsed.action.tool, parsed.action.input)

@@ -7,14 +7,11 @@ function formatServerConfig(name: string, config: MCPServerConfig): string {
     lines.push(`- **${name}**`)
 
     if ('url' in config) {
-        // HTTP 类型 (streamable_http 或 sse)
+        // HTTP 类型 (streamable_http)
         lines.push(`  - Type: ${config.type ?? 'streamable_http'}`)
         lines.push(`  - URL: ${config.url}`)
         if (config.bearer_token_env_var) {
             lines.push(`  - Bearer token env: ${config.bearer_token_env_var}`)
-        }
-        if (config.type !== 'sse' && config.fallback_to_sse !== undefined) {
-            lines.push(`  - Fallback to SSE: ${config.fallback_to_sse}`)
         }
         const headers = config.http_headers ?? config.headers
         if (headers && Object.keys(headers).length > 0) {

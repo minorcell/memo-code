@@ -1,11 +1,10 @@
 /** @file MCP Client 连接池管理 */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { MCPServerConfig, McpClientConnection } from '../types'
 
-type ClientTransport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport
+type ClientTransport = StdioClientTransport | StreamableHTTPClientTransport
 
 function mergeProcessEnv(env?: Record<string, string>): Record<string, string> | undefined {
     if (!env) return undefined
@@ -58,36 +57,16 @@ async function connectOverHttp(
     const baseUrl = new URL(config.url)
     const requestInit = buildRequestInit(resolveHttpHeaders(config))
 
-    // SSE 类型强制使用 SSE 传输
-    if (config.type === 'sse') {
-        const client = createMcpClient()
-        const transport = new SSEClientTransport(baseUrl, { requestInit })
-        await client.connect(transport)
-        return { client, transport }
-    }
-
-    // streamable_http 类型，默认尝试 streamable，失败后可回退 SSE
-    const allowFallback = config.fallback_to_sse ?? true
-
     try {
         const client = createMcpClient()
         const transport = new StreamableHTTPClientTransport(baseUrl, { requestInit })
         await client.connect(transport)
         return { client, transport }
     } catch (streamErr) {
-        if (!allowFallback) throw streamErr
-
-        try {
-            const client = createMcpClient()
-            const transport = new SSEClientTransport(baseUrl, { requestInit })
-            await client.connect(transport)
-            return { client, transport }
-        } catch (sseErr) {
-            const message = `Failed to connect via streamable_http (${(streamErr as Error).message}); SSE fallback failed (${(sseErr as Error).message})`
-            const combined = new Error(message)
-            ;(combined as any).cause = { streamErr, sseErr }
-            throw combined
-        }
+        const message = `Failed to connect via streamable_http (${(streamErr as Error).message})`
+        const error = new Error(message)
+        ;(error as any).cause = streamErr
+        throw error
     }
 }
 
