@@ -82,5 +82,16 @@ export async function runHook<K extends HookName>(
 }
 
 export function snapshotHistory(history: ChatMessage[]): ChatMessage[] {
-    return history.map((msg) => ({ ...msg }))
+    return history.map((msg) => {
+        if (msg.role === 'assistant' && msg.tool_calls?.length) {
+            return {
+                ...msg,
+                tool_calls: msg.tool_calls.map((toolCall) => ({
+                    ...toolCall,
+                    function: { ...toolCall.function },
+                })),
+            }
+        }
+        return { ...msg }
+    })
 }

@@ -5,15 +5,50 @@ import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
  * Agent 层的基础类型声明，涵盖对话消息、解析结果与依赖注入接口。
  * 每个类型尽量保持精简，方便在 UI/工具等层复用。
  */
-export type Role = 'system' | 'user' | 'assistant'
+export type Role = 'system' | 'user' | 'assistant' | 'tool'
 
-/** 模型侧的单条聊天消息（OpenAI 兼容）。 */
-export type ChatMessage = {
-    /** 消息角色：system/user/assistant。 */
-    role: Role
-    /** 消息正文。 */
-    content: string
+/** Assistant 的结构化工具调用（OpenAI tool_calls 兼容形态）。 */
+export type AssistantToolCall = {
+    id: string
+    type: 'function'
+    function: {
+        name: string
+        arguments: string
+    }
 }
+
+/** 模型侧消息：兼容普通文本与结构化工具调用/结果。 */
+export type ChatMessage =
+    | {
+          /** 系统消息。 */
+          role: 'system'
+          /** 消息正文。 */
+          content: string
+      }
+    | {
+          /** 用户消息。 */
+          role: 'user'
+          /** 消息正文。 */
+          content: string
+      }
+    | {
+          /** Assistant 文本或结构化工具调用。 */
+          role: 'assistant'
+          /** Assistant 文本；纯工具调用时允许为空字符串。 */
+          content: string
+          /** 结构化工具调用列表（若有）。 */
+          tool_calls?: AssistantToolCall[]
+      }
+    | {
+          /** 工具结果消息（对应某次 tool_call）。 */
+          role: 'tool'
+          /** 工具输出文本。 */
+          content: string
+          /** 对应 assistant.tool_calls[*].id。 */
+          tool_call_id: string
+          /** 可选工具名，便于调试。 */
+          name?: string
+      }
 
 /** 单步调试记录，便于回放与可观测。 */
 export type AgentStepTrace = {

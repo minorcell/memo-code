@@ -17,6 +17,7 @@ import type {
     AgentSessionDeps,
     AgentSessionOptions,
     CallLLM,
+    ChatMessage,
     HistorySink,
     TokenCounter,
     ToolRegistry,
@@ -29,6 +30,34 @@ export function parseToolArguments(
         return { ok: true, data: JSON.parse(raw) }
     } catch (err) {
         return { ok: false, raw, error: (err as Error).message }
+    }
+}
+
+function toOpenAIMessage(message: ChatMessage): OpenAI.Chat.Completions.ChatCompletionMessageParam {
+    if (message.role === 'assistant') {
+        return {
+            role: 'assistant',
+            content: message.content,
+            tool_calls: message.tool_calls?.map((toolCall) => ({
+                id: toolCall.id,
+                type: toolCall.type,
+                function: {
+                    name: toolCall.function.name,
+                    arguments: toolCall.function.arguments,
+                },
+            })),
+        }
+    }
+    if (message.role === 'tool') {
+        return {
+            role: 'tool',
+            content: message.content,
+            tool_call_id: message.tool_call_id,
+        }
+    }
+    return {
+        role: message.role,
+        content: message.content,
     }
 }
 
@@ -134,6 +163,7 @@ export async function withDefaultDeps(
                     apiKey,
                     baseURL: provider.base_url,
                 })
+                const openAIMessages = messages.map(toOpenAIMessage)
 
                 // 构建 OpenAI 格式的工具定义
                 const tools =
@@ -153,7 +183,7 @@ export async function withDefaultDeps(
                     const stream = await client.chat.completions.create(
                         {
                             model: provider.model,
-                            messages,
+                            messages: openAIMessages,
                             stream: true,
                         },
                         { signal: callOptions?.signal },
@@ -171,7 +201,7 @@ export async function withDefaultDeps(
                     const data = await client.chat.completions.create(
                         {
                             model: provider.model,
-                            messages,
+                            messages: openAIMessages,
                             tools,
                             tool_choice: tools ? 'auto' : undefined,
                         },

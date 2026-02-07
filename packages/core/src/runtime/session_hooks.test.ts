@@ -277,6 +277,60 @@ describe('session hooks & middleware', () => {
         }
     })
 
+    test('records structured tool call/result messages without json fallback payloads', async () => {
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'x' }),
+            endTurnResponse('done'),
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('meta')
+            assert.strictEqual(result.finalText, 'done')
+
+            const assistantToolMessage = session.history.find(
+                (message) =>
+                    message.role === 'assistant' &&
+                    message.tool_calls?.some((toolCall) => toolCall.id === 'action-1'),
+            )
+            assert.ok(assistantToolMessage, 'assistant tool_calls message should exist')
+
+            const toolResultMessage = session.history.find(
+                (message) => message.role === 'tool' && message.tool_call_id === 'action-1',
+            )
+            assert.ok(toolResultMessage, 'tool result message should exist')
+            if (toolResultMessage?.role === 'tool') {
+                assert.strictEqual(toolResultMessage.content, 'echo:x')
+                assert.strictEqual(toolResultMessage.name, 'echo')
+            }
+
+            assert.ok(
+                !session.history.some(
+                    (message) =>
+                        message.role === 'assistant' && message.content.startsWith('{"tool":'),
+                ),
+                'assistant history should not contain plain-text tool json payloads',
+            )
+            assert.ok(
+                !session.history.some(
+                    (message) =>
+                        message.role === 'user' && message.content.includes('"observation"'),
+                ),
+                'history should not inject observation json through user messages',
+            )
+        } finally {
+            await session.close()
+        }
+    })
+
     test('emits structured rejection metadata in final event', async () => {
         const events: HistoryEvent[] = []
         const outputs = [
@@ -318,6 +372,104 @@ describe('session hooks & middleware', () => {
             assert.strictEqual(finalEvent?.meta?.error_type, 'approval_denied')
             assert.strictEqual(finalEvent?.meta?.action_id, 'reject-1')
             assert.strictEqual(typeof finalEvent?.meta?.duration_ms, 'number')
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('retries once when model emits plain-text tool json, then recovers via structured tool_use', async () => {
+        const outputs: LLMResponse[] = [
+            endTurnResponse('{"tool":"echo","input":{"text":"recover"}}'),
+            toolUseResponse('action-2', 'echo', { text: 'recover' }),
+            endTurnResponse('done'),
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('recover')
+            assert.strictEqual(result.status, 'ok')
+            assert.strictEqual(result.finalText, 'done')
+            assert.ok(
+                result.steps.some((step) => step.observation === 'echo:recover'),
+                'should recover and execute the structured tool call',
+            )
+            assert.ok(
+                session.history.some(
+                    (m) =>
+                        m.role === 'system' && m.content.includes('纯文本 JSON 形式请求调用工具'),
+                ),
+                'should insert protocol repair message after first violation',
+            )
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('fails with model_protocol_error after repeated plain-text tool json violations', async () => {
+        const events: HistoryEvent[] = []
+        const outputs: LLMResponse[] = [
+            endTurnResponse('{"tool":"echo","input":{"text":"x"}}'),
+            endTurnResponse('{"tool":"echo","input":{"text":"x"}}'),
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [
+                    {
+                        append: async (event) => {
+                            events.push(event)
+                        },
+                    },
+                ],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('recover')
+            assert.strictEqual(result.status, 'error')
+            assert.ok(result.finalText.includes('Model protocol error'))
+
+            const finalEvent = [...events].reverse().find((event) => event.type === 'final')
+            assert.ok(finalEvent, 'final event should exist')
+            assert.strictEqual(finalEvent?.meta?.error_type, 'model_protocol_error')
+            assert.strictEqual(finalEvent?.meta?.protocol_violation_count, 2)
+
+            const turnEnd = [...events].reverse().find((event) => event.type === 'turn_end')
+            assert.ok(turnEnd, 'turn_end should exist')
+            assert.strictEqual(turnEnd?.meta?.status, 'error')
+            assert.strictEqual(turnEnd?.meta?.protocol_violation_count, 2)
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('does not treat unknown tool json text as protocol violation', async () => {
+        const outputs: LLMResponse[] = [endTurnResponse('{"tool":"unknown","input":{}}')]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('unknown')
+            assert.strictEqual(result.status, 'ok')
+            assert.strictEqual(result.finalText, '{"tool":"unknown","input":{}}')
         } finally {
             await session.close()
         }

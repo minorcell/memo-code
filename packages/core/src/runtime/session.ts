@@ -5,6 +5,7 @@ import { withDefaultDeps } from '@memo/core/runtime/defaults'
 import { buildThinking } from '@memo/core/utils/utils'
 import type {
     ChatMessage,
+    AssistantToolCall,
     AgentSession,
     AgentSessionDeps,
     AgentSessionOptions,
@@ -38,6 +39,7 @@ import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 const DEFAULT_SESSION_MODE: SessionMode = 'interactive'
 const DEFAULT_MAX_PROMPT_TOKENS = 120_000
+const MAX_PROTOCOL_VIOLATION_RETRIES = 1
 
 function emptyUsage(): TokenUsage {
     return { prompt: 0, completion: 0, total: 0 }
@@ -114,7 +116,7 @@ function isAbortError(err: unknown): err is Error {
 
 // 稳定序列化用于重复动作检测（确保键顺序一致）
 function stableStringify(value: unknown): string {
-    if (value === null || typeof value !== 'object') return JSON.stringify(value)
+    if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
     if (Array.isArray(value)) {
         return `[${value.map((v) => stableStringify(v)).join(',')}]`
     }
@@ -122,6 +124,49 @@ function stableStringify(value: unknown): string {
         a.localeCompare(b),
     )
     return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`
+}
+
+function buildAssistantToolCalls(
+    toolUseBlocks: Array<{ id: string; name: string; input: unknown }>,
+): AssistantToolCall[] {
+    return toolUseBlocks.map((block) => ({
+        id: block.id,
+        type: 'function',
+        function: {
+            name: block.name,
+            arguments: stableStringify(block.input),
+        },
+    }))
+}
+
+function parseTextToolCall(
+    text: string,
+    tools: ToolRegistry,
+): { tool: string; input: unknown } | null {
+    const trimmed = text.trim()
+    if (!trimmed) return null
+
+    const candidates = [trimmed]
+    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+    if (fenced?.[1]) {
+        candidates.push(fenced[1].trim())
+    }
+
+    for (const candidate of candidates) {
+        if (!candidate.startsWith('{') || !candidate.endsWith('}')) continue
+        try {
+            const parsed = JSON.parse(candidate)
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
+            const obj = parsed as Record<string, unknown>
+            const tool = typeof obj.tool === 'string' ? obj.tool.trim() : ''
+            if (!tool || !Object.prototype.hasOwnProperty.call(tools, tool)) continue
+            return { tool, input: obj.input ?? {} }
+        } catch {
+            // ignore invalid json
+        }
+    }
+
+    return null
 }
 
 /** 进程内的对话 Session，实现多轮运行与日志写入。 */
@@ -286,14 +331,14 @@ class AgentSessionImpl implements AgentSession {
             let finalText = ''
             let status: TurnStatus = 'ok'
             let errorMessage: string | undefined
+            let protocolViolationCount = 0
 
             // ReAct 主循环
             for (let step = 0; ; step++) {
                 const estimatedPrompt = this.tokenCounter.countMessages(this.history)
                 if (estimatedPrompt > effectiveMaxPromptTokens) {
                     const limitMessage = `Context tokens (${estimatedPrompt}) exceed the limit. Please shorten the input or restart the session.`
-                    const finalPayload = JSON.stringify({ final: limitMessage })
-                    this.history.push({ role: 'assistant', content: finalPayload })
+                    this.history.push({ role: 'assistant', content: limitMessage })
                     status = 'prompt_limit'
                     finalText = limitMessage
                     errorMessage = limitMessage
@@ -365,8 +410,7 @@ class AgentSessionImpl implements AgentSession {
                         break
                     }
                     const msg = `LLM call failed: ${(err as Error).message}`
-                    const finalPayload = JSON.stringify({ final: msg })
-                    this.history.push({ role: 'assistant', content: finalPayload })
+                    this.history.push({ role: 'assistant', content: msg })
                     status = 'error'
                     finalText = msg
                     errorMessage = msg
@@ -388,8 +432,14 @@ class AgentSessionImpl implements AgentSession {
                     this.deps.onAssistantStep?.(assistantText, step)
                 }
 
+                const textToolCall =
+                    toolUseBlocks.length === 0 && assistantText
+                        ? parseTextToolCall(assistantText, this.deps.tools)
+                        : null
+
                 // 优先使用 Tool Use API 的结果；文本仅作为最终回答处理。
                 let parsed: ParsedAssistant
+                let assistantHistoryMessage: ChatMessage | null = null
                 if (toolUseBlocks.length > 0) {
                     // Tool Use API 模式：使用结构化的工具调用
                     // 如果有多个工具，只取第一个（保持向后兼容）
@@ -403,25 +453,21 @@ class AgentSessionImpl implements AgentSession {
                             },
                             thinking,
                         }
+                        assistantHistoryMessage = {
+                            role: 'assistant',
+                            content: assistantText,
+                            tool_calls: buildAssistantToolCalls(toolUseBlocks),
+                        }
                     } else {
                         parsed = {}
                     }
                 } else if (assistantText) {
                     parsed = { final: assistantText }
+                    assistantHistoryMessage = { role: 'assistant', content: assistantText }
                 } else {
                     // 没有内容，视为空响应
                     parsed = {}
                 }
-
-                const historyContent = parsed.action
-                    ? JSON.stringify({
-                          tool: parsed.action.tool,
-                          input: parsed.action.input,
-                      })
-                    : parsed.final
-                      ? JSON.stringify({ final: parsed.final })
-                      : assistantText
-                this.history.push({ role: 'assistant', content: historyContent })
 
                 // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。
                 const completionTokens = this.tokenCounter.countText(assistantText)
@@ -448,8 +494,70 @@ class AgentSessionImpl implements AgentSession {
                     step,
                     content: assistantText,
                     role: 'assistant',
-                    meta: { tokens: stepUsage },
+                    meta: {
+                        tokens: stepUsage,
+                        protocol_violation: Boolean(textToolCall),
+                        protocol_violation_count: textToolCall
+                            ? protocolViolationCount + 1
+                            : protocolViolationCount || undefined,
+                    },
                 })
+
+                if (textToolCall) {
+                    protocolViolationCount += 1
+
+                    if (protocolViolationCount <= MAX_PROTOCOL_VIOLATION_RETRIES) {
+                        const repairMessage = `系统提醒：你刚刚以纯文本 JSON 形式请求调用工具「${textToolCall.tool}」。请改为结构化 tool call，不要输出 {"tool": ...} 文本。`
+                        this.history.push({ role: 'system', content: repairMessage })
+                        await this.emitEvent('observation', {
+                            turn,
+                            step,
+                            content: repairMessage,
+                            meta: {
+                                phase: 'protocol_repair',
+                                tool: textToolCall.tool,
+                                protocol_violation: true,
+                                protocol_violation_count: protocolViolationCount,
+                            },
+                        })
+                        continue
+                    }
+
+                    const protocolError = `Model protocol error: returned plain-text tool JSON for "${textToolCall.tool}" ${protocolViolationCount} times. Structured tool calls are required.`
+                    status = 'error'
+                    finalText = protocolError
+                    errorMessage = protocolError
+                    this.history.push({ role: 'assistant', content: protocolError })
+                    await this.emitEvent('final', {
+                        turn,
+                        step,
+                        content: protocolError,
+                        role: 'assistant',
+                        meta: {
+                            error_type: 'model_protocol_error',
+                            tool: textToolCall.tool,
+                            protocol_violation: true,
+                            protocol_violation_count: protocolViolationCount,
+                            tokens: stepUsage,
+                        },
+                    })
+                    await runHook(this.hooks, 'onFinal', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        finalText,
+                        status,
+                        errorMessage,
+                        tokenUsage: stepUsage,
+                        turnUsage: { ...turnUsage },
+                        steps,
+                    })
+                    break
+                }
+
+                if (assistantHistoryMessage) {
+                    this.history.push(assistantHistoryMessage)
+                }
 
                 // 处理工具调用（支持并发执行多个工具）
                 if (toolUseBlocks.length > 1) {
@@ -511,6 +619,12 @@ class AgentSessionImpl implements AgentSession {
                     )
 
                     for (const [idx, result] of execution.results.entries()) {
+                        this.history.push({
+                            role: 'tool',
+                            content: result.observation,
+                            tool_call_id: result.actionId,
+                            name: result.tool,
+                        })
                         await this.emitEvent('observation', {
                             turn,
                             step,
@@ -528,10 +642,6 @@ class AgentSessionImpl implements AgentSession {
                     }
 
                     const combinedObservation = execution.combinedObservation
-                    this.history.push({
-                        role: 'user',
-                        content: JSON.stringify({ observation: combinedObservation }),
-                    })
                     const lastStep = steps[steps.length - 1]
                     if (lastStep) {
                         lastStep.observation = combinedObservation
@@ -647,8 +757,10 @@ class AgentSessionImpl implements AgentSession {
                     const observation = result.observation
 
                     this.history.push({
-                        role: 'user',
-                        content: JSON.stringify({ observation, tool: parsed.action.tool }),
+                        role: 'tool',
+                        content: observation,
+                        tool_call_id: result.actionId,
+                        name: parsed.action.tool,
                     })
                     const lastStep = steps[steps.length - 1]
                     if (lastStep) {
@@ -716,8 +828,7 @@ class AgentSessionImpl implements AgentSession {
                 }
                 finalText = 'Unable to produce a final answer. Please retry or adjust the request.'
                 errorMessage = finalText
-                const payload = JSON.stringify({ final: finalText })
-                this.history.push({ role: 'assistant', content: payload })
+                this.history.push({ role: 'assistant', content: finalText })
                 await this.emitEvent('final', {
                     turn,
                     content: finalText,
@@ -741,6 +852,7 @@ class AgentSessionImpl implements AgentSession {
                     stepCount: steps.length,
                     durationMs: Date.now() - turnStartedAt,
                     tokens: turnUsage,
+                    protocol_violation_count: protocolViolationCount || undefined,
                 },
             })
 
