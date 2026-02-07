@@ -98,10 +98,10 @@ describe('todo tool', () => {
     })
 
     test('rejects invalid status enum', () => {
-        const parsed = todoTool.inputSchema.safeParse({
+        const parsed = todoTool.validateInput?.({
             type: 'add',
             todos: [{ content: 'x', status: 'done' }],
         })
-        assert.strictEqual(parsed.success, false)
+        assert.ok(parsed && !parsed.ok)
     })
 })

@@ -2,7 +2,8 @@
 import assert from 'node:assert'
 import { describe, test } from 'vitest'
 import { createAgentSession, createTokenCounter } from '@memo/core'
-import type { Tool } from '@memo/core/toolRouter'
+import type { HistoryEvent } from '@memo/core'
+import type { Tool } from '@memo/tools/router'
 
 const echoTool: Tool = {
     name: 'echo',
@@ -99,8 +100,12 @@ describe('session hooks & middleware', () => {
                 // 自动批准所有工具调用
                 requestApproval: async () => 'once',
                 hooks: {
-                    onAction: ({ action }) => hookLog.push(`action:${action.tool}`),
-                    onFinal: ({ finalText }) => hookLog.push(`final:${finalText}`),
+                    onAction: ({ action }) => {
+                        hookLog.push(`action:${action.tool}`)
+                    },
+                    onFinal: ({ finalText }) => {
+                        hookLog.push(`final:${finalText}`)
+                    },
                 },
             },
             {},
@@ -188,7 +193,118 @@ describe('session hooks & middleware', () => {
         try {
             const result = await session.runTurn('hi')
             assert.strictEqual(result.finalText, 'done')
-            assert.ok(result.steps[0]?.observation.includes('write invalid input'))
+            assert.ok(result.steps[0]?.observation?.includes('write invalid input'))
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('emits structured tool execution metadata in history events', async () => {
+        const events: HistoryEvent[] = []
+        const outputs = [
+            {
+                content: [
+                    {
+                        type: 'tool_use' as const,
+                        id: 'action-1',
+                        name: 'echo',
+                        input: { text: 'x' },
+                    },
+                ],
+                stop_reason: 'tool_use' as const,
+            },
+            {
+                content: [{ type: 'text' as const, text: 'done' }],
+                stop_reason: 'end_turn' as const,
+            },
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () =>
+                    outputs.shift() ?? {
+                        content: [{ type: 'text', text: 'done' }],
+                        stop_reason: 'end_turn',
+                    },
+                historySinks: [
+                    {
+                        append: async (event) => {
+                            events.push(event)
+                        },
+                    },
+                ],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('meta')
+            assert.strictEqual(result.finalText, 'done')
+
+            const actionEvent = events.find((event) => event.type === 'action')
+            assert.ok(actionEvent, 'action event should exist')
+            assert.strictEqual(actionEvent.meta?.phase, 'dispatch')
+            assert.strictEqual(actionEvent.meta?.action_id, 'action-1')
+
+            const observationEvent = events.find(
+                (event) => event.type === 'observation' && event.meta?.action_id === 'action-1',
+            )
+            assert.ok(observationEvent, 'observation event should exist')
+            assert.strictEqual(observationEvent.meta?.phase, 'result')
+            assert.strictEqual(observationEvent.meta?.status, 'success')
+            assert.strictEqual(observationEvent.meta?.error_type, undefined)
+            assert.strictEqual(typeof observationEvent.meta?.duration_ms, 'number')
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('emits structured rejection metadata in final event', async () => {
+        const events: HistoryEvent[] = []
+        const outputs = [
+            {
+                content: [
+                    {
+                        type: 'tool_use' as const,
+                        id: 'reject-1',
+                        name: 'echo',
+                        input: { text: 'x' },
+                    },
+                ],
+                stop_reason: 'tool_use' as const,
+            },
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () =>
+                    outputs.shift() ?? {
+                        content: [{ type: 'text', text: 'done' }],
+                        stop_reason: 'end_turn',
+                    },
+                historySinks: [
+                    {
+                        append: async (event) => {
+                            events.push(event)
+                        },
+                    },
+                ],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'deny',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('meta')
+            assert.strictEqual(result.status, 'cancelled')
+            const finalEvent = [...events].reverse().find((event) => event.type === 'final')
+            assert.ok(finalEvent, 'final event should exist')
+            assert.strictEqual(finalEvent?.meta?.rejected, true)
+            assert.strictEqual(finalEvent?.meta?.phase, 'result')
+            assert.strictEqual(finalEvent?.meta?.error_type, 'approval_denied')
+            assert.strictEqual(finalEvent?.meta?.action_id, 'reject-1')
+            assert.strictEqual(typeof finalEvent?.meta?.duration_ms, 'number')
         } finally {
             await session.close()
         }

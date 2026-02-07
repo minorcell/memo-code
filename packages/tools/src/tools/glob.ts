@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { normalizePath, getIgnoreMatcher, appendLongResultHint } from '@memo/tools/tools/helpers'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 import fg from 'fast-glob'
 
@@ -17,7 +17,7 @@ type GlobInput = z.infer<typeof GLOB_INPUT_SCHEMA>
  * 扫描目录下符合 pattern 的文件，返回绝对路径列表。
  * 默认在当前工作目录执行，可通过 path 覆盖。
  */
-export const globFastTool: McpTool<GlobInput> = {
+export const globFastTool = defineMcpTool<GlobInput>({
     name: 'glob',
     description: '按 glob 模式匹配文件，返回绝对路径列表',
     inputSchema: GLOB_INPUT_SCHEMA,
@@ -41,7 +41,7 @@ export const globFastTool: McpTool<GlobInput> = {
             return textResult(`glob 失败: ${(err as Error).message}`, true)
         }
     },
-}
+})
 
 // Backward compatibility alias
 export const globTool = globFastTool

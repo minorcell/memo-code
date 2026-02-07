@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
 // 在进程内维护任务列表，进程退出后清空
@@ -127,7 +127,7 @@ function mutate(input: TodoInput) {
 }
 
 /** todo: 进程内待办管理（add/update/remove/replace），最多 10 条，不持久化。 */
-export const todoTool: McpTool<TodoInput> = {
+export const todoTool = defineMcpTool<TodoInput>({
     name: 'todo',
     description: '管理待办列表（add/update/remove/replace），最多 10 条，不持久化',
     inputSchema: TODO_INPUT_SCHEMA,
@@ -145,4 +145,4 @@ export const todoTool: McpTool<TodoInput> = {
         }
         return textResult(JSON.stringify(payload))
     },
-}
+})

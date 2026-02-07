@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { dirname } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { normalizePath, writePathDenyReason } from '@memo/tools/tools/helpers'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
 const WRITE_INPUT_SCHEMA = z
@@ -32,7 +32,7 @@ function normalizeContent(raw: WriteInput['content']): { data: string | Uint8Arr
 }
 
 /** 覆盖写入文件内容，必要时递归创建父目录。 */
-export const writeTool: McpTool<WriteInput> = {
+export const writeTool = defineMcpTool<WriteInput>({
     name: 'write',
     description: '创建或覆盖文件，传入 file_path 与 content',
     inputSchema: WRITE_INPUT_SCHEMA,
@@ -51,4 +51,4 @@ export const writeTool: McpTool<WriteInput> = {
             return textResult(`写入失败: ${(err as Error).message}`, true)
         }
     },
-}
+})

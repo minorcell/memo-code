@@ -11,7 +11,7 @@ import {
 } from '@memo/core/config/config'
 import { JsonlHistorySink } from '@memo/core/runtime/history'
 import { loadSystemPrompt as defaultLoadPrompt } from '@memo/core/runtime/prompt'
-import { ToolRouter } from '@memo/core/toolRouter'
+import { ToolRouter } from '@memo/tools/router'
 import { readFile, access } from 'node:fs/promises'
 import type {
     AgentSessionDeps,

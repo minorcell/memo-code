@@ -3,7 +3,7 @@ import { extname } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { access, readFile } from 'node:fs/promises'
 import { normalizePath } from '@memo/tools/tools/helpers'
-import type { McpTool } from './types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
 const MAX_BYTES = 512_000
@@ -57,7 +57,7 @@ const READ_INPUT_SCHEMA = z
 
 type ReadInput = z.infer<typeof READ_INPUT_SCHEMA>
 
-export const readTool: McpTool<ReadInput> = {
+export const readTool = defineMcpTool<ReadInput>({
     name: 'read',
     description: '读取指定文件内容，可按 offset/limit 截取并附带行号',
     inputSchema: READ_INPUT_SCHEMA,
@@ -133,4 +133,4 @@ export const readTool: McpTool<ReadInput> = {
             return textResult(`读取失败: ${(err as Error).message}`, true)
         }
     },
-}
+})

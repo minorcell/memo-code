@@ -1,6 +1,5 @@
 /** @file Core 与 Runtime 共享的公共类型声明（会被 UI/Tools 复用）。 */
-import type { McpTool } from '@memo/tools/tools/types'
-import type { ApprovalRequest, ApprovalDecision } from './approval/types'
+import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 /**
  * Agent 层的基础类型声明，涵盖对话消息、解析结果与依赖注入接口。
@@ -104,7 +103,7 @@ export type ParsedAssistant = {
 }
 
 /** 工具注册表，键为工具名称，值为工具定义。 */
-export type ToolRegistry = Record<string, import('./toolRouter/types').Tool>
+export type ToolRegistry = Record<string, import('@memo/tools/router/types').Tool>
 
 /** 工具定义结构（用于传递给 LLM API）*/
 export type ToolDefinition = {

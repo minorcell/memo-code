@@ -13,18 +13,15 @@ import { generateFingerprint } from './fingerprint'
 import { APPROVAL_REASONS } from './constants'
 
 interface ApprovalCache {
-    /** 会话级授权（整个会话期间有效） */
     session: Set<ApprovalKey>
-    /** 单次授权（当前 turn 有效，turn 结束后清除） */
     once: Set<ApprovalKey>
-    /** 已拒绝的请求（临时，防止重复询问） */
     denied: Set<ApprovalKey>
 }
 
 export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalManager {
     const { mode = 'auto', dangerous = false, toolRiskLevels } = config || {}
+    const approvalMode = mode === 'strict' ? 'strict' : 'auto'
 
-    // 危险模式直接返回简化实现
     if (dangerous) {
         return {
             isDangerousMode: true,
@@ -57,20 +54,16 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
         check(toolName: string, params: unknown): ApprovalCheckResult {
             const riskLevel = classifier.getRiskLevel(toolName)
 
-            // 检查是否需要审批
-            if (!classifier.needsApproval(riskLevel, mode)) {
+            if (!classifier.needsApproval(riskLevel, approvalMode)) {
                 return { needApproval: false, decision: 'auto-execute' }
             }
 
-            // 生成指纹
             const fingerprint = generateFingerprint(toolName, params)
 
-            // 检查缓存
             if (cache.session.has(fingerprint) || cache.once.has(fingerprint)) {
                 return { needApproval: false, decision: 'auto-execute' }
             }
 
-            // 检查是否已被拒绝
             if (cache.denied.has(fingerprint)) {
                 return {
                     needApproval: true,
@@ -93,7 +86,6 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
         },
 
         recordDecision(fingerprint: ApprovalKey, decision: ApprovalDecision): void {
-            // 清除之前的状态
             cache.session.delete(fingerprint)
             cache.once.delete(fingerprint)
             cache.denied.delete(fingerprint)

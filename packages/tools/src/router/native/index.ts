@@ -1,14 +1,5 @@
 /** @file 内置工具注册表 */
-import type { NativeTool, ToolRegistry, JSONSchema } from '../types'
-
-/** 从 zod schema 转换为 JSON Schema (使用 Zod v4 内置方法) */
-function convertZodToJSONSchema(zodSchema: object): JSONSchema {
-    // Zod v4 内置 toJSONSchema 方法
-    const jsonSchema = (zodSchema as any).toJSONSchema()
-    // 移除 $schema 等额外字段，保持简洁
-    const { $schema, ...rest } = jsonSchema as JSONSchema & { $schema?: string }
-    return rest
-}
+import type { NativeTool, ToolRegistry } from '../types'
 
 /** 内置工具注册表 */
 export class NativeToolRegistry {
@@ -53,21 +44,5 @@ export class NativeToolRegistry {
     /** 获取工具数量 */
     get size(): number {
         return this.tools.size
-    }
-}
-
-/** 从现有的工具模块创建 NativeTool */
-export function createNativeTool(
-    name: string,
-    description: string,
-    inputSchema: object,
-    execute: (input: unknown) => Promise<import('@modelcontextprotocol/sdk/types').CallToolResult>,
-): NativeTool {
-    return {
-        name,
-        description,
-        source: 'native',
-        inputSchema: convertZodToJSONSchema(inputSchema),
-        execute,
     }
 }

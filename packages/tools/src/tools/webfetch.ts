@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { McpTool } from '@memo/tools/tools/types'
+import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 
 const WEBFETCH_INPUT_SCHEMA = z
@@ -69,7 +69,7 @@ const sanitizePreview = (text: string) => text.replace(/\s+/g, ' ').trim()
 /**
  * WebFetch：受限 HTTP GET，返回纯文本（会对 HTML 进行去标签与解码），带超时与大小限制。
  */
-export const webfetchTool: McpTool<WebFetchInput> = {
+export const webfetchTool = defineMcpTool<WebFetchInput>({
     name: 'webfetch',
     description: 'HTTP GET 请求，返回处理后的纯文本正文（自动剥离 HTML 标签）',
     inputSchema: WEBFETCH_INPUT_SCHEMA,
@@ -155,4 +155,4 @@ export const webfetchTool: McpTool<WebFetchInput> = {
             clearTimeout(timer)
         }
     },
-}
+})

@@ -46,8 +46,8 @@ afterAll(async () => {
 
 describe('write tool', () => {
     test('rejects missing path', async () => {
-        const res = writeTool.inputSchema.safeParse({ content: 'x' })
-        assert.strictEqual(res.success, false)
+        const res = writeTool.validateInput?.({ content: 'x' })
+        assert.ok(res && !res.ok)
     })
 
     test('writes content to file', async () => {
@@ -71,8 +71,8 @@ describe('write tool', () => {
 
 describe('read tool', () => {
     test('schema rejects invalid params', () => {
-        const parsed = readTool.inputSchema.safeParse({})
-        assert.strictEqual(parsed.success, false)
+        const parsed = readTool.validateInput?.({})
+        assert.ok(parsed && !parsed.ok)
     })
 
     test('reads with offset and limit', async () => {
@@ -121,17 +121,17 @@ describe('read tool', () => {
 
 describe('edit tool', () => {
     test('rejects missing fields', async () => {
-        const res = editTool.inputSchema.safeParse({})
-        assert.strictEqual(res.success, false)
+        const res = editTool.validateInput?.({})
+        assert.ok(res && !res.ok)
     })
 
     test('rejects empty old_string', async () => {
-        const res = editTool.inputSchema.safeParse({
+        const res = editTool.validateInput?.({
             file_path: 'x',
             old_string: '',
             new_string: 'y',
         })
-        assert.strictEqual(res.success, false)
+        assert.ok(res && !res.ok)
     })
 
     test('replaces first occurrence by default', async () => {
