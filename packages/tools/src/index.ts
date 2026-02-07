@@ -39,7 +39,7 @@ function buildCodexTools(): McpTool[] {
     const shellMode = process.env.MEMO_SHELL_TOOL_TYPE?.trim() || 'unified_exec'
     const experimental = parseCsvEnv('MEMO_EXPERIMENTAL_TOOLS')
     const enableAllExperimental = experimental.size === 0
-    const collabEnabled = process.env.MEMO_ENABLE_COLLAB_TOOLS === '1'
+    const collabEnabled = process.env.MEMO_ENABLE_COLLAB_TOOLS !== '0'
     const memoryToolEnabled = process.env.MEMO_ENABLE_MEMORY_TOOL !== '0'
 
     if (shellMode === 'shell') {

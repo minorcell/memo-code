@@ -10,7 +10,7 @@ import type {
 } from './types'
 import { createToolClassifier } from './classifier'
 import { generateFingerprint } from './fingerprint'
-import { APPROVAL_REASONS } from './constants'
+import { APPROVAL_REASONS, ALWAYS_AUTO_APPROVE_TOOLS } from './constants'
 
 interface ApprovalCache {
     session: Set<ApprovalKey>
@@ -52,6 +52,10 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
         },
 
         check(toolName: string, params: unknown): ApprovalCheckResult {
+            if (ALWAYS_AUTO_APPROVE_TOOLS.has(toolName)) {
+                return { needApproval: false, decision: 'auto-execute' }
+            }
+
             const riskLevel = classifier.getRiskLevel(toolName)
 
             if (!classifier.needsApproval(riskLevel, approvalMode)) {
