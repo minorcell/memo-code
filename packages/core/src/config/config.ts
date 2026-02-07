@@ -25,24 +25,14 @@ export type MCPServerConfig =
           stderr?: 'inherit' | 'pipe' | 'ignore'
       }
     | {
-          /** 通过 Streamable HTTP 连接远程 MCP（必要时可回退 SSE）。 */
+          /** 通过 Streamable HTTP 连接远程 MCP。 */
           type?: 'streamable_http'
           url: string
-          /** 失败时是否回退到 SSE 传输，默认 true。 */
-          fallback_to_sse?: boolean
           /** 附加请求头（如鉴权）。 */
           headers?: Record<string, string>
           /** codex 风格字段：附加请求头（优先于 headers）。 */
           http_headers?: Record<string, string>
           /** codex 风格字段：Bearer token env var。 */
-          bearer_token_env_var?: string
-      }
-    | {
-          /** 强制使用 SSE（旧版 HTTP 传输）。 */
-          type: 'sse'
-          url: string
-          headers?: Record<string, string>
-          http_headers?: Record<string, string>
           bearer_token_env_var?: string
       }
 
@@ -135,9 +125,6 @@ function serializeConfig(config: MemoConfig) {
                     const lines = [`[mcp_servers.${name}]`]
                     lines.push(`type = "${conf.type ?? 'streamable_http'}"`)
                     lines.push(`url = "${conf.url}"`)
-                    if ('fallback_to_sse' in conf && conf.fallback_to_sse !== undefined) {
-                        lines.push(`fallback_to_sse = ${conf.fallback_to_sse}`)
-                    }
                     if (conf.bearer_token_env_var) {
                         lines.push(
                             `bearer_token_env_var = ${JSON.stringify(conf.bearer_token_env_var)}`,
@@ -236,26 +223,6 @@ export function getMemoryPath(loaded: LoadedConfig) {
     return join(loaded.home, DEFAULT_MEMORY_FILE)
 }
 
-function sanitizePathComponent(raw: string, maxLen = 100) {
-    const replaced = raw.replace(/[\\/:\s]+/g, '-')
-    const collapsed = replaced.replace(/-+/g, '-')
-    const trimmed = collapsed.replace(/^-+|-+$/g, '')
-    const sliced = trimmed.slice(0, maxLen)
-    return sliced || 'root'
-}
-
-function truncatePath(parts: string[], maxTotalLen = 180) {
-    const result: string[] = []
-    let current = 0
-    for (const part of parts) {
-        const safe = part.slice(0, Math.max(1, maxTotalLen - current - (result.length > 0 ? 1 : 0)))
-        result.push(safe)
-        current += safe.length + (result.length > 1 ? 1 : 0)
-        if (current >= maxTotalLen) break
-    }
-    return result
-}
-
 export function buildSessionPath(baseDir: string, sessionId: string) {
     const now = new Date()
     const yyyy = String(now.getFullYear())
@@ -266,18 +233,6 @@ export function buildSessionPath(baseDir: string, sessionId: string) {
     const SS = String(now.getSeconds()).padStart(2, '0')
     const fileName = `rollout-${yyyy}-${mm}-${dd}T${HH}-${MM}-${SS}-${sessionId}.jsonl`
     return join(baseDir, yyyy, mm, dd, fileName)
-}
-
-function buildSessionDirName(cwd: string) {
-    const safeParts = cwd.split(/[/\\]+/).map((p) => sanitizePathComponent(p))
-    const truncatedParts = truncatePath(safeParts, 180)
-    return truncatedParts.join('-') || 'root'
-}
-
-/** 获取某个 cwd 对应的 session 日志目录。 */
-export function getSessionLogDir(baseDir: string, cwd: string) {
-    // Legacy support for old path layout: sessions/<sanitized-cwd>/<timestamp>_<id>.jsonl
-    return join(baseDir, buildSessionDirName(cwd))
 }
 
 /** 提供一个新的 sessionId，便于外部复用。 */

@@ -41,7 +41,10 @@ describe('memory injection', () => {
 
         const session = await createAgentSession(
             {
-                callLLM: async () => ({ content: JSON.stringify({ final: 'ok' }) }),
+                callLLM: async () => ({
+                    content: [{ type: 'text', text: 'ok' }],
+                    stop_reason: 'end_turn',
+                }),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
             },
@@ -65,7 +68,10 @@ describe('memory injection', () => {
     test('injects runtime context into system prompt', async () => {
         const session = await createAgentSession(
             {
-                callLLM: async () => ({ content: JSON.stringify({ final: 'ok' }) }),
+                callLLM: async () => ({
+                    content: [{ type: 'text', text: 'ok' }],
+                    stop_reason: 'end_turn',
+                }),
                 historySinks: [],
                 tokenCounter: createTokenCounter('cl100k_base'),
             },

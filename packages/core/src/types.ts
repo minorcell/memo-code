@@ -107,25 +107,17 @@ export type TextBlock = {
 /** Content Block - 可以是文本或工具调用 */
 export type ContentBlock = TextBlock | ToolUseBlock
 
-/** LLM 响应（支持 Tool Use API 和传统文本模式）。 */
-export type LLMResponse =
-    | string
-    | {
-          /** 模型输出文本（传统模式）。 */
-          content: string
-          /** 模型返回的 token usage（可选）。 */
-          usage?: Partial<TokenUsage>
-          /** 若为流式增量输出，标记已通过 onChunk 传递过部分内容。 */
-          streamed?: boolean
-      }
-    | {
-          /** 结构化内容块（Tool Use API 模式）*/
-          content: ContentBlock[]
-          /** 停止原因 */
-          stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
-          /** 模型返回的 token usage（可选）。 */
-          usage?: Partial<TokenUsage>
-      }
+/** LLM 响应（统一使用结构化 content blocks）。 */
+export type LLMResponse = {
+    /** 结构化内容块（文本 + 工具调用）。 */
+    content: ContentBlock[]
+    /** 停止原因。 */
+    stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
+    /** 模型返回的 token usage（可选）。 */
+    usage?: Partial<TokenUsage>
+    /** 若为流式增量输出，标记已通过 onChunk 传递过部分内容。 */
+    streamed?: boolean
+}
 
 /** 将 LLM 输出解析成 action/final 结构后的表示。 */
 export type ParsedAssistant = {

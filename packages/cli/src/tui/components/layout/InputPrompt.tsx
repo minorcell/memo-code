@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { Box, Text, useInput } from 'ink'
-import { getSessionLogDir, type ProviderConfig, type MCPServerConfig } from '@memo/core'
+import { type ProviderConfig, type MCPServerConfig } from '@memo/core'
 import { getFileSuggestions, type InputHistoryEntry } from '../../suggestions'
 import { SuggestionList, type SuggestionListItem } from '../input/SuggestionList'
 import { SLASH_COMMANDS, type SlashCommand } from '../../slash'
@@ -556,29 +556,21 @@ type HistoryLoadOptions = {
 type SessionFileCandidate = {
     path: string
     mtimeMs: number
-    source: 'legacy' | 'dated'
-}
-
-type HistoryEntryBuildOptions = {
-    requireCwdMatch: boolean
 }
 
 async function loadSessionHistoryEntries(
     options: HistoryLoadOptions,
 ): Promise<InputHistoryEntry[]> {
     const normalizedActive = options.activeSessionFile ? resolve(options.activeSessionFile) : null
-    const [legacyCandidates, datedCandidates] = await Promise.all([
-        collectLegacySessionCandidates(options.sessionsDir, options.cwd),
-        collectDatePartitionedSessionCandidates(options.sessionsDir),
-    ])
-    const candidates = [...legacyCandidates, ...datedCandidates]
+    const candidates = await collectDatePartitionedSessionCandidates(options.sessionsDir)
+    const filteredCandidates = candidates
         .filter((candidate) => !normalizedActive || resolve(candidate.path) !== normalizedActive)
         .filter(
             (candidate, index, list) =>
                 list.findIndex((other) => resolve(other.path) === resolve(candidate.path)) ===
                 index,
         )
-    const sorted = candidates.sort((a, b) => b.mtimeMs - a.mtimeMs)
+    const sorted = filteredCandidates.sort((a, b) => b.mtimeMs - a.mtimeMs)
     const limit = options.limit ?? 10
     const keyword = options.keyword?.trim().toLowerCase()
     const entries: InputHistoryEntry[] = []
@@ -588,7 +580,6 @@ async function loadSessionHistoryEntries(
             candidate.path,
             options.cwd,
             candidate.mtimeMs,
-            { requireCwdMatch: candidate.source === 'dated' },
         )
         if (!entry) continue
         if (keyword && !entry.input.toLowerCase().includes(keyword)) {
@@ -604,12 +595,11 @@ async function buildHistoryEntryFromFile(
     filePath: string,
     cwd: string,
     ts: number,
-    options: HistoryEntryBuildOptions,
 ): Promise<InputHistoryEntry | null> {
     try {
         const raw = await readFile(filePath, 'utf8')
         const { firstPrompt, sessionCwd } = extractSessionSummary(raw)
-        if (!matchSessionCwd(cwd, sessionCwd, options)) {
+        if (!matchSessionCwd(cwd, sessionCwd)) {
             return null
         }
         const title = firstPrompt?.trim() || formatSessionFileName(filePath)
@@ -669,46 +659,9 @@ function normalizeCwd(input: string) {
     return process.platform === 'win32' ? normalized.toLowerCase() : normalized
 }
 
-function matchSessionCwd(
-    cwd: string,
-    sessionCwd: string | null,
-    options: HistoryEntryBuildOptions,
-) {
-    if (!sessionCwd) {
-        return !options.requireCwdMatch
-    }
+function matchSessionCwd(cwd: string, sessionCwd: string | null) {
+    if (!sessionCwd) return false
     return normalizeCwd(cwd) === normalizeCwd(sessionCwd)
-}
-
-async function collectLegacySessionCandidates(
-    sessionsDir: string,
-    cwd: string,
-): Promise<SessionFileCandidate[]> {
-    const logDir = getSessionLogDir(sessionsDir, cwd)
-    let dirEntries: import('node:fs').Dirent[]
-    try {
-        dirEntries = await readdir(logDir, { withFileTypes: true })
-    } catch {
-        return []
-    }
-    const candidates = await Promise.all(
-        dirEntries
-            .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
-            .map(async (entry) => {
-                const fullPath = join(logDir, entry.name)
-                try {
-                    const info = await stat(fullPath)
-                    return {
-                        path: fullPath,
-                        mtimeMs: info.mtimeMs,
-                        source: 'legacy' as const,
-                    }
-                } catch {
-                    return null
-                }
-            }),
-    )
-    return candidates.filter((item): item is SessionFileCandidate => Boolean(item))
 }
 
 async function collectDatePartitionedSessionCandidates(
@@ -755,7 +708,6 @@ async function collectDatePartitionedSessionCandidates(
                 return {
                     path: filePath,
                     mtimeMs: info.mtimeMs,
-                    source: 'dated' as const,
                 }
             } catch {
                 return null
