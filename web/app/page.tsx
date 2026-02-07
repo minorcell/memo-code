@@ -24,8 +24,8 @@ const featureCards = [
         description: '支持连接外部工具与服务，按团队需求逐步扩展能力边界。',
     },
     {
-        title: '连续上下文协作',
-        description: '保留项目语境并支持持续迭代，减少重复沟通和上下文重建。',
+        title: '多Agent系统',
+        description: '支持Subagent模式，多agent协作更好完成你的任务。',
     },
 ]
 

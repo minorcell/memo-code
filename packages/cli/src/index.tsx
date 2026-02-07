@@ -127,7 +127,6 @@ async function runPlainMode(parsed: ParsedArgs) {
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        stream: loaded.config.stream_output ?? false,
         maxPromptTokens: loaded.config.max_prompt_tokens,
         dangerous: parsed.options.dangerous,
     }
@@ -138,9 +137,6 @@ async function runPlainMode(parsed: ParsedArgs) {
     }
 
     const deps: AgentSessionDeps = {
-        onAssistantStep: (text: string) => {
-            process.stdout.write(text)
-        },
         // 非危险模式下，plain 模式不支持交互式审批，所以不设置 requestApproval
         // 当工具需要审批时会返回错误
         requestApproval: parsed.options.dangerous
@@ -179,9 +175,7 @@ async function runPlainMode(parsed: ParsedArgs) {
     try {
         console.log(`User: ${question}\n`)
         const turnResult = await session.runTurn(question)
-        if (!loaded.config.stream_output) {
-            console.log(`\n${turnResult.finalText}`)
-        }
+        console.log(`\n${turnResult.finalText}`)
         console.log(
             `\n[tokens] prompt=${turnResult.tokenUsage.prompt} completion=${turnResult.tokenUsage.completion} total=${turnResult.tokenUsage.total}`,
         )
@@ -200,7 +194,6 @@ async function runInteractiveTui(parsed: ParsedArgs) {
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        stream: loaded.config.stream_output ?? false,
         maxPromptTokens: loaded.config.max_prompt_tokens,
         dangerous: parsed.options.dangerous,
     }

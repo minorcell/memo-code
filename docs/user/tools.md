@@ -1,61 +1,106 @@
-# Tools (Built-in Tool Overview)
+# 工具总览
 
-Memo has a built-in toolset and also supports external tools via MCP. In most cases, you do not need to call tools manually. Just describe your goal clearly and explicitly specify which files should be read or changed.
+Memo 内置一组 codex 风格工具，并支持 MCP 外部工具。通常你不需要手动“点名调用工具”，只需明确目标和约束。
 
-## Built-in Tool Groups
+## 一、当前内置工具分组
 
-### Read-only Tools (Usually no approval needed)
+### 1) Shell 执行族
 
-- `read_file`: read local files with offset/limit
-- `list_dir`: list directory entries
-- `grep_files`: content search (ripgrep-backed)
-- `webfetch`: restricted HTTP GET with cleaned text preview
-- `get_memory`: read `Agents.md` memory payload
-- `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource`: inspect MCP-provided resources
-- `update_plan`: maintain structured plan state in-session
-- `wait`: read status snapshots for collaboration agents (feature-gated)
+- `exec_command`
+- `write_stdin`
+- `shell`（兼容模式）
+- `shell_command`（兼容模式）
 
-### Write Tools (Approval required)
+说明：
 
-- `apply_patch`: patch-based file edits
+- 默认 `MEMO_SHELL_TOOL_TYPE=unified_exec`，通常使用 `exec_command + write_stdin`。
+- `shell` / `shell_command` 主要用于兼容切换。
 
-### Execution Tools (High risk, approval required)
+### 2) 文件与检索族
 
-- `exec_command` / `write_stdin`: run and continue shell sessions
-- `shell` / `shell_command`: compatibility shell variants (enabled by env/feature flags)
-- `spawn_agent` / `send_input` / `resume_agent` / `close_agent`: collaboration-agent controls (feature-gated)
+- `apply_patch`
+- `read_file`
+- `list_dir`
+- `grep_files`
 
-## How to Help Memo Use Tools Effectively
+说明：
 
-- **State goal and scope clearly**: for example, "Only modify `@packages/core/src/config/config.ts`; do not touch other files."
-- **Read before write**: for example, "Read `@README.md` first, then add one section based on the current structure."
-- **Set constraints**: for example, "Do not run destructive commands; read-only only."
+- `apply_patch` 为写入工具。
+- `read_file` / `list_dir` / `grep_files` 受 `MEMO_EXPERIMENTAL_TOOLS` 控制。
+- 当前实现中，`MEMO_EXPERIMENTAL_TOOLS` 为空时默认全部启用这三项。
 
-## Detailed Tool Parameter Docs
+### 3) MCP 资源族
 
-Use these pages when you need exact parameter/behavior details:
+- `list_mcp_resources`
+- `list_mcp_resource_templates`
+- `read_mcp_resource`
 
-- `read_file`: `docs/tool/read_file.md`
-- `list_dir`: `docs/tool/list_dir.md`
-- `grep_files`: `docs/tool/grep_files.md`
-- `webfetch`: `docs/tool/webfetch.md`
-- `get_memory`: `docs/tool/get_memory.md`
-- `apply_patch`: `docs/tool/apply_patch.md`
-- `exec_command`: `docs/tool/exec_command.md`
-- `write_stdin`: `docs/tool/write_stdin.md`
-- `shell`: `docs/tool/shell.md`
-- `shell_command`: `docs/tool/shell_command.md`
-- `update_plan`: `docs/tool/update_plan.md`
-- `list_mcp_resources`: `docs/tool/list_mcp_resources.md`
-- `list_mcp_resource_templates`: `docs/tool/list_mcp_resource_templates.md`
-- `read_mcp_resource`: `docs/tool/read_mcp_resource.md`
-- `spawn_agent`: `docs/tool/spawn_agent.md`
-- `send_input`: `docs/tool/send_input.md`
-- `resume_agent`: `docs/tool/resume_agent.md`
-- `wait`: `docs/tool/wait.md`
-- `close_agent`: `docs/tool/close_agent.md`
+### 4) 流程与上下文工具
 
-## Related Docs
+- `update_plan`
+- `get_memory`（可开关）
+- `webfetch`
 
-- Tool approvals and dangerous mode: [Tool Approval and Safety](./approval-safety.md)
-- MCP external tools: [MCP Extensions](./mcp.md)
+### 5) 多 agent（Subagent）工具
+
+- `spawn_agent`
+- `send_input`
+- `resume_agent`
+- `wait`
+- `close_agent`
+
+说明：
+
+- 默认启用；可通过 `MEMO_ENABLE_COLLAB_TOOLS=0` 显式关闭。
+
+## 二、审批风险分级（默认）
+
+- 只读：通常自动放行（如 `read_file`、`list_dir`、`grep_files`、`webfetch`、MCP 读取类）
+- 写入：需要审批（`apply_patch`）
+- 执行：需要审批（Shell 执行族）
+- Subagent 工具族默认免审批，按危险语义执行（需自行控制任务边界）
+
+详细机制见：[审批与安全](./approval-safety.md)
+
+## 三、常用运行开关
+
+- `MEMO_SHELL_TOOL_TYPE`：`unified_exec` / `shell` / `shell_command` / `disabled`
+- `MEMO_EXPERIMENTAL_TOOLS`：逗号分隔（如 `read_file,list_dir`）
+- `MEMO_ENABLE_MEMORY_TOOL`：`0` 时禁用 `get_memory`
+- `MEMO_ENABLE_COLLAB_TOOLS=0`：禁用 subagent 工具（默认启用）
+- `MEMO_SUBAGENT_COMMAND`：subagent 实际执行命令
+- `MEMO_SUBAGENT_MAX_AGENTS`：subagent 并发上限（默认 `4`）
+
+## 四、如何让工具调用更稳定
+
+- 明确作用范围：例如“只改 `packages/tools/src/index.ts`”。
+- 先读后写：先让模型读取目标文件，再执行改动。
+- 给出约束：例如“禁止执行删除命令，只允许读操作”。
+- 输出过长时收敛范围：缩小目录、增加关键词、降低结果上限。
+
+## 五、Subagent 专项说明
+
+如果你要系统使用 `spawn_agent / send_input / wait / close_agent / resume_agent`，建议先阅读：
+
+- [`docs/user/subagent.md`](./subagent.md)
+
+## 六、工具参数细节
+
+各工具参数与示例见 `docs/tool/*`：
+
+- `docs/tool/exec_command.md`
+- `docs/tool/write_stdin.md`
+- `docs/tool/apply_patch.md`
+- `docs/tool/read_file.md`
+- `docs/tool/list_dir.md`
+- `docs/tool/grep_files.md`
+- `docs/tool/webfetch.md`
+- `docs/tool/get_memory.md`
+- `docs/tool/list_mcp_resources.md`
+- `docs/tool/list_mcp_resource_templates.md`
+- `docs/tool/read_mcp_resource.md`
+- `docs/tool/spawn_agent.md`
+- `docs/tool/send_input.md`
+- `docs/tool/resume_agent.md`
+- `docs/tool/wait.md`
+- `docs/tool/close_agent.md`

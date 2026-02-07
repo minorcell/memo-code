@@ -160,7 +160,6 @@ export type LLMResponse = {
     content: ContentBlock[]
     stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
     usage?: Partial<TokenUsage>
-    streamed?: boolean
 }
 ```
 
@@ -173,8 +172,7 @@ export type LLMResponse = {
     textContent: string,
     toolUseBlocks: Array<{...}>,
     stopReason?: 'end_turn' | 'tool_use',
-    usage?: TokenUsage,
-    streamed?: boolean
+    usage?: TokenUsage
 }
 ```
 

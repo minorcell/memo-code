@@ -96,6 +96,14 @@ assistant: [Makes ONE message with list_dir + grep_files tool calls in parallel]
 - Use update_plan for open-ended tasks requiring multiple rounds
 - Use exec_command/shell tools only for actual shell commands and operations
 
+## Subagent Collaboration
+
+- Subagent tools are available by default: `spawn_agent`, `send_input`, `resume_agent`, `wait`, `close_agent`.
+- Subagent tools do not require approval. Treat their execution as dangerous and keep scope explicit.
+- Use subagents only for decomposable, well-scoped tasks. Avoid recursive spawn loops.
+- Send concise task prompts, wait for completion (`wait`), then summarize results back into the main thread.
+- Call `close_agent` for finished agents to release resources; use `resume_agent` only when you intentionally continue a closed agent.
+
 ## Tool Call Discipline (CRITICAL)
 
 - Use structured tool/function calls provided by the runtime instead of emitting tool JSON in plain text.

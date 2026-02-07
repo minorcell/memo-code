@@ -38,7 +38,6 @@ export type MCPServerConfig =
 
 export type MemoConfig = {
     current_provider: string
-    stream_output?: boolean
     /** Persistent prompt token limit (maps to AgentSessionOptions.maxPromptTokens). */
     max_prompt_tokens?: number
     /** Map of server name to server configuration */
@@ -53,7 +52,6 @@ const DEFAULT_SESSIONS_DIR = 'sessions'
 
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
-    stream_output: false,
     max_prompt_tokens: 120000,
     providers: [
         {
@@ -154,10 +152,7 @@ function serializeConfig(config: MemoConfig) {
             .join('\n\n')
     }
 
-    const mainLines = [
-        `current_provider = "${config.current_provider}"`,
-        `stream_output = ${config.stream_output ?? false}`,
-    ]
+    const mainLines = [`current_provider = "${config.current_provider}"`]
     if (typeof config.max_prompt_tokens === 'number' && Number.isFinite(config.max_prompt_tokens)) {
         mainLines.push(`max_prompt_tokens = ${Math.floor(config.max_prompt_tokens)}`)
     }
@@ -194,7 +189,6 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
                 : undefined
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
-            stream_output: parsed.stream_output ?? DEFAULT_CONFIG.stream_output,
             max_prompt_tokens: maxPromptTokens ?? DEFAULT_CONFIG.max_prompt_tokens,
             providers,
             mcp_servers: parsed.mcp_servers ?? {},

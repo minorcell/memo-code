@@ -51,7 +51,7 @@ memo
 
 ## Usage
 
-- Interactive mode: `memo` (default TUI; supports multi-turn chat, streaming, tool visualization, shortcuts).
+- Interactive mode: `memo` (default TUI; supports multi-turn chat, tool visualization, shortcuts).
 - Plain mode (non-TTY): `echo "your prompt" | memo` (plain text output; useful for scripts).
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
@@ -64,7 +64,6 @@ Location: `~/.memo/config.toml` (can be changed via `MEMO_HOME`).
 
 ```toml
 current_provider = "deepseek"
-stream_output = false
 
 [[providers.deepseek]]
 name = "deepseek"

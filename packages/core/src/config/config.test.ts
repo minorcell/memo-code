@@ -129,7 +129,6 @@ describe('mcp config serialization', () => {
         await mkdir(home, { recursive: true })
         const configText = `
 current_provider = "deepseek"
-stream_output = false
 max_prompt_tokens = 150000
 
 [[providers.deepseek]]
@@ -186,7 +185,6 @@ model = "legacy-model"
         await mkdir(home, { recursive: true })
         const configText = `
 current_provider = "deepseek"
-stream_output = false
 
 [[providers.deepseek]]
 name = "deepseek"

@@ -15,6 +15,10 @@ export const DEFAULT_TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
     list_dir: 'read',
     grep_files: 'read',
     wait: 'read',
+    spawn_agent: 'read',
+    send_input: 'read',
+    resume_agent: 'read',
+    close_agent: 'read',
 
     // 写入工具 - 需要审批
     apply_patch: 'write',
@@ -24,11 +28,19 @@ export const DEFAULT_TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
     shell_command: 'execute',
     exec_command: 'execute',
     write_stdin: 'execute',
-    spawn_agent: 'execute',
-    send_input: 'execute',
-    resume_agent: 'execute',
-    close_agent: 'execute',
 }
+
+/**
+ * 永远跳过审批的工具（即使 strict mode）。
+ * subagent 工具默认按 dangerous 语义执行，不阻塞审批流程。
+ */
+export const ALWAYS_AUTO_APPROVE_TOOLS = new Set<string>([
+    'spawn_agent',
+    'send_input',
+    'resume_agent',
+    'wait',
+    'close_agent',
+])
 
 /** 风险等级描述 */
 export const RISK_LEVEL_DESCRIPTIONS: Record<RiskLevel, string> = {

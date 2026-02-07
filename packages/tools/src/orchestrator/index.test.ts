@@ -77,6 +77,38 @@ describe('tool orchestrator', () => {
         assert.ok(result.actionId.length)
     })
 
+    test('auto-approves subagent tools even in strict approval mode', async () => {
+        let askedApproval = false
+        const orchestrator = createToolOrchestrator({
+            tools: {
+                spawn_agent: {
+                    name: 'spawn_agent',
+                    execute: async () => ({
+                        content: [{ type: 'text', text: 'spawned' }],
+                    }),
+                },
+            },
+            approval: {
+                mode: 'strict',
+            },
+        })
+
+        const result = await orchestrator.executeAction(
+            { name: 'spawn_agent', input: { message: 'task' } },
+            {
+                requestApproval: async () => {
+                    askedApproval = true
+                    return 'deny'
+                },
+            },
+        )
+
+        assert.strictEqual(askedApproval, false)
+        assert.strictEqual(result.success, true)
+        assert.strictEqual(result.status, 'success')
+        assert.strictEqual(result.observation, 'spawned')
+    })
+
     test('returns unknown tool error', async () => {
         const orchestrator = createToolOrchestrator({ tools: {} })
         const result = await orchestrator.executeAction(

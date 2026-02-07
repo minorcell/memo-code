@@ -1,11 +1,11 @@
 # Memo CLI `close_agent` Tool
 
-Closes an agent record.
+Closes an existing subagent and terminates running work.
 
 ## Basic Info
 
 - Tool name: `close_agent`
-- Description: set agent status to closed
+- Description: close subagent by id
 - File: `packages/tools/src/tools/collab.ts`
 - Confirmation: no
 
@@ -16,6 +16,7 @@ Closes an agent record.
 ## Behavior
 
 - Looks up agent by id.
-- Sets `status` to `closed`.
-- Returns updated record JSON.
+- If a submission is running, terminates it before returning.
+- Sets status to `closed`.
+- Returns JSON with `agent_id` and `status`.
 - Returns `isError=true` when id is unknown.

@@ -1,48 +1,23 @@
-# Configuration (Provider / Config)
+# 配置说明
 
-Memo uses `config.toml` to manage providers, models, MCP servers, and other runtime settings.
+Memo 使用 `config.toml` 管理 Provider、模型、MCP 服务器与上下文上限。
 
-## Config File Location
+## 配置文件位置
 
-Default location:
+默认位置：
 
 - `~/.memo/config.toml`
 
-Override via environment variable:
+可通过 `MEMO_HOME` 重定向：
 
-- `MEMO_HOME=/path/to/dir` -> config file becomes `$MEMO_HOME/config.toml`
+- `MEMO_HOME=/path/to/home`
+- 配置文件路径变为：`$MEMO_HOME/config.toml`
 
-> You can also use multiple `MEMO_HOME` directories for separate setups (for example work/personal, different base URLs).
-
-## Provider Configuration (Multi-model / Multi-endpoint)
-
-Minimal example (DeepSeek):
+## 基础配置示例
 
 ```toml
 current_provider = "deepseek"
-stream_output = false
-
-[[providers.deepseek]]
-name = "deepseek"
-env_api_key = "DEEPSEEK_API_KEY"
-model = "deepseek-chat"
-base_url = "https://api.deepseek.com"
-```
-
-Field descriptions:
-
-- `current_provider`: current default provider (used by `/models` and startup selection)
-- `stream_output`: whether streaming output is enabled
-- `providers.<name>`: provider list (multiple entries supported)
-    - `env_api_key`: env var to read API key from
-    - `model`: model ID
-    - `base_url`: OpenAI-compatible endpoint (optional)
-
-### Multi-provider Example
-
-```toml
-current_provider = "deepseek"
-stream_output = false
+max_prompt_tokens = 120000
 
 [[providers.deepseek]]
 name = "deepseek"
@@ -57,23 +32,42 @@ model = "gpt-4.1-mini"
 base_url = "https://api.openai.com/v1"
 ```
 
-## Important Note About `stream_output`
+字段说明：
 
-When `stream_output=true`, Memo prefers a streaming response path. In the current implementation, tool definitions are not sent in that path, so tool calling can be limited (better for plain Q&A/summarization).
+- `current_provider`：当前默认 provider 名称
+- `max_prompt_tokens`：上下文上限（与 `/context` 联动）
+- `providers.*`：Provider 列表（可多组）
+    - `env_api_key`：读取 API Key 的环境变量名
+    - `model`：模型标识
+    - `base_url`：OpenAI 兼容 API 地址（可选）
 
-If you need stable tool usage (`read_file`/`list_dir`/`grep_files`/`apply_patch`/`exec_command`, etc.), keep:
+## MCP 配置示例
+
+### 本地 stdio MCP
 
 ```toml
-stream_output = false
+[mcp_servers.local_tools]
+command = "/path/to/mcp-server"
+args = ["--flag"]
 ```
 
-## MCP Server Configuration
+### 远程 streamable HTTP MCP
 
-You can define MCP servers in `config.toml` under `[mcp_servers.<name>]` or manage them with `memo mcp add/remove`.
+```toml
+[mcp_servers.remote]
+type = "streamable_http"
+url = "https://your-mcp-server.com/mcp"
+bearer_token_env_var = "MCP_TOKEN"
+```
 
-- [MCP Extensions](./mcp.md)
+也可以使用命令行维护：`memo mcp list/get/add/remove`。
 
-## Related Paths
+## 其他相关路径
 
-- Session logs: `~/.memo/sessions/` by default (see [Sessions and Logs](./sessions-history.md))
-- Memory file: `~/.memo/Agents.md` by default (used by `get_memory`, see [Long-term Memory](./memory.md))
+- 会话历史：`~/.memo/sessions/`（可随 `MEMO_HOME` 变化）
+- 记忆文件：`~/.memo/Agents.md`（`get_memory` 读取）
+
+## 相关文档
+
+- [MCP 扩展](./mcp.md)
+- [会话与历史](./sessions-history.md)

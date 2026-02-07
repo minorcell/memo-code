@@ -1,6 +1,6 @@
 # Memo CLI `resume_agent` Tool
 
-Marks a closed agent record as running again.
+Reopens a previously closed subagent.
 
 ## Basic Info
 
@@ -16,6 +16,7 @@ Marks a closed agent record as running again.
 ## Behavior
 
 - Looks up agent by id.
-- Sets `status` to `running`.
-- Returns updated record JSON.
+- If status is `closed`, restores the pre-close status.
+- Does not start a new submission by itself; use `send_input` for new work.
+- Returns JSON with `agent_id` and current `status`.
 - Returns `isError=true` when id is unknown.
