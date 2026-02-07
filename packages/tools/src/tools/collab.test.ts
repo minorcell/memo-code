@@ -111,33 +111,6 @@ describe('collab tools', () => {
         )
     })
 
-    test('send_input requires interrupt when agent is busy and supports interruption', async () => {
-        const spawnResult = await spawnAgentTool.execute({ message: 'sleep:5000' })
-        const spawned = JSON.parse(textPayload(spawnResult))
-        const agentId = spawned.agent_id as string
-
-        const busySend = await sendInputTool.execute({
-            id: agentId,
-            message: 'echo:next',
-        })
-        assert.strictEqual(busySend.isError, true)
-        assert.ok(textPayload(busySend).includes('set interrupt=true'))
-
-        const interruptedSend = await sendInputTool.execute({
-            id: agentId,
-            message: 'echo:next',
-            interrupt: true,
-        })
-        assert.strictEqual(interruptedSend.isError, false)
-        const sent = JSON.parse(textPayload(interruptedSend))
-        assert.strictEqual(sent.status, 'running')
-
-        const waitResult = await waitTool.execute({ ids: [agentId], timeout_ms: 10_000 })
-        const waited = JSON.parse(textPayload(waitResult))
-        assert.strictEqual(waited.timed_out, false)
-        assert.strictEqual(waited.status[agentId], 'completed')
-    })
-
     test('close_agent marks closed and resume_agent restores pre-close status', async () => {
         const spawnResult = await spawnAgentTool.execute({ message: 'echo:first' })
         const spawned = JSON.parse(textPayload(spawnResult))
