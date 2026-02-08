@@ -276,7 +276,11 @@ class AgentSessionImpl implements AgentSession {
         const effectiveMaxPromptTokens = this.options.maxPromptTokens ?? DEFAULT_MAX_PROMPT_TOKENS
 
         if (!this.sessionStartEmitted) {
+            const systemPrompt =
+                this.history[0]?.role === 'system' ? this.history[0].content : undefined
             await this.emitEvent('session_start', {
+                content: systemPrompt,
+                role: systemPrompt ? 'system' : undefined,
                 meta: {
                     mode: this.mode,
                     cwd: process.cwd(),
