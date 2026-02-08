@@ -1,38 +1,12 @@
 import { Box, Text } from 'ink'
 import { memo } from 'react'
-import os from 'node:os'
 
 type HeaderBarProps = {
     providerName: string
     model: string
-    cwd: string
-    sessionId?: string
 }
 
-function formatCwd(cwd: string) {
-    const home = os.homedir()
-    if (!home) return cwd
-    return cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd
-}
-
-function formatSessionId(id: string | undefined): string {
-    if (!id) return 'N/A'
-    // Show first 8 chars and last 4 chars
-    if (id.length > 16) {
-        return `${id.slice(0, 8)}...${id.slice(-4)}`
-    }
-    return id
-}
-
-export const HeaderBar = memo(function HeaderBar({
-    providerName,
-    model,
-    cwd,
-    sessionId,
-}: HeaderBarProps) {
-    const displayCwd = formatCwd(cwd)
-    const displaySession = formatSessionId(sessionId)
-
+export const HeaderBar = memo(function HeaderBar({ providerName, model }: HeaderBarProps) {
     return (
         <Box
             borderStyle="round"
@@ -52,14 +26,6 @@ export const HeaderBar = memo(function HeaderBar({
 
             {/* Info Rows */}
             <Box flexDirection="column" gap={0}>
-                <Box>
-                    <Text color="gray">Directory: </Text>
-                    <Text color="cyan">{displayCwd}</Text>
-                </Box>
-                <Box>
-                    <Text color="gray">Session: </Text>
-                    <Text color="cyan">{displaySession}</Text>
-                </Box>
                 <Box>
                     <Text color="gray">Model: </Text>
                     <Text color="cyan">{model}</Text>
