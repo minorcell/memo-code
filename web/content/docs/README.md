@@ -1,0 +1,32 @@
+# Memo Documentation
+
+This documentation reflects the current behavior of Memo CLI and focuses on practical usage.
+
+## Recommended Reading
+
+1. [Getting Started](./getting-started.md)
+2. [CLI & TUI Guide](./cli-tui.md)
+3. [Configuration](./configuration.md)
+4. [Built-in Tools](./tools.md)
+5. [Safety & Approvals](./approval-safety.md)
+6. [Multi-Agent (Subagent)](./subagent.md)
+7. [MCP Integration](./mcp.md)
+8. [Sessions & History](./sessions-history.md)
+9. [Troubleshooting](./troubleshooting.md)
+
+## Documentation Index
+
+- [Getting Started](./getting-started.md): install, API key, first run.
+- [CLI & TUI Guide](./cli-tui.md): interaction model, slash commands, shortcuts, plain mode.
+- [Configuration](./configuration.md): `config.toml`, providers, MCP, environment variables.
+- [Built-in Tools](./tools.md): available tools, default toolset, feature switches.
+- [Safety & Approvals](./approval-safety.md): approval model, `--dangerous`, plain-mode behavior.
+- [Multi-Agent (Subagent)](./subagent.md): parallel task execution and lifecycle.
+- [MCP Integration](./mcp.md): how to add/manage MCP servers.
+- [Sessions & History](./sessions-history.md): JSONL logs, resume behavior, cleanup.
+- [Troubleshooting](./troubleshooting.md): common issues and direct fixes.
+
+## Scope
+
+- These pages are user-facing and intentionally avoid deep implementation internals.
+- Behavior described here is based on the current code in this repository.

@@ -195,7 +195,7 @@ memo-cli/
 - `/help`: show help and shortcut guide.
 - `/models`: list available Provider/Model entries and switch with Enter; also supports direct selection like `/models deepseek`.
 - `/context`: open 80k/120k/150k/200k options and apply immediately.
-- `$ <cmd>`: run a local shell command in current cwd and display result directly (`Shell Result`).
+- `/mcp`: show configured MCP servers in current session.
 - `resume` history: type `resume` to list and load past sessions for current directory.
 - Exit and clear: `exit` / `/exit`, `Ctrl+L` for new session, `Esc Esc` to cancel current run or clear input.
 - **Tool approval**: risky operations open an approval dialog with `once`/`session`/`deny`.
@@ -212,7 +212,7 @@ memo-cli/
 
 ## Related Docs
 
-- [User Guide](./docs/user/README.md) - User-facing docs by module
+- [User Guide](./web/content/docs/README.md) - User-facing docs by module
 - [Core Architecture](./docs/core.md) - Core implementation details
 - [CLI Adaptation History](./docs/cli-update.md) - Historical migration notes (Tool Use API)
 - [Contributing](./CONTRIBUTING.md) - Contribution guide

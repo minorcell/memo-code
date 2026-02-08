@@ -1,0 +1,141 @@
+# Troubleshooting
+
+This page covers common runtime issues and direct fixes.
+
+## Missing API Key
+
+Symptom:
+
+- errors like `Missing env var ...`
+
+Fix:
+
+1. Export the env var referenced by your provider's `env_api_key`.
+2. Check `current_provider` and provider entries in `config.toml`.
+3. Restart Memo from the same shell where env vars are set.
+
+## Plain Mode Cannot Execute Risky Tools
+
+Symptom:
+
+- write/exec actions are rejected in pipe mode
+
+Cause:
+
+- plain mode has no interactive approval UI
+
+Fix:
+
+1. run interactive TUI: `memo`
+2. or use `memo --dangerous` in controlled environments
+3. or keep the task read-only
+
+## `grep_files` Fails Because `rg` Is Missing
+
+Symptom:
+
+- `grep_files failed` with ripgrep-related error
+
+Fix:
+
+- install ripgrep (`rg`) and ensure it is in PATH
+
+## Tool Set Looks Different Than Expected
+
+Check environment switches:
+
+- `MEMO_SHELL_TOOL_TYPE`
+- `MEMO_EXPERIMENTAL_TOOLS`
+- `MEMO_ENABLE_MEMORY_TOOL`
+- `MEMO_ENABLE_COLLAB_TOOLS`
+
+A non-empty `MEMO_EXPERIMENTAL_TOOLS` enables only listed experimental tools.
+
+## Context Limit Exceeded
+
+Symptom:
+
+- final message indicates prompt/context tokens exceed limit
+
+Fix:
+
+1. use `/new` to reset session context
+2. lower task scope and continue in smaller chunks
+3. adjust `/context` to a larger supported value if needed
+
+## MCP Server Not Available in Session
+
+Symptoms:
+
+- `memo mcp list` shows config, but current TUI session does not reflect it
+
+Fix:
+
+1. check with `/mcp`
+2. create a new session (`/new`) or restart Memo after MCP config changes
+
+## `memo mcp login/logout` Fails
+
+Current behavior:
+
+- OAuth login/logout flow is not implemented yet
+
+Fix:
+
+- use `--bearer-token-env-var` and exported env token for remote HTTP MCP
+
+## Subagent Issues
+
+### `spawn_agent` Concurrency Error
+
+Cause:
+
+- running subagents reached `MEMO_SUBAGENT_MAX_AGENTS`
+
+Fix:
+
+- increase limit
+- close finished/unused agents
+- reduce parallel fan-out
+
+### `send_input` Busy Error
+
+Fix:
+
+- wait for current submission to complete, or
+- send with `interrupt=true`
+
+### `wait` Keeps Timing Out
+
+Fix:
+
+- verify `MEMO_SUBAGENT_COMMAND` is executable
+- increase `timeout_ms` (effective range `10000` to `300000`)
+- simplify subagent task scope
+
+## Tool Output Replaced by Omission Hint
+
+Symptom:
+
+- tool result is replaced with a `<system_hint ... tool_output_omitted ...>` message
+
+Cause:
+
+- tool output exceeded `MEMO_TOOL_RESULT_MAX_CHARS`
+
+Fix:
+
+1. narrow query scope (path, pattern, limit)
+2. split work into smaller calls
+3. increase `MEMO_TOOL_RESULT_MAX_CHARS` only if necessary
+
+## `--once` Flag Error
+
+Symptom:
+
+- `--once has been removed`
+
+Fix:
+
+- use `memo` for interactive mode
+- use stdin piping for one-shot plain mode

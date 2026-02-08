@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { cache } from 'react'
 import { marked } from 'marked'
 
-export type DocCategory = 'Basics' | 'Capabilities' | 'Operations'
+export type DocCategory = 'Getting Started' | 'Core Features' | 'Extensions' | 'Operations'
 
 export type DocSection = {
     id: string
@@ -37,71 +37,66 @@ type DocSpec = {
     category: DocCategory
 }
 
+// Documentation specification - order matters
 const DOC_SPECS: DocSpec[] = [
     {
         slug: 'getting-started',
         fileName: 'getting-started.md',
         order: 1,
-        category: 'Basics',
+        category: 'Getting Started',
     },
     {
         slug: 'cli-tui',
         fileName: 'cli-tui.md',
         order: 2,
-        category: 'Basics',
+        category: 'Getting Started',
     },
     {
         slug: 'configuration',
         fileName: 'configuration.md',
         order: 3,
-        category: 'Capabilities',
+        category: 'Getting Started',
     },
     {
         slug: 'tools',
         fileName: 'tools.md',
         order: 4,
-        category: 'Capabilities',
+        category: 'Core Features',
     },
     {
         slug: 'approval-safety',
         fileName: 'approval-safety.md',
         order: 5,
-        category: 'Capabilities',
-    },
-    {
-        slug: 'mcp',
-        fileName: 'mcp.md',
-        order: 6,
-        category: 'Capabilities',
+        category: 'Core Features',
     },
     {
         slug: 'subagent',
         fileName: 'subagent.md',
+        order: 6,
+        category: 'Core Features',
+    },
+    {
+        slug: 'mcp',
+        fileName: 'mcp.md',
         order: 7,
-        category: 'Capabilities',
+        category: 'Extensions',
     },
     {
         slug: 'sessions-history',
         fileName: 'sessions-history.md',
-        order: 9,
+        order: 8,
         category: 'Operations',
     },
     {
         slug: 'troubleshooting',
         fileName: 'troubleshooting.md',
-        order: 10,
+        order: 9,
         category: 'Operations',
     },
 ]
 
-const DOCS_DIR_CANDIDATES = [
-    resolve(process.cwd(), 'docs', 'user'),
-    resolve(process.cwd(), '..', 'docs', 'user'),
-]
-
-const DOCS_DIR =
-    DOCS_DIR_CANDIDATES.find((candidate) => existsSync(candidate)) ?? DOCS_DIR_CANDIDATES[1]
-
+// New location for web documentation
+const DOCS_DIR = resolve(process.cwd(), 'content', 'docs')
 const USER_GUIDE_FILE = 'README.md'
 
 function normalizeDocLinks(markdown: string) {

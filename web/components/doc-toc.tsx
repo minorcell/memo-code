@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { DocSectionAnchor } from '@/components/docs-shell'
+import { ArrowUp } from 'lucide-react'
 
 type DocTocProps = {
     sections: DocSectionAnchor[]
@@ -55,7 +56,7 @@ export function DocToc({ sections }: DocTocProps) {
 
     useEffect(() => {
         const updateProgress = () => {
-            const article = document.getElementById('doc-article')
+            const article = document.querySelector('article')
             if (!article) {
                 setProgress(0)
                 return
@@ -85,48 +86,70 @@ export function DocToc({ sections }: DocTocProps) {
 
     return (
         <aside className="hidden xl:block">
-            <div className="panel sticky top-6 rounded-2xl p-4">
-                <p className="text-xs font-semibold tracking-[0.1em] text-[var(--color-muted)]">
-                    Reading progress
-                </p>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/10">
-                    <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-brand),var(--color-accent))] transition-[width]"
-                        style={{ width: `${Math.round(progress * 100)}%` }}
-                    />
+            <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-auto">
+                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-5">
+                    {/* Progress */}
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                            Progress
+                        </p>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+                            <div
+                                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-[width] duration-300"
+                                style={{ width: `${Math.round(progress * 100)}%` }}
+                            />
+                        </div>
+                        <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+                            {Math.round(progress * 100)}% completed
+                        </p>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="my-5 h-px bg-[var(--border-default)]" />
+
+                    {/* TOC */}
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                            On this page
+                        </p>
+                        <nav className="mt-3 space-y-1">
+                            {sections.map((section) => {
+                                const isActive = section.id === activeId
+                                return (
+                                    <a
+                                        key={section.id}
+                                        href={`#${section.id}`}
+                                        className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-all ${
+                                            isActive
+                                                ? 'bg-indigo-500/10 text-indigo-400'
+                                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-white'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                                                isActive
+                                                    ? 'bg-indigo-400'
+                                                    : 'bg-[var(--text-tertiary)] group-hover:bg-white'
+                                            }`}
+                                        />
+                                        {section.title}
+                                    </a>
+                                )
+                            })}
+                        </nav>
+                    </div>
+
+                    {/* Back to top */}
+                    <div className="mt-5 border-t border-[var(--border-default)] pt-5">
+                        <a
+                            href="#"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-tertiary)] transition-colors hover:text-white"
+                        >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                            Back to top
+                        </a>
+                    </div>
                 </div>
-                <p className="mt-1 text-xs text-[var(--color-muted)]">
-                    {Math.round(progress * 100)}%
-                </p>
-
-                <p className="mt-5 text-xs font-semibold tracking-[0.1em] text-[var(--color-muted)]">
-                    On this page
-                </p>
-                <nav className="mt-2 space-y-1">
-                    {sections.map((section) => {
-                        const isActive = section.id === activeId
-                        return (
-                            <a
-                                key={section.id}
-                                href={`#${section.id}`}
-                                className={`block rounded-lg px-2 py-1.5 text-sm transition-colors ${
-                                    isActive
-                                        ? 'bg-[var(--color-brand)]/12 text-[var(--color-ink)]'
-                                        : 'text-[var(--color-muted)] hover:bg-black/5 hover:text-[var(--color-ink)]'
-                                }`}
-                            >
-                                {section.title}
-                            </a>
-                        )
-                    })}
-                </nav>
-
-                <a
-                    href="#doc-top"
-                    className="mt-4 inline-block text-xs font-semibold text-[var(--color-accent)]"
-                >
-                    Back to top
-                </a>
             </div>
         </aside>
     )

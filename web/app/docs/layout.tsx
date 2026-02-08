@@ -4,17 +4,18 @@ import { SiteHeader } from '@/components/site-header'
 
 export const metadata: Metadata = {
     title: {
-        default: 'Memo Docs',
-        template: '%s | Memo Docs',
+        default: 'Documentation',
+        template: '%s | Memo CLI Docs',
     },
-    description: 'Official Memo documentation sourced from /docs/user.',
+    description:
+        'Complete documentation for Memo CLI. Learn how to install, configure, and use the AI coding agent.',
 }
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
     return (
-        <>
+        <div className="docs-container min-h-screen">
             <SiteHeader />
             {children}
-        </>
+        </div>
     )
 }
