@@ -310,6 +310,8 @@ class AgentSessionImpl implements AgentSession {
             let status: TurnStatus = 'ok'
             let errorMessage: string | undefined
             let protocolViolationCount = 0
+            let lastNonEmptyAssistantText: string | null = null
+            let lastNonEmptyAssistantStep = -1
 
             // ReAct 主循环
             for (let step = 0; ; step++) {
@@ -361,6 +363,10 @@ class AgentSessionImpl implements AgentSession {
                     toolUseBlocks = normalized.toolUseBlocks
                     stopReason = normalized.stopReason
                     usageFromLLM = normalized.usage
+                    if (assistantText.trim().length > 0) {
+                        lastNonEmptyAssistantText = assistantText
+                        lastNonEmptyAssistantStep = step
+                    }
                 } catch (err) {
                     if (this.cancelling && isAbortError(err)) {
                         status = 'cancelled'
@@ -761,7 +767,16 @@ class AgentSessionImpl implements AgentSession {
                 // 检查是否是最终回复（end_turn 或有 final 字段）
                 if (stopReason === 'end_turn' || parsed.final) {
                     this.resetActionRepetition()
-                    finalText = parsed.final || assistantText
+                    const shouldFallbackFromPreviousText =
+                        stopReason === 'end_turn' &&
+                        !parsed.final &&
+                        assistantText.trim().length === 0 &&
+                        Boolean(lastNonEmptyAssistantText) &&
+                        lastNonEmptyAssistantStep === step - 1
+
+                    finalText = shouldFallbackFromPreviousText
+                        ? (lastNonEmptyAssistantText ?? '')
+                        : parsed.final || assistantText
                     if (parsed.final) {
                         parsed.final = finalText
                     }
@@ -770,7 +785,11 @@ class AgentSessionImpl implements AgentSession {
                         step,
                         content: finalText,
                         role: 'assistant',
-                        meta: { tokens: stepUsage },
+                        meta: {
+                            tokens: stepUsage,
+                            fallback_from_previous_text:
+                                shouldFallbackFromPreviousText || undefined,
+                        },
                     })
                     await runHook(this.hooks, 'onFinal', {
                         sessionId: this.id,

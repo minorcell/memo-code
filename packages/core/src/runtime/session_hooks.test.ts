@@ -140,6 +140,30 @@ describe('session hooks & middleware', () => {
         }
     })
 
+    test('reuses previous assistant text when end_turn arrives empty after tool call', async () => {
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'x' }, '这是最终答案'),
+            endTurnResponse(''),
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('hi')
+            assert.strictEqual(result.status, 'ok')
+            assert.strictEqual(result.finalText, '这是最终答案')
+        } finally {
+            await session.close()
+        }
+    })
+
     test('warns after three identical tool calls', async () => {
         const outputs: LLMResponse[] = [
             toolUseResponse('loop-1', 'echo', { text: 'loop' }),

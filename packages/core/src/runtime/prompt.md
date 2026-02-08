@@ -108,6 +108,9 @@ assistant: [Makes ONE message with list_dir + grep_files tool calls in parallel]
 
 - Use structured tool/function calls provided by the runtime instead of emitting tool JSON in plain text.
 - Keep tool arguments valid and minimal; for shell commands prefer a single-line string unless multiline is required.
+- Final answer MUST be the last step in a turn.
+- Do NOT call any tool after you have already produced the user-facing final answer.
+- If you need `update_plan`, run it before the final answer, not after.
 
 ---
 
