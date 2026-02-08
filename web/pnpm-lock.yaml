@@ -7,6 +7,9 @@ settings:
 importers:
     .:
         dependencies:
+            '@remotion/player':
+                specifier: ^4.0.419
+                version: 4.0.419(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
             lucide-react:
                 specifier: ^0.563.0
                 version: 0.563.0(react@19.2.3)
@@ -22,6 +25,9 @@ importers:
             react-dom:
                 specifier: 19.2.3
                 version: 19.2.3(react@19.2.3)
+            remotion:
+                specifier: ^4.0.419
+                version: 4.0.419(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
         devDependencies:
             '@tailwindcss/postcss':
                 specifier: ^4
@@ -642,6 +648,15 @@ packages:
                 integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==,
             }
         engines: { node: '>=12.4.0' }
+
+    '@remotion/player@4.0.419':
+        resolution:
+            {
+                integrity: sha512-bG0K9rJifXs8iHKBq/cHIM+Ivzvk/tw75pKTK+rRZ6lGdTvriNBwx9dl4bGjhkcjqhUBzES1zkNzKfeoyEs/6g==,
+            }
+        peerDependencies:
+            react: '>=16.8.0'
+            react-dom: '>=16.8.0'
 
     '@rtsao/scc@1.1.0':
         resolution:
@@ -2723,6 +2738,15 @@ packages:
             }
         engines: { node: '>= 0.4' }
 
+    remotion@4.0.419:
+        resolution:
+            {
+                integrity: sha512-h00WpNrcksePPfpyC5RZhZKBIUqGWERN6RTtVjLWvHijTpGKgO0LkXkCpihzJ5y2l+V2CIOvRINl/KykcaQDRg==,
+            }
+        peerDependencies:
+            react: '>=16.8.0'
+            react-dom: '>=16.8.0'
+
     resolve-from@4.0.0:
         resolution:
             {
@@ -3529,6 +3553,12 @@ snapshots:
             fastq: 1.20.1
 
     '@nolyfill/is-core-module@1.0.39': {}
+
+    '@remotion/player@4.0.419(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+        dependencies:
+            react: 19.2.3
+            react-dom: 19.2.3(react@19.2.3)
+            remotion: 4.0.419(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
 
     '@rtsao/scc@1.1.0': {}
 
@@ -4907,6 +4937,11 @@ snapshots:
             get-proto: 1.0.1
             gopd: 1.2.0
             set-function-name: 2.0.2
+
+    remotion@4.0.419(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+        dependencies:
+            react: 19.2.3
+            react-dom: 19.2.3(react@19.2.3)
 
     resolve-from@4.0.0: {}
 
