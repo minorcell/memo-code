@@ -29,6 +29,8 @@ Memo 会把会话过程写入本地 JSONL，便于恢复上下文和排查问题
 
 排障时通常重点看：`action`、`observation`、`final`。
 
+补充：`session_start` 事件会写入本次会话实际使用的系统提示词（`role=system`，`content` 字段）。
+
 ## 三、如何恢复历史
 
 在输入框输入：

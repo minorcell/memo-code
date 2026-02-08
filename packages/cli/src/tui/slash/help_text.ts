@@ -5,7 +5,6 @@ const SLASH_LINES = buildSlashHelpLines().join('\n')
 export const HELP_TEXT = `Available commands:
 ${SLASH_LINES}
   exit        Exit the session (no slash)
-  $           Execute shell command (e.g. $ git status)
 
 Shortcuts:
   Enter       Send message

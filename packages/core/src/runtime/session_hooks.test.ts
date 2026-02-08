@@ -286,6 +286,11 @@ describe('session hooks & middleware', () => {
             const sessionStart = events.find((event) => event.type === 'session_start')
             assert.ok(sessionStart, 'session_start should exist')
             assert.strictEqual(sessionStart?.meta?.cwd, process.cwd())
+            assert.strictEqual(sessionStart?.role, 'system')
+            assert.ok(
+                typeof sessionStart?.content === 'string' && sessionStart.content.length > 0,
+                'session_start should include system prompt content',
+            )
 
             const actionEvent = events.find((event) => event.type === 'action')
             assert.ok(actionEvent, 'action event should exist')
