@@ -106,15 +106,14 @@ memo mcp remove remote
 
 ## 内置工具
 
-- `bash`：执行 shell 命令
-- `read`：读取文件
-- `write`：写入文件
-- `edit`：编辑文件
-- `glob`：搜索文件（模式匹配）
-- `grep`：搜索内容（正则匹配）
+- `exec_command` / `write_stdin`：执行命令（默认执行工具族）
+- `shell` / `shell_command`：兼容执行工具（按环境开关切换）
+- `apply_patch`：结构化文件改动
+- `read_file` / `list_dir` / `grep_files`：文件读取与检索
+- `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource`：MCP 资源访问
 - `webfetch`：获取网页
-- `save_memory`：保存长期记忆
-- `todo`：管理任务列表
+- `update_plan`：更新当前会话内的计划状态
+- `get_memory`：读取 `~/.memo/Agents.md`（或 `MEMO_HOME` 下）记忆内容
 
 通过 MCP 协议可扩展更多工具。
 
@@ -122,8 +121,8 @@ memo mcp remove remote
 
 新增工具审批机制，保护用户免受危险操作影响：
 
-- **自动审批**：安全工具（read、glob、grep等）自动通过
-- **手动审批**：危险工具（bash、write、edit等）需要用户确认
+- **自动审批**：读类工具（如 `read_file`、`list_dir`、`grep_files`、`webfetch` 等）
+- **手动审批**：高风险工具（如 `apply_patch`、`exec_command`、`write_stdin`）
 - **审批选项**：
     - `once`：仅批准当前操作
     - `session`：批准本次会话中的所有同类操作
@@ -192,7 +191,7 @@ memo-cli/
 - `/help`：显示帮助与快捷键说明。
 - `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
 - `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
-- `$ <cmd>`：在当前工作目录本地执行 shell 命令，直接显示输出（`Shell Result`）。
+- `/mcp`：查看当前会话加载的 MCP 服务器配置。
 - `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
 - 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。
 - **工具审批**：危险操作会弹出审批对话框，可选择 `once`/`session`/`deny`。
@@ -209,7 +208,7 @@ memo-cli/
 
 ## 相关文档
 
-- [用户指南](./docs/user/README.md) - 面向使用者的分模块说明
+- [用户指南](./web/content/docs/README.md) - 面向使用者的分模块说明
 - [Core 架构](./docs/core.md) - 核心实现详解
 - [CLI 适配更新](./docs/cli-update.md) - Tool Use API 迁移说明
 - [开发指南](./CONTRIBUTING.md) - 贡献指南

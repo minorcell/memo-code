@@ -1,0 +1,79 @@
+# Getting Started
+
+Set up Memo in a few minutes: install, configure an API key, and run your first session.
+
+## Prerequisites
+
+- Node.js `>= 18`
+- At least one compatible API key (for example `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`)
+
+## Install
+
+```bash
+npm install -g @memo-code/memo
+# or
+pnpm add -g @memo-code/memo
+# or
+yarn global add @memo-code/memo
+# or
+bun add -g @memo-code/memo
+```
+
+Verify installation:
+
+```bash
+memo --version
+```
+
+## Configure API Key
+
+At runtime, Memo reads the environment variable configured by your provider (`env_api_key` in config).
+
+Examples:
+
+```bash
+export DEEPSEEK_API_KEY=your_key
+# or
+export OPENAI_API_KEY=your_key
+```
+
+## First Run (Recommended: TUI)
+
+Start Memo interactively:
+
+```bash
+memo
+```
+
+What happens on first run:
+
+- If Memo can use an existing env key with default provider settings, it writes `~/.memo/config.toml` automatically.
+- Otherwise, TUI setup asks for provider name, key env var, model, and base URL, then writes config.
+
+## Plain Mode (Pipes / Scripts)
+
+When stdin/stdout is non-TTY, Memo runs in plain mode.
+
+```bash
+echo "Summarize this repository structure" | memo
+```
+
+Use plain mode for scripts and CI. For interactive approvals and richer workflow, use TUI mode.
+
+## Dangerous Mode
+
+Skip approval prompts:
+
+```bash
+memo --dangerous
+# or
+memo -d
+```
+
+Only use this in trusted repositories and controlled environments.
+
+## Next Steps
+
+- Interaction model and shortcuts: [CLI & TUI Guide](./cli-tui.md)
+- Provider/MCP setup details: [Configuration](./configuration.md)
+- Tool capabilities and switches: [Built-in Tools](./tools.md)
