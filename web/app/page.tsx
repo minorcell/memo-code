@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { SiteHeader } from '@/components/site-header'
+import { MemoHeroRemotion } from '@/components/memo-hero-remotion'
 import { ArrowRight, Zap, Shield, Terminal, Cpu, GitBranch, Sparkles } from 'lucide-react'
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
@@ -120,38 +121,7 @@ export default function Home() {
 
                         {/* Hero Terminal Preview */}
                         <div className="animate-fade-in-up stagger-4 mt-16">
-                            <div className="card-gradient mx-auto max-w-4xl overflow-hidden">
-                                <div className="flex items-center gap-2 border-b border-[var(--border-default)] bg-[#0d0d12] px-4 py-3">
-                                    <div className="flex gap-1.5">
-                                        <div className="h-3 w-3 rounded-full bg-red-500/80" />
-                                        <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                                        <div className="h-3 w-3 rounded-full bg-green-500/80" />
-                                    </div>
-                                    <div className="ml-4 flex-1 text-center">
-                                        <span className="text-xs text-[var(--text-tertiary)]">
-                                            memo
-                                        </span>
-                                    </div>
-                                    <div className="w-16" />
-                                </div>
-                                <div className="bg-[#0d0d12] p-6 font-mono text-sm">
-                                    <div className="flex items-start gap-2">
-                                        <span className="text-green-400">➜</span>
-                                        <span className="text-blue-400">~/project</span>
-                                        <span className="text-[var(--text-secondary)]">memo</span>
-                                    </div>
-                                    <div className="mt-4 space-y-2 text-[var(--text-secondary)]">
-                                        <p>✓ Loaded project context</p>
-                                        <p>✓ Connected to OpenAI</p>
-                                        <p className="text-[var(--text-primary)]">
-                                            How can I help you today?{' '}
-                                            <span className="animate-pulse text-[var(--accent-primary)]">
-                                                ▋
-                                            </span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                            <MemoHeroRemotion />
                         </div>
                     </div>
                 </section>
