@@ -54,17 +54,6 @@ echo "your prompt" | memo
 
 此外，直接输入 `exit`（不加 `/`）也可退出。
 
-### 本地 Shell 命令
-
-输入以 `$` 开头的命令会在本地 `cwd` 执行：
-
-```text
-$ git status
-$ rg "createAgentSession" -n
-```
-
-这是用户主动执行，不走模型工具审批流程。
-
 ## 快捷键
 
 - `Enter`：发送

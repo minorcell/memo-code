@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { exec } from 'node:child_process'
-import { promisify } from 'node:util'
 import { Box, useApp, Text } from 'ink'
 import {
     createAgentSession,
@@ -28,8 +26,6 @@ import { inferToolStatus, formatTokenUsage, calculateContextPercent } from './ut
 import { resolveSlashCommand } from './commands'
 import { checkForUpdate, findLocalPackageInfoSync } from './version'
 import { SetupWizard } from './components/setup/SetupWizard'
-
-const execAsync = promisify(exec)
 
 export type AppProps = {
     sessionOptions: AgentSessionOptions
@@ -453,32 +449,6 @@ export function App({
         [appendSystemMessage, busy, currentModel, currentProvider, persistCurrentProvider],
     )
 
-    const runShellCommand = useCallback(
-        async (command: string) => {
-            if (!command.trim()) {
-                appendSystemMessage('Shell Command', 'Usage: $ <command> (e.g. $ git status)')
-                return
-            }
-            setBusy(true)
-            try {
-                const { stdout, stderr } = await execAsync(command, {
-                    cwd,
-                    maxBuffer: 5 * 1024 * 1024, // prevent truncation on large outputs
-                })
-                const output = [stdout?.trim(), stderr?.trim()].filter(Boolean).join('\n')
-                appendSystemMessage('Shell Result', output || '(no output)')
-            } catch (err) {
-                const error = err as Error & { stdout?: string; stderr?: string }
-                const parts = [error.stdout?.trim(), error.stderr?.trim(), error.message]
-                const message = parts.filter(Boolean).join('\n')
-                appendSystemMessage('Shell Error', message || 'Command failed')
-            } finally {
-                setBusy(false)
-            }
-        },
-        [appendSystemMessage, cwd],
-    )
-
     const handleCommand = useCallback(
         async (raw: string) => {
             const result = resolveSlashCommand(raw, {
@@ -542,10 +512,6 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
                 }
                 return
             }
-            if (result.kind === 'shell_command') {
-                await runShellCommand(result.command)
-                return
-            }
             appendSystemMessage(result.title, result.content)
         },
         [
@@ -560,7 +526,6 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
             currentProvider,
             contextLimit,
             providersState,
-            runShellCommand,
         ],
     )
 
@@ -601,13 +566,6 @@ Make the AGENTS.md concise but informative, following best practices for AI agen
             }
 
             if (!session || busy) return
-            const trimmed = value.trim()
-            if (trimmed.startsWith('$')) {
-                const command = trimmed.slice(1).trim()
-                setInputHistory((prev) => [...prev, value])
-                await runShellCommand(command)
-                return
-            }
             if (value.startsWith('/')) {
                 await handleCommand(value)
                 return

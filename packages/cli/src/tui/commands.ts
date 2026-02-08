@@ -17,7 +17,6 @@ export type SlashCommandResult =
     | { kind: 'switch_model'; provider: ProviderConfig }
     | { kind: 'set_context_limit'; limit: number }
     | { kind: 'init_agents_md' }
-    | { kind: 'shell_command'; command: string }
 
 export function resolveSlashCommand(raw: string, context: SlashResolveContext): SlashCommandResult {
     const [commandRaw, ...rest] = raw.trim().slice(1).split(/\s+/)
@@ -77,17 +76,6 @@ export function resolveSlashCommand(raw: string, context: SlashResolveContext): 
         }
         case 'init':
             return { kind: 'init_agents_md' }
-        case '$': {
-            const command = rest.join(' ').trim()
-            if (!command) {
-                return {
-                    kind: 'message',
-                    title: 'Shell Command',
-                    content: 'Usage: $ <command> (e.g. $ git status)',
-                }
-            }
-            return { kind: 'shell_command', command }
-        }
         case 'models':
             if (!context.providers.length) {
                 return {
