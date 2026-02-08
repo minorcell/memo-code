@@ -1,6 +1,5 @@
 import { Box, Static, Text } from 'ink'
 import { memo } from 'react'
-import os from 'node:os'
 import type { SystemMessage, TurnView as TurnViewType } from '../../types'
 import { SystemMessageView } from '../messages/SystemMessageView'
 import { TurnView } from '../turns/TurnView'
@@ -17,20 +16,6 @@ type MainContentProps = {
         mcpNames: string[]
         version: string
     }
-}
-
-function formatCwd(cwd: string) {
-    const home = os.homedir()
-    if (!home) return cwd
-    return cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd
-}
-
-function formatSessionId(id: string): string {
-    // Show first 8 chars and last 4 chars
-    if (id.length > 16) {
-        return `${id.slice(0, 8)}...${id.slice(-4)}`
-    }
-    return id
 }
 
 // Custom comparison to prevent re-render when arrays haven't actually changed
@@ -144,16 +129,6 @@ export const MainContent = memo(function MainContent({
                                     </Box>
                                 </Box>
                                 <Box flexDirection="column" gap={0}>
-                                    <Box>
-                                        <Text color="gray">Directory: </Text>
-                                        <Text color="cyan">{formatCwd(header.cwd)}</Text>
-                                    </Box>
-                                    <Box>
-                                        <Text color="gray">Session: </Text>
-                                        <Text color="cyan">
-                                            {formatSessionId(header.sessionId)}
-                                        </Text>
-                                    </Box>
                                     <Box>
                                         <Text color="gray">Model: </Text>
                                         <Text color="cyan">{header.model}</Text>

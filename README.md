@@ -174,7 +174,7 @@ pnpm test packages/tools    # tools package
 ### Format
 
 ```bash
-npm run format        # format all files
+npm run format        # format source/config files
 npm run format:check  # check format (CI)
 ```
 

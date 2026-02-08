@@ -1,14 +1,7 @@
 'use client'
 
 import { Player } from '@remotion/player'
-import {
-    AbsoluteFill,
-    Easing,
-    interpolate,
-    spring,
-    useCurrentFrame,
-    useVideoConfig,
-} from 'remotion'
+import { AbsoluteFill, useCurrentFrame } from 'remotion'
 
 const FPS = 30
 const ACTIVE_FRAMES = 14 * FPS
@@ -17,14 +10,7 @@ const DURATION_IN_FRAMES = ACTIVE_FRAMES + HOLD_FRAMES
 const COMPOSITION_WIDTH = 1440
 const COMPOSITION_HEIGHT = 900
 
-const clamp = {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-} as const
-
 const welcomeMeta = [
-    { label: 'Directory', value: '~/Desktop/workspace/memo-cli' },
-    { label: 'Session', value: '7f3bf47d...252a' },
     {
         label: 'Model',
         value: 'deepseek-chat',
@@ -35,55 +21,45 @@ const welcomeMeta = [
 ]
 
 type ToolEvent = {
+    kind?: 'used' | 'note'
     tool: string
     args?: string
 }
 
 const toolEvents: ToolEvent[] = [
+    { kind: 'note', tool: "I'll examine the project structure to help you understand it better." },
     { tool: 'update_plan' },
     { tool: 'list_dir', args: '.' },
     { tool: 'read_file', args: 'package.json' },
-    { tool: 'read_file', args: 'AGENTS.md' },
-    { tool: 'exec_command', args: 'pwd' },
-    { tool: 'list_dir', args: '/Users/mcell/Desktop/workspace/memo-cli' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/package...' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/AGENTS.md' },
+    { tool: 'grep_files', args: 'AGENTS' },
     { tool: 'update_plan' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/tsconfi...' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/README.md' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/pnpm-wo...' },
-    { tool: 'update_plan' },
-    { tool: 'list_dir', args: '/Users/mcell/Desktop/workspace/memo-cli/packages' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/package...' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/package...' },
-    { tool: 'update_plan' },
-    { tool: 'read_file', args: '/Users/mcell/Desktop/workspace/memo-cli/package...' },
-    { tool: 'exec_command', args: 'find /Users/mcell/Desktop/workspace/memo-cli -n...' },
+    { tool: 'read_file', args: 'README.md' },
+    { tool: 'read_file', args: 'tsconfig.json' },
+    { tool: 'list_dir', args: 'packages' },
+    { tool: 'read_file', args: 'packages/cli/src/index.tsx' },
+    { tool: 'read_file', args: 'packages/core/src/index.ts' },
     { tool: 'update_plan' },
 ]
 
 const responseLines = [
-    'Memo Code is a TypeScript CLI coding agent with a monorepo structure:',
+    'Memo Code is a TypeScript monorepo CLI tool with three main packages:',
     '',
-    'Core packages:',
-    '- packages/cli: TUI interface with Ink/React',
-    '- packages/core: Session state, config, shared types',
-    '- packages/tools: Built-in tools + MCP integration',
+    'Core Structure:',
+    '- packages/cli/: TUI entry point using Ink (React for terminals)',
+    '- packages/core/: Session management, config handling, shared types',
+    '- packages/tools/: Built-in MCP-like tools (exec_command, read_file, etc.)',
     '',
-    'Key features:',
-    '- Interactive TUI and plain mode for scripts',
-    '- DeepSeek/OpenAI providers with config.toml',
-    '- MCP server support (local/remote)',
-    '- Tool approval system with dangerous mode',
-    '- Session history in JSONL format',
+    'Key Features:',
+    '- Terminal-based coding agent with interactive TUI',
+    '- Supports DeepSeek (default) and OpenAI-compatible APIs',
+    '- Uses MCP (Model Context Protocol) for tool integration',
+    '- Monorepo with pnpm workspace, TypeScript ESM',
     '',
     'Development:',
-    '- Node.js >=18, pnpm workspace',
-    '- TypeScript + ESM, Prettier formatting',
-    '- Vitest tests next to source files',
-    '- Build outputs to dist/index.js',
-    '',
-    'The project follows clear boundaries: Core (logic), Tools (capabilities), CLI (UI).',
+    '- Node.js ≥18, pnpm for package management',
+    '- Build with pnpm run build, test with pnpm test',
+    '- Config stored in ~/.memo/config.toml',
+    '- Runtime logs in ~/.memo/',
 ]
 
 const questionPrompt = 'I want to quickly understand the project so as to develop it better.'
@@ -97,16 +73,10 @@ const typewriter = (text: string, frame: number, startFrame: number, charsPerSte
     return text.slice(0, Math.min(text.length, typedChars))
 }
 
-const reveal = (frame: number, startFrame: number, duration = 12) => {
-    return interpolate(frame, [startFrame, startFrame + duration], [0, 1], {
-        ...clamp,
-        easing: Easing.out(Easing.quad),
-    })
-}
+const showAt = (frame: number, startFrame: number) => (frame >= startFrame ? 1 : 0)
 
 const MemoHeroComposition = () => {
     const frame = useCurrentFrame()
-    const { fps } = useVideoConfig()
     const playFrame = Math.min(frame, ACTIVE_FRAMES - 1)
     const commandStart = 20
     const commandCharsPerStep = 3
@@ -119,24 +89,13 @@ const MemoHeroComposition = () => {
     const responseStart = toolsStart + toolEvents.length * toolStagger + 18
     const finalPromptStart = responseStart + 12
 
-    const entrance = spring({
-        frame: playFrame - 4,
-        fps,
-        config: { damping: 200 },
-        durationInFrames: Math.round(0.9 * fps),
-    })
-
-    const windowOpacity = interpolate(entrance, [0, 1], [0, 1], clamp)
-    const windowTranslateY = interpolate(entrance, [0, 1], [36, 0], clamp)
-    const windowScale = interpolate(entrance, [0, 1], [0.97, 1], clamp)
-
     const commandText = typewriter('memo', playFrame, commandStart, commandCharsPerStep)
     const questionText = typewriter(questionPrompt, playFrame, questionStart, questionCharsPerStep)
-    const welcomeBlockOpacity = reveal(playFrame, 52, 8)
+    const welcomeBlockOpacity = showAt(playFrame, 52)
     const showCommandCursor = playFrame >= commandStart && playFrame < commandDoneFrame
     const showQuestionCursor = playFrame >= questionStart && playFrame < questionDoneFrame
 
-    const cursorOpacity = interpolate(playFrame % 26, [0, 13, 26], [1, 0.2, 1], clamp)
+    const cursorOpacity = playFrame % 26 < 13 ? 1 : 0.2
 
     return (
         <AbsoluteFill style={{ background: '#0d1117' }}>
@@ -145,11 +104,8 @@ const MemoHeroComposition = () => {
                     flex: 1,
                     borderRadius: 16,
                     overflow: 'hidden',
-                    border: '1px solid rgba(140, 148, 255, 0.35)',
-                    backgroundColor: '#0d1117',
-                    boxShadow: 'inset 0 0 50px rgba(94, 106, 210, 0.08)',
-                    opacity: windowOpacity,
-                    transform: `translateY(${windowTranslateY}px) scale(${windowScale})`,
+                    opacity: 1,
+                    transform: 'none',
                 }}
             >
                 <div
@@ -208,8 +164,8 @@ const MemoHeroComposition = () => {
                         padding: '18px 22px',
                         fontFamily:
                             '"JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace',
-                        fontSize: 11,
-                        lineHeight: 1.16,
+                        fontSize: 13,
+                        lineHeight: 1.24,
                         color: '#e5e7eb',
                         whiteSpace: 'pre',
                         letterSpacing: 0.2,
@@ -233,8 +189,8 @@ const MemoHeroComposition = () => {
                     <div style={{ marginTop: 6, opacity: welcomeBlockOpacity }}>
                         <div
                             style={{
-                                maxWidth: 760,
-                                border: '2px solid #7c3aed',
+                                maxWidth: 470,
+                                border: '1px solid #a6abf2',
                                 borderRadius: 8,
                                 background:
                                     'linear-gradient(135deg, rgba(22, 24, 35, 0.78), rgba(14, 17, 28, 0.72))',
@@ -256,7 +212,7 @@ const MemoHeroComposition = () => {
                                         style={{
                                             color: '#a1a1aa',
                                             display: 'inline-block',
-                                            width: 70,
+                                            width: 92,
                                         }}
                                     >
                                         {item.label}:
@@ -273,7 +229,7 @@ const MemoHeroComposition = () => {
                     <div
                         style={{
                             marginTop: 8,
-                            opacity: reveal(playFrame, questionStart, 8),
+                            opacity: showAt(playFrame, questionStart),
                             color: '#f9fafb',
                         }}
                     >
@@ -288,24 +244,35 @@ const MemoHeroComposition = () => {
                             <div
                                 key={`${item.tool}-${item.args ?? index}`}
                                 style={{
-                                    opacity: reveal(playFrame, toolsStart + index * toolStagger, 8),
+                                    opacity: showAt(playFrame, toolsStart + index * toolStagger),
                                 }}
                             >
-                                <span style={{ color: '#32d74b' }}>●</span>
-                                <span style={{ color: '#9ca3af' }}> Used </span>
-                                <span style={{ color: '#22d3ee' }}>{item.tool}</span>
-                                {item.args ? (
+                                {item.kind === 'note' ? (
                                     <>
-                                        <span style={{ color: '#9ca3af' }}> (</span>
-                                        <span style={{ color: '#22d3ee' }}>{item.args}</span>
-                                        <span style={{ color: '#9ca3af' }}>)</span>
+                                        <span style={{ color: '#32d74b' }}>● </span>
+                                        <span style={{ color: '#d1d5db' }}>{item.tool}</span>
                                     </>
-                                ) : null}
+                                ) : (
+                                    <>
+                                        <span style={{ color: '#32d74b' }}>●</span>
+                                        <span style={{ color: '#9ca3af' }}> Used </span>
+                                        <span style={{ color: '#22d3ee' }}>{item.tool}</span>
+                                        {item.args ? (
+                                            <>
+                                                <span style={{ color: '#9ca3af' }}> (</span>
+                                                <span style={{ color: '#22d3ee' }}>
+                                                    {item.args}
+                                                </span>
+                                                <span style={{ color: '#9ca3af' }}>)</span>
+                                            </>
+                                        ) : null}
+                                    </>
+                                )}
                             </div>
                         ))}
                     </div>
 
-                    <div style={{ marginTop: 6, opacity: reveal(playFrame, responseStart, 10) }}>
+                    <div style={{ marginTop: 6, opacity: showAt(playFrame, responseStart) }}>
                         {responseLines.map((line, index) => {
                             const isHeading = line.endsWith(':') && !line.startsWith('-')
                             const isBullet = line.startsWith('-')
@@ -330,7 +297,7 @@ const MemoHeroComposition = () => {
                     <div
                         style={{
                             marginTop: 6,
-                            opacity: reveal(playFrame, finalPromptStart, 8),
+                            opacity: showAt(playFrame, finalPromptStart),
                             color: '#f3f4f6',
                         }}
                     >

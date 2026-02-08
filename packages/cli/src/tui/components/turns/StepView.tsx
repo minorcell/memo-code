@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink'
 import { memo } from 'react'
+import path from 'node:path'
 import type { StepView as StepViewType } from '../../types'
 import { MarkdownMessage } from '../messages/MarkdownMessage'
 
@@ -8,20 +9,35 @@ type StepViewProps = {
     hideAssistantText?: boolean
 }
 
+const PATH_PARAM_KEYS = new Set(['dir_path', 'file_path', 'path', 'file', 'filename', 'cwd', 'dir'])
+
+function truncate(value: string): string {
+    return value.length > 50 ? `${value.slice(0, 47)}...` : value
+}
+
+function toDisplayPath(value: string, cwd: string): string {
+    if (!path.isAbsolute(value)) return value
+
+    const relative = path.relative(cwd, value)
+    if (!relative) return '.'
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+        return value
+    }
+
+    return relative.split(path.sep).join('/')
+}
+
 // Extract the most important parameter to display
-function getMainParam(toolInput: unknown): string | undefined {
+export function getMainParam(toolInput: unknown, cwd = process.cwd()): string | undefined {
     if (!toolInput) return undefined
 
     if (typeof toolInput === 'string') {
-        if (toolInput.length > 50) {
-            return toolInput.slice(0, 47) + '...'
-        }
-        return toolInput
+        return truncate(toDisplayPath(toolInput, cwd))
     }
 
     if (typeof toolInput !== 'object' || Array.isArray(toolInput)) return undefined
 
-    const input = toolInput as Record<string, any>
+    const input = toolInput as Record<string, unknown>
 
     const priorityKeys = [
         'cmd',
@@ -41,21 +57,19 @@ function getMainParam(toolInput: unknown): string | undefined {
     ]
 
     for (const key of priorityKeys) {
-        if (input[key]) {
-            const value = String(input[key])
-            if (value.length > 50) {
-                return value.slice(0, 47) + '...'
-            }
-            return value
-        }
+        const rawValue = input[key]
+        if (rawValue === undefined || rawValue === null || rawValue === '') continue
+        const value = String(rawValue)
+        const displayValue =
+            PATH_PARAM_KEYS.has(key) || key.includes('path') ? toDisplayPath(value, cwd) : value
+        return truncate(displayValue)
     }
 
     for (const [key, value] of Object.entries(input)) {
         if (typeof value === 'string' && key !== 'description') {
-            if (value.length > 50) {
-                return value.slice(0, 47) + '...'
-            }
-            return value
+            const displayValue =
+                PATH_PARAM_KEYS.has(key) || key.includes('path') ? toDisplayPath(value, cwd) : value
+            return truncate(displayValue)
         }
     }
 
