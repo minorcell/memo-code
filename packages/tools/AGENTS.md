@@ -85,3 +85,7 @@ Prefer validating tool contracts through:
 - `tool.execute(...)` for runtime behavior and output.
 
 Avoid relying on internal schema objects from test code.
+
+## Maintenance
+
+- 需要维护agents.md的更新。

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { SiteHeader } from '@/components/site-header'
 import { MemoHeroRemotion } from '@/components/memo-hero-remotion'
+import { MemoArchitectureDiagram } from '@/components/memo-architecture-remotion'
 import { ArrowRight, Terminal, Cpu, Shield, GitBranch, Layers, Gauge } from 'lucide-react'
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
@@ -131,6 +132,23 @@ export default function Home() {
                                     </p>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </section>
+
+                <section className="border-b border-[var(--border-default)] px-4 py-16 md:px-8 md:py-20">
+                    <div className="mx-auto max-w-6xl">
+                        <div className="badge">Architecture</div>
+                        <h2 className="mt-4 max-w-4xl text-2xl font-semibold text-[var(--text-primary)] md:text-3xl">
+                            System architecture design
+                        </h2>
+                        <p className="mt-3 max-w-3xl text-[var(--text-secondary)]">
+                            A clean layered map of Memo CLI internals, kept consistent with the
+                            current Linear-style visual language.
+                        </p>
+
+                        <div className="mt-8 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)]">
+                            <MemoArchitectureDiagram />
                         </div>
                     </div>
                 </section>
