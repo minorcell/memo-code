@@ -33,7 +33,7 @@ jobs:
               run: pnpm run format:check
 
             - name: Test all packages
-              run: pnpm run test:core && pnpm run test:tools
+              run: pnpm run test:core && pnpm run test:tools && pnpm run test:tui
 
             - name: Test build
               run: pnpm run build

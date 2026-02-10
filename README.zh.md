@@ -162,9 +162,10 @@ pnpm run build  # 生成 dist/index.js
 ### 测试
 
 ```bash
-pnpm test              # 全量测试
-pnpm test packages/core     # 测试 core 包
-pnpm test packages/tools    # 测试 tools 包
+pnpm test            # 全量测试
+pnpm run test:core   # 测试 core 包
+pnpm run test:tools  # 测试 tools 包
+pnpm run test:tui    # 测试 tui 包
 ```
 
 ### 代码格式化
@@ -181,7 +182,7 @@ memo-cli/
 ├── packages/
 │   ├── core/       # 核心逻辑：Session、工具路由、配置
 │   ├── tools/      # 内置工具实现
-│   └── cli/        # TUI 界面
+│   └── tui/        # 终端运行时（CLI 入口、交互 TUI、slash、MCP 子命令）
 ├── docs/           # 技术文档
 └── dist/           # 构建输出
 ```
@@ -210,6 +211,7 @@ memo-cli/
 
 - [用户指南](./web/content/docs/README.md) - 面向使用者的分模块说明
 - [Core 架构](./docs/core.md) - 核心实现详解
+- [TUI 重构设计](./docs/tui-rewrite-design.md) - 对标 Codex 的 TUI 架构与迁移说明
 - [CLI 适配更新](./docs/cli-update.md) - Tool Use API 迁移说明
 - [开发指南](./CONTRIBUTING.md) - 贡献指南
 - [项目约定](./AGENTS.md) - 代码规范和开发流程

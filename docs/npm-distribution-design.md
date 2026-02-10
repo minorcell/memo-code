@@ -50,8 +50,8 @@
 ```text
 Source Code                    Build Output
 ────────────                   ────────────
-packages/cli/src/
-  └─ index.tsx    ───┐         dist/
+packages/tui/src/
+  └─ cli.tsx      ───┐         dist/
                      ├─tsup──→   ├─ index.js (bundled)
 packages/core/src/  ─┤            │   - React/Ink UI
   ├─ runtime/        │            │   - Session management
@@ -87,7 +87,7 @@ packages/core/src/   │            │
 
 ```typescript
 export default defineConfig({
-    entry: ['packages/cli/src/index.tsx'],
+    entry: ['packages/tui/src/cli.tsx'],
     format: ['esm'], // ESM format
     target: 'node18', // minimum Node.js version
     bundle: true, // bundle all dependencies

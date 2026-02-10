@@ -1,6 +1,13 @@
 # Core Implementation Notes (Current Architecture)
 
-Core focuses on "Tool Use API + concurrent execution + state machine". Session/Turn APIs drive tool calls and JSONL event recording. Defaults are completed from `~/.memo/config.toml` (provider, log paths, etc.), while UI only handles interaction and callbacks.
+Core focuses on "Tool Use API + concurrent execution + state machine". Session/Turn APIs drive tool calls and JSONL event recording. Defaults are completed from `~/.memo/config.toml` (provider, log paths, etc.), while terminal UX/entry is hosted in `packages/tui`.
+
+## Package Boundaries (TUI vs Core)
+
+- `packages/core`: runtime contracts, session state machine, tool-calling loop, config/log defaults.
+- `packages/tui`: terminal runtime package (`src/cli.tsx` entry, plain-mode runtime, interactive UI state/rendering, slash commands, approval overlay).
+
+Core should stay UI-agnostic: do not add Ink/UI rendering details into `packages/core`.
 
 ## Directory and Modules
 

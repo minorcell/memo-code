@@ -34,11 +34,13 @@ import {
     type ToolApprovalHooks,
     type ToolOrchestrator,
     type ToolActionResult,
+    type ToolActionStatus,
 } from '@memo/tools/orchestrator'
 import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 const DEFAULT_SESSION_MODE: SessionMode = 'interactive'
 const DEFAULT_MAX_PROMPT_TOKENS = 120_000
+const TOOL_ACTION_SUCCESS_STATUS: ToolActionStatus = 'success'
 
 function emptyUsage(): TokenUsage {
     return { prompt: 0, completion: 0, total: 0 }
@@ -620,6 +622,11 @@ class AgentSessionImpl implements AgentSession {
                     }
 
                     const combinedObservation = execution.combinedObservation
+                    const parallelResultStatuses = execution.results.map((result) => result.status)
+                    const resultStatus =
+                        parallelResultStatuses.find(
+                            (candidate) => candidate !== TOOL_ACTION_SUCCESS_STATUS,
+                        ) ?? TOOL_ACTION_SUCCESS_STATUS
                     const lastStep = steps[steps.length - 1]
                     if (lastStep) {
                         lastStep.observation = combinedObservation
@@ -631,6 +638,8 @@ class AgentSessionImpl implements AgentSession {
                         step,
                         tool: toolUseBlocks.map((b) => b.name).join(', '),
                         observation: combinedObservation,
+                        resultStatus,
+                        parallelResultStatuses,
                         history: snapshotHistory(this.history),
                     })
 
@@ -763,6 +772,7 @@ class AgentSessionImpl implements AgentSession {
                         step,
                         tool: parsed.action.tool,
                         observation,
+                        resultStatus: result.status,
                         history: snapshotHistory(this.history),
                     })
                     continue
