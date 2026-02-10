@@ -52,6 +52,7 @@ memo
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 - 查看版本：`memo --version` 或 `memo -v`。
 - 启动目录约定：若启动根目录存在 `AGENTS.md`，Memo 会自动将其拼接进系统提示词。
+- MCP 启动选择：当配置了 MCP server 时，启动会弹出多选以决定本次会话激活哪些 server。
 
 ## 配置文件
 
@@ -86,6 +87,10 @@ args = []
 type = "streamable_http"
 url = "https://your-mcp-server.com/mcp"
 # headers = { Authorization = "Bearer xxx" }
+
+# 可选：启动时默认激活的 MCP server
+active_mcp_servers = ["local_tools", "remote"]
+# 可选：设为 [] 表示启动时不激活任何 MCP server
 ```
 
 也可以通过 CLI 管理 MCP 配置（对齐 Codex CLI 风格）：

@@ -56,6 +56,7 @@ memo
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
 - Startup project guidance: if `AGENTS.md` exists in the startup root, Memo appends it to the system prompt automatically.
+- MCP activation selection: when MCP servers are configured, startup shows a multi-select to activate servers for this run.
 
 ## Configuration
 
@@ -90,6 +91,10 @@ args = []
 type = "streamable_http"
 url = "https://your-mcp-server.com/mcp"
 # headers = { Authorization = "Bearer xxx" }
+
+# Optional: default active MCP servers at startup
+active_mcp_servers = ["local_tools", "remote"]
+# Optional: use [] to start with no MCP servers active
 ```
 
 You can also manage MCP configs via CLI (aligned with Codex CLI style):

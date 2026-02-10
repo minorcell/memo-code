@@ -19,6 +19,7 @@ import { ChatWidget } from './chatwidget/ChatWidget'
 import { Composer } from './bottom_pane/Composer'
 import { Footer } from './bottom_pane/Footer'
 import { ApprovalOverlay } from './overlays/ApprovalOverlay'
+import { McpActivationOverlay } from './overlays/McpActivationOverlay'
 import { SetupWizard } from './setup/SetupWizard'
 import { parseHistoryLog } from './controllers/history_parser'
 import {
@@ -56,6 +57,30 @@ export type AppProps = {
     needsSetup?: boolean
 }
 
+function normalizeActiveMcpServers(
+    availableNames: string[],
+    configuredActiveNames: string[] | undefined,
+): string[] {
+    if (availableNames.length === 0) return []
+    if (configuredActiveNames === undefined) {
+        return [...availableNames]
+    }
+    if (configuredActiveNames.length === 0) {
+        return []
+    }
+
+    const available = new Set(availableNames)
+    const normalized = configuredActiveNames.filter((name) => available.has(name))
+    return normalized.length > 0 ? normalized : [...availableNames]
+}
+
+function normalizeMcpSelection(availableNames: string[], selectedNames: string[]): string[] {
+    if (availableNames.length === 0) return []
+    if (selectedNames.length === 0) return []
+    const available = new Set(availableNames)
+    return selectedNames.filter((name) => available.has(name))
+}
+
 export function App({
     sessionOptions,
     providerName,
@@ -69,6 +94,14 @@ export function App({
     needsSetup = false,
 }: AppProps) {
     const { exit } = useApp()
+    const availableMcpServerNames = useMemo(
+        () => Object.keys(mcpServers ?? {}).sort(),
+        [mcpServers],
+    )
+    const initialActiveMcpServers = useMemo(
+        () => normalizeActiveMcpServers(availableMcpServerNames, sessionOptions.activeMcpServers),
+        [availableMcpServerNames, sessionOptions.activeMcpServers],
+    )
     const defaultToolPermissionMode: ToolPermissionMode =
         sessionOptions.toolPermissionMode ??
         (dangerous ? TOOL_PERMISSION_MODES.FULL : TOOL_PERMISSION_MODES.ONCE)
@@ -103,6 +136,11 @@ export function App({
     const [currentContextTokens, setCurrentContextTokens] = useState(0)
 
     const [setupPending, setSetupPending] = useState(needsSetup)
+    const [mcpSelectionPending, setMcpSelectionPending] = useState(
+        !needsSetup && availableMcpServerNames.length > 0,
+    )
+    const [activeMcpServerNames, setActiveMcpServerNames] =
+        useState<string[]>(initialActiveMcpServers)
     const [exitMessage, setExitMessage] = useState<string | null>(null)
 
     const [session, setSession] = useState<AgentSession | null>(null)
@@ -119,6 +157,12 @@ export function App({
     const dispatch = useCallback((action: ChatTimelineAction) => {
         dispatchTimeline(action)
     }, [])
+
+    useEffect(() => {
+        if (setupPending) return
+        setActiveMcpServerNames(initialActiveMcpServers)
+        setMcpSelectionPending(availableMcpServerNames.length > 0)
+    }, [setupPending, initialActiveMcpServers, availableMcpServerNames.length])
 
     const appendSystemMessage = useCallback(
         (title: string, content: string, tone: 'info' | 'warning' | 'error' = 'info') => {
@@ -209,7 +253,7 @@ export function App({
     useEffect(() => {
         let cancelled = false
         ;(async () => {
-            if (setupPending) return
+            if (setupPending || mcpSelectionPending) return
 
             const previous = sessionRef.current
             if (previous) {
@@ -230,7 +274,7 @@ export function App({
         return () => {
             cancelled = true
         }
-    }, [deps, sessionOptionsState, setupPending])
+    }, [deps, mcpSelectionPending, sessionOptionsState, setupPending])
 
     useEffect(() => {
         let cancelled = false
@@ -422,6 +466,43 @@ export function App({
         [appendSystemMessage, busy, pendingApproval, toolPermissionLabel, toolPermissionMode],
     )
 
+    const persistActiveMcpServers = useCallback(
+        async (names: string[]) => {
+            try {
+                const loaded = await loadMemoConfig()
+                await writeMemoConfig(loaded.configPath, {
+                    ...loaded.config,
+                    active_mcp_servers: names,
+                })
+            } catch (err) {
+                appendSystemMessage(
+                    'MCP',
+                    `Failed to persist active MCP servers: ${(err as Error).message}`,
+                    'warning',
+                )
+            }
+        },
+        [appendSystemMessage],
+    )
+
+    const handleConfirmMcpActivation = useCallback(
+        (selectedNames: string[], persistSelection: boolean) => {
+            const normalized = normalizeMcpSelection(availableMcpServerNames, selectedNames)
+            setActiveMcpServerNames(normalized)
+            setMcpSelectionPending(false)
+            setSessionOptionsState((prev) => ({
+                ...prev,
+                sessionId: randomUUID(),
+                activeMcpServers: normalized,
+            }))
+
+            if (persistSelection) {
+                void persistActiveMcpServers(normalized)
+            }
+        },
+        [availableMcpServerNames, persistActiveMcpServers],
+    )
+
     const handleHistorySelect = useCallback(
         async (entry: SessionHistoryEntry) => {
             try {
@@ -578,6 +659,19 @@ Keep the result concise and actionable.`
         )
     }
 
+    if (mcpSelectionPending) {
+        return (
+            <McpActivationOverlay
+                serverNames={availableMcpServerNames}
+                defaultSelected={initialActiveMcpServers}
+                onConfirm={handleConfirmMcpActivation}
+                onExit={() => {
+                    void handleExit()
+                }}
+            />
+        )
+    }
+
     return (
         <Box flexDirection="column">
             <ChatWidget
@@ -586,7 +680,7 @@ Keep the result concise and actionable.`
                     model: currentModel,
                     cwd,
                     sessionId: sessionOptionsState.sessionId ?? 'unknown',
-                    mcpNames: Object.keys(mcpServers ?? {}).sort(),
+                    mcpNames: activeMcpServerNames,
                     version: localPackageInfo?.version ?? 'unknown',
                 }}
                 systemMessages={timeline.systemMessages}

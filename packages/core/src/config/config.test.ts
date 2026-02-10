@@ -90,6 +90,7 @@ describe('mcp config serialization', () => {
         await writeMemoConfig(configPath, {
             current_provider: 'deepseek',
             max_prompt_tokens: 120000,
+            active_mcp_servers: ['remote'],
             providers: [
                 { name: 'deepseek', env_api_key: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
             ],
@@ -111,6 +112,7 @@ describe('mcp config serialization', () => {
         const text = await readFile(configPath, 'utf-8')
         expect(text).toContain('[[providers.deepseek]]')
         expect(text).toContain('max_prompt_tokens = 120000')
+        expect(text).toContain('active_mcp_servers = ["remote"]')
         expect(text).toContain('[mcp_servers.remote]')
         expect(text).toContain('type = "streamable_http"')
         expect(text).toContain('url = "https://example.com/mcp"')
@@ -123,6 +125,28 @@ describe('mcp config serialization', () => {
         expect(text).toContain('"FOO" = "bar"')
     })
 
+    test('loadMemoConfig keeps explicit empty active_mcp_servers selection', async () => {
+        const home = join(tempBase, 'memo-home-empty-active')
+        process.env.MEMO_HOME = home
+        await mkdir(home, { recursive: true })
+        const configText = `
+current_provider = "deepseek"
+active_mcp_servers = []
+
+[[providers.deepseek]]
+name = "deepseek"
+env_api_key = "DEEPSEEK_API_KEY"
+model = "deepseek-chat"
+
+[mcp_servers.remote]
+url = "https://example.com/mcp"
+`
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
+
+        const loaded = await loadMemoConfig()
+        expect(loaded.config.active_mcp_servers).toEqual([])
+    })
+
     test('loadMemoConfig parses streamable_http servers with headers', async () => {
         const home = join(tempBase, 'memo-home-load')
         process.env.MEMO_HOME = home
@@ -130,6 +154,7 @@ describe('mcp config serialization', () => {
         const configText = `
 current_provider = "deepseek"
 max_prompt_tokens = 150000
+active_mcp_servers = ["remote2"]
 
 [[providers.deepseek]]
 name = "deepseek"
@@ -149,6 +174,7 @@ url = "https://example.com/mcp-2"
         const loaded = await loadMemoConfig()
         const servers = loaded.config.mcp_servers ?? {}
         expect(loaded.config.max_prompt_tokens).toBe(150000)
+        expect(loaded.config.active_mcp_servers).toEqual(['remote2'])
         const remote = servers.remote
         expectHttpServer(remote)
         expect(remote.type ?? 'streamable_http').toBe('streamable_http')
