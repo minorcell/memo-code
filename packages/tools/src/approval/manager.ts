@@ -1,4 +1,4 @@
-/** @file 审批管理器实现 */
+/** @file Approval manager implementation */
 
 import type {
     ApprovalManager,
@@ -10,12 +10,16 @@ import type {
 } from './types'
 import { createToolClassifier } from './classifier'
 import { generateFingerprint } from './fingerprint'
-import { APPROVAL_REASONS, ALWAYS_AUTO_APPROVE_TOOLS } from './constants'
+import { ALWAYS_AUTO_APPROVE_TOOLS } from './constants'
 
 interface ApprovalCache {
     session: Set<ApprovalKey>
     once: Set<ApprovalKey>
     denied: Set<ApprovalKey>
+}
+
+function buildApprovalReason(toolName: string): string {
+    return `Tool "${toolName}" requires approval.`
 }
 
 export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalManager {
@@ -73,7 +77,7 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
                     needApproval: true,
                     fingerprint,
                     riskLevel,
-                    reason: '该请求已被拒绝',
+                    reason: 'This request was previously denied.',
                     toolName,
                     params,
                 }
@@ -83,7 +87,7 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
                 needApproval: true,
                 fingerprint,
                 riskLevel,
-                reason: APPROVAL_REASONS[riskLevel](toolName),
+                reason: buildApprovalReason(toolName),
                 toolName,
                 params,
             }

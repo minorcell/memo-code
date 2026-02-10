@@ -1,7 +1,14 @@
 /** @file 工具风险分类器 */
 
 import type { RiskLevel } from './types'
-import { DEFAULT_TOOL_RISK_LEVELS, RISK_LEVEL_ORDER } from './constants'
+import {
+    AUTO_MODE_APPROVAL_RISKS,
+    DEFAULT_TOOL_RISK_LEVELS,
+    EXECUTE_RISK_KEYWORDS,
+    READ_RISK_KEYWORDS,
+    RISK_LEVEL_ORDER,
+    WRITE_RISK_KEYWORDS,
+} from './constants'
 
 export interface ToolClassifier {
     /** 获取工具的风险等级 */
@@ -34,35 +41,15 @@ export function createToolClassifier(config?: ToolClassifierConfig): ToolClassif
 
             const lowerName = toolName.toLowerCase()
 
-            if (
-                lowerName.includes('exec') ||
-                lowerName.includes('run') ||
-                lowerName.includes('shell') ||
-                lowerName.includes('command') ||
-                lowerName.includes('stdin')
-            ) {
+            if (matchesAnyKeyword(lowerName, EXECUTE_RISK_KEYWORDS)) {
                 return 'execute'
             }
 
-            if (
-                lowerName.includes('write') ||
-                lowerName.includes('patch') ||
-                lowerName.includes('create') ||
-                lowerName.includes('delete') ||
-                lowerName.includes('modify') ||
-                lowerName.includes('update')
-            ) {
+            if (matchesAnyKeyword(lowerName, WRITE_RISK_KEYWORDS)) {
                 return 'write'
             }
 
-            if (
-                lowerName.includes('read') ||
-                lowerName.includes('get') ||
-                lowerName.includes('fetch') ||
-                lowerName.includes('search') ||
-                lowerName.includes('list') ||
-                lowerName.includes('find')
-            ) {
+            if (matchesAnyKeyword(lowerName, READ_RISK_KEYWORDS)) {
                 return 'read'
             }
 
@@ -78,7 +65,11 @@ export function createToolClassifier(config?: ToolClassifierConfig): ToolClassif
                 return true
             }
 
-            return riskLevel === 'write' || riskLevel === 'execute'
+            return AUTO_MODE_APPROVAL_RISKS.has(riskLevel)
         },
     }
+}
+
+function matchesAnyKeyword(name: string, keywords: readonly string[]): boolean {
+    return keywords.some((keyword) => name.includes(keyword))
 }
