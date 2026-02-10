@@ -108,7 +108,8 @@ function MarkdownNode({ node }: { node: MarkdownNode }) {
             return (
                 <Box flexDirection="column" marginY={1}>
                     <Text color="yellow" dimColor>
-                        {language}{'```'}
+                        {language}
+                        {'```'}
                     </Text>
                     <Text color="gray">{node.content}</Text>
                     <Text color="yellow" dimColor>
@@ -131,9 +132,7 @@ function MarkdownNode({ node }: { node: MarkdownNode }) {
                 <Box flexDirection="column">
                     {node.items.map((item, i) => (
                         <Box key={i}>
-                            <Text color="gray">
-                                {node.ordered ? `${i + 1}.` : '•'}
-                            </Text>
+                            <Text color="gray">{node.ordered ? `${i + 1}.` : '•'}</Text>
                             <Text> {item}</Text>
                         </Box>
                     ))}

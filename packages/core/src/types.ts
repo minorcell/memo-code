@@ -281,7 +281,6 @@ export type ApprovalHookPayload = {
     request: ApprovalRequest
 }
 
-
 export type ApprovalResponseHookPayload = {
     sessionId: string
     turn: number
