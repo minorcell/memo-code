@@ -71,7 +71,8 @@ const sanitizePreview = (text: string) => text.replace(/\s+/g, ' ').trim()
  */
 export const webfetchTool = defineMcpTool<WebFetchInput>({
     name: 'webfetch',
-    description: 'HTTP GET request, returns processed plain text body (automatically strips HTML tags)',
+    description:
+        'HTTP GET request, returns processed plain text body (automatically strips HTML tags)',
     inputSchema: WEBFETCH_INPUT_SCHEMA,
     supportsParallelToolCalls: true,
     isMutating: false,
@@ -93,7 +94,10 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
             const lengthHeader = res.headers.get('content-length')
             const declaredLength = lengthHeader ? Number(lengthHeader) : undefined
             if (declaredLength && declaredLength > MAX_BODY_BYTES) {
-                return textResult(`Request rejected: response body too large (${declaredLength} bytes)`, true)
+                return textResult(
+                    `Request rejected: response body too large (${declaredLength} bytes)`,
+                    true,
+                )
             }
 
             let consumedBytes = 0
@@ -109,7 +113,10 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
                     consumedBytes += value.byteLength
                     if (consumedBytes > MAX_BODY_BYTES) {
                         controller.abort()
-                        return textResult(`Request aborted: response body exceeds ${MAX_BODY_BYTES} bytes`, true)
+                        return textResult(
+                            `Request aborted: response body exceeds ${MAX_BODY_BYTES} bytes`,
+                            true,
+                        )
                     }
                     chunks.push(value)
                 }
@@ -124,7 +131,10 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
                 bodyText = await res.text()
                 consumedBytes = new TextEncoder().encode(bodyText).byteLength
                 if (consumedBytes > MAX_BODY_BYTES) {
-                    return textResult(`Request rejected: response body exceeds ${MAX_BODY_BYTES} bytes`, true)
+                    return textResult(
+                        `Request rejected: response body exceeds ${MAX_BODY_BYTES} bytes`,
+                        true,
+                    )
                 }
             }
 

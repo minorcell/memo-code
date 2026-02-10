@@ -57,7 +57,7 @@ export class McpToolRegistry {
                     totalTools += connection.tools.length
                     if (this.shouldLog) {
                         console.log(
-                            `[MCP] Connected to '${name}' with ${connection.tools.length} tools`
+                            `[MCP] Connected to '${name}' with ${connection.tools.length} tools`,
                         )
                     }
                 } catch (err) {
