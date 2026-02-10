@@ -9,6 +9,7 @@ const context = {
     mcpServers: {},
     providers: [],
     contextLimit: 120000,
+    toolPermissionMode: 'once' as const,
 }
 
 describe('slash registry', () => {
@@ -28,5 +29,13 @@ describe('slash registry', () => {
         const result = resolveSlashCommand('/context 100k', context)
         assert.strictEqual(result.kind, 'message')
         assert.strictEqual(result.title, 'Context')
+    })
+
+    test('tools command resolves mode switch', () => {
+        const result = resolveSlashCommand('/tools full', context)
+        assert.strictEqual(result.kind, 'set_tool_permission')
+        if (result.kind === 'set_tool_permission') {
+            assert.strictEqual(result.mode, 'full')
+        }
     })
 })
