@@ -5,7 +5,7 @@ import { startExecSession } from '@memo/tools/tools/exec_runtime'
 
 const EXEC_COMMAND_INPUT_SCHEMA = z
     .object({
-        cmd: z.string().min(1, 'cmd 不能为空'),
+        cmd: z.string().min(1, 'cmd cannot be empty'),
         workdir: z.string().optional(),
         shell: z.string().optional(),
         login: z.boolean().optional(),

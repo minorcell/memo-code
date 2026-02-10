@@ -1,4 +1,4 @@
-/** @file 工具审批系统入口 */
+/** @file Tool approval system entry */
 
 export type {
     ApprovalManager,

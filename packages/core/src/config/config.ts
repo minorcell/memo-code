@@ -1,4 +1,4 @@
-/** @file 配置管理：读取/写入 ~/.memo/config.toml 及路径构造工具。 */
+/** @file Configuration management: read/write ~/.memo/config.toml and path construction utilities. */
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -15,24 +15,24 @@ export type ProviderConfig = {
 
 export type MCPServerConfig =
     | {
-          /** 默认：启动本地进程，通过 stdio 连接。 */
+          /** Default: start local process, connect via stdio. */
           type?: 'stdio'
           command: string
           args?: string[]
-          /** 传递给本地进程的环境变量（会与当前环境合并）。 */
+          /** Environment variables passed to local process (merged with current environment). */
           env?: Record<string, string>
-          /** 子进程 stderr 行为（默认在 TTY 中静默）。 */
+          /** Subprocess stderr behavior (silent in TTY by default). */
           stderr?: 'inherit' | 'pipe' | 'ignore'
       }
     | {
-          /** 通过 Streamable HTTP 连接远程 MCP。 */
+          /** Connect to remote MCP via Streamable HTTP. */
           type?: 'streamable_http'
           url: string
-          /** 附加请求头（如鉴权）。 */
+          /** Additional request headers (e.g., authentication). */
           headers?: Record<string, string>
-          /** codex 风格字段：附加请求头（优先于 headers）。 */
+          /** codex-style field: additional request headers (prioritized over headers). */
           http_headers?: Record<string, string>
-          /** codex 风格字段：Bearer token env var。 */
+          /** codex-style field: Bearer token env var. */
           bearer_token_env_var?: string
       }
 

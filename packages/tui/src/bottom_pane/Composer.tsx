@@ -10,13 +10,20 @@ import {
     CONTEXT_LIMIT_CHOICES,
     formatSlashCommand,
     SLASH_COMMANDS,
+    TOOL_PERMISSION_MODES,
     type ToolPermissionMode,
 } from '../constants'
 
 const DOUBLE_ESC_WINDOW_MS = 400
 const MODELS_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.MODELS)
 const CONTEXT_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.CONTEXT)
+const TOOLS_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.TOOLS)
 const INIT_SLASH_COMMAND = formatSlashCommand(SLASH_COMMANDS.INIT)
+const TOOL_MODE_OPTIONS: Array<{ mode: ToolPermissionMode; description: string }> = [
+    { mode: TOOL_PERMISSION_MODES.NONE, description: 'Disable all tool calls' },
+    { mode: TOOL_PERMISSION_MODES.ONCE, description: 'Require per-call approval' },
+    { mode: TOOL_PERMISSION_MODES.FULL, description: 'Run tools without approval' },
+]
 
 type ComposerProps = {
     disabled: boolean
@@ -44,7 +51,7 @@ type ComposerProps = {
     onSystemMessage: (title: string, content: string) => void
 }
 
-type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model' | 'context'
+type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model' | 'context' | 'tools'
 
 type SuggestionMeta =
     | { type: 'file'; isDir?: boolean }
@@ -52,6 +59,7 @@ type SuggestionMeta =
     | { type: 'slash' }
     | { type: 'model'; provider: ProviderConfig }
     | { type: 'context'; value: number }
+    | { type: 'tools'; mode: ToolPermissionMode }
 
 type SuggestionRecord = SuggestionItem & {
     value: string
@@ -63,7 +71,14 @@ type HistoryTrigger = { type: 'history'; keyword: string }
 type SlashTrigger = { type: 'slash'; keyword: string }
 type ModelTrigger = { type: 'models'; keyword: string }
 type ContextTrigger = { type: 'context' }
-type Trigger = FileTrigger | HistoryTrigger | SlashTrigger | ModelTrigger | ContextTrigger
+type ToolsTrigger = { type: 'tools' }
+type Trigger =
+    | FileTrigger
+    | HistoryTrigger
+    | SlashTrigger
+    | ModelTrigger
+    | ContextTrigger
+    | ToolsTrigger
 
 function detectFileTrigger(value: string): FileTrigger | null {
     const atIndex = value.lastIndexOf('@')
@@ -134,8 +149,17 @@ function detectContextTrigger(value: string): ContextTrigger | null {
     return { type: 'context' }
 }
 
+function detectToolsTrigger(value: string): ToolsTrigger | null {
+    const trimmed = value.trimStart()
+    if (!trimmed.startsWith(TOOLS_SLASH_PREFIX)) return null
+    const rest = trimmed.slice(TOOLS_SLASH_PREFIX.length)
+    if (rest && !rest.startsWith(' ')) return null
+    return { type: 'tools' }
+}
+
 function detectTrigger(value: string): Trigger | null {
     return (
+        detectToolsTrigger(value) ??
         detectContextTrigger(value) ??
         detectModelsTrigger(value) ??
         detectSlashTrigger(value) ??
@@ -153,6 +177,144 @@ function formatTimestamp(ts: number): string {
     const HH = String(date.getHours()).padStart(2, '0')
     const MM = String(date.getMinutes()).padStart(2, '0')
     return `${yyyy}-${mm}-${dd} ${HH}:${MM}`
+}
+
+type SuggestionBuildInput = {
+    trigger: Trigger
+    cwd: string
+    sessionsDir: string
+    currentSessionFile?: string
+    providers: ProviderConfig[]
+    contextLimit: number
+    toolPermissionMode: ToolPermissionMode
+}
+
+type SuggestionBuildResult = {
+    mode: SuggestionMode
+    items: SuggestionRecord[]
+}
+
+function buildModelSuggestions(
+    providers: ProviderConfig[],
+    keyword: string,
+): SuggestionBuildResult {
+    const items: SuggestionRecord[] = providers
+        .filter((provider) => {
+            if (!keyword) return true
+            const name = provider.name.toLowerCase()
+            const modelName = provider.model.toLowerCase()
+            return name.includes(keyword) || modelName.includes(keyword)
+        })
+        .map((provider) => ({
+            id: provider.name,
+            title: `${provider.name}: ${provider.model}`,
+            subtitle: provider.base_url,
+            kind: 'model',
+            value: `${MODELS_SLASH_PREFIX} ${provider.name}`,
+            meta: { type: 'model', provider },
+        }))
+
+    return { mode: 'model', items }
+}
+
+function buildContextSuggestions(contextLimit: number): SuggestionBuildResult {
+    const items: SuggestionRecord[] = CONTEXT_LIMIT_CHOICES.map((choice) => ({
+        id: `${choice}`,
+        title: `${Math.floor(choice / 1000)}k tokens`,
+        subtitle: choice === contextLimit ? 'Current' : undefined,
+        kind: 'context',
+        value: `${CONTEXT_SLASH_PREFIX} ${Math.floor(choice / 1000)}k`,
+        meta: { type: 'context', value: choice },
+    }))
+    return { mode: 'context', items }
+}
+
+function buildToolSuggestions(toolPermissionMode: ToolPermissionMode): SuggestionBuildResult {
+    const items: SuggestionRecord[] = TOOL_MODE_OPTIONS.map((option) => ({
+        id: option.mode,
+        title: option.mode,
+        subtitle:
+            option.mode === toolPermissionMode
+                ? `Current · ${option.description}`
+                : option.description,
+        kind: 'tools',
+        value: `${TOOLS_SLASH_PREFIX} ${option.mode}`,
+        meta: { type: 'tools', mode: option.mode },
+    }))
+    return { mode: 'tools', items }
+}
+
+function buildSlashSuggestions(keyword: string): SuggestionBuildResult {
+    const items: SuggestionRecord[] = SLASH_SPECS.filter((spec) =>
+        spec.name.startsWith(keyword),
+    ).map((spec) => ({
+        id: spec.name,
+        title: `/${spec.name}`,
+        subtitle: spec.description,
+        kind: 'slash',
+        value: `/${spec.name}`,
+        meta: { type: 'slash' },
+    }))
+
+    return { mode: 'slash', items }
+}
+
+async function buildSuggestionsForTrigger({
+    trigger,
+    cwd,
+    sessionsDir,
+    currentSessionFile,
+    providers,
+    contextLimit,
+    toolPermissionMode,
+}: SuggestionBuildInput): Promise<SuggestionBuildResult> {
+    switch (trigger.type) {
+        case 'file': {
+            const matches = await getFileSuggestions({
+                cwd,
+                query: trigger.query,
+                limit: 8,
+            })
+            const items: SuggestionRecord[] = matches.map((match) => ({
+                id: match.id,
+                title: match.isDir ? `${match.path}/` : match.path,
+                kind: 'file',
+                value: match.isDir ? `${match.path}/` : match.path,
+                meta: { type: 'file', isDir: match.isDir },
+            }))
+            return { mode: 'file', items }
+        }
+
+        case 'history': {
+            const entries = await loadSessionHistoryEntries({
+                sessionsDir,
+                cwd,
+                keyword: trigger.keyword,
+                activeSessionFile: currentSessionFile,
+            })
+            const items: SuggestionRecord[] = entries.map((entry) => ({
+                id: entry.id,
+                title: entry.input,
+                subtitle: formatTimestamp(entry.ts),
+                kind: 'history',
+                value: entry.input,
+                meta: { type: 'history', entry },
+            }))
+            return { mode: 'history', items }
+        }
+
+        case 'models':
+            return buildModelSuggestions(providers, trigger.keyword)
+
+        case 'context':
+            return buildContextSuggestions(contextLimit)
+
+        case 'tools':
+            return buildToolSuggestions(toolPermissionMode)
+
+        case 'slash':
+            return buildSlashSuggestions(trigger.keyword)
+    }
 }
 
 export function Composer({
@@ -226,6 +388,17 @@ export function Composer({
         setLoading(false)
     }, [])
 
+    const setComposerValue = useCallback((next: string) => {
+        valueRef.current = next
+        setValue(next)
+        setHistoryIndex(null)
+        setDraft('')
+    }, [])
+
+    const clearComposerValue = useCallback(() => {
+        setComposerValue('')
+    }, [setComposerValue])
+
     useEffect(() => {
         if (disabled) {
             closeSuggestions(false)
@@ -243,114 +416,21 @@ export function Composer({
         setLoading(true)
         ;(async () => {
             try {
-                if (trigger.type === 'file') {
-                    const matches = await getFileSuggestions({
-                        cwd,
-                        query: trigger.query,
-                        limit: 8,
-                    })
-                    if (cancelled || requestId !== requestIdRef.current) return
-                    const mapped: SuggestionRecord[] = matches.map((match) => ({
-                        id: match.id,
-                        title: match.isDir ? `${match.path}/` : match.path,
-                        kind: 'file',
-                        value: match.isDir ? `${match.path}/` : match.path,
-                        meta: { type: 'file', isDir: match.isDir },
-                    }))
-                    setMode('file')
-                    setItems(mapped)
-                    setActiveIndex((prev) =>
-                        mapped.length ? Math.min(prev, mapped.length - 1) : 0,
-                    )
-                    return
-                }
-
-                if (trigger.type === 'history') {
-                    const entries = await loadSessionHistoryEntries({
-                        sessionsDir,
-                        cwd,
-                        keyword: trigger.keyword,
-                        activeSessionFile: currentSessionFile,
-                    })
-                    if (cancelled || requestId !== requestIdRef.current) return
-                    const mapped: SuggestionRecord[] = entries.map((entry) => ({
-                        id: entry.id,
-                        title: entry.input,
-                        subtitle: formatTimestamp(entry.ts),
-                        kind: 'history',
-                        value: entry.input,
-                        meta: { type: 'history', entry },
-                    }))
-                    setMode('history')
-                    setItems(mapped)
-                    setActiveIndex((prev) =>
-                        mapped.length ? Math.min(prev, mapped.length - 1) : 0,
-                    )
-                    return
-                }
-
-                if (trigger.type === 'models') {
-                    const mapped: SuggestionRecord[] = providers
-                        .filter((provider) => {
-                            if (!trigger.keyword) return true
-                            const name = provider.name.toLowerCase()
-                            const modelName = provider.model.toLowerCase()
-                            return (
-                                name.includes(trigger.keyword) ||
-                                modelName.includes(trigger.keyword)
-                            )
-                        })
-                        .map((provider) => ({
-                            id: provider.name,
-                            title: `${provider.name}: ${provider.model}`,
-                            subtitle: provider.base_url,
-                            kind: 'model',
-                            value: `${MODELS_SLASH_PREFIX} ${provider.name}`,
-                            meta: { type: 'model', provider },
-                        }))
-                    setMode('model')
-                    setItems(mapped)
-                    setActiveIndex((prev) =>
-                        mapped.length ? Math.min(prev, mapped.length - 1) : 0,
-                    )
-                    return
-                }
-
-                if (trigger.type === 'context') {
-                    const mapped: SuggestionRecord[] = CONTEXT_LIMIT_CHOICES.map((choice) => ({
-                        id: `${choice}`,
-                        title: `${Math.floor(choice / 1000)}k tokens`,
-                        subtitle: choice === contextLimit ? 'Current' : undefined,
-                        kind: 'context',
-                        value: `${CONTEXT_SLASH_PREFIX} ${Math.floor(choice / 1000)}k`,
-                        meta: { type: 'context', value: choice },
-                    }))
-                    setMode('context')
-                    setItems(mapped)
-                    setActiveIndex((prev) =>
-                        mapped.length ? Math.min(prev, mapped.length - 1) : 0,
-                    )
-                    return
-                }
-
-                if (trigger.type === 'slash') {
-                    const mapped: SuggestionRecord[] = SLASH_SPECS.filter((spec) =>
-                        spec.name.startsWith(trigger.keyword),
-                    ).map((spec) => ({
-                        id: spec.name,
-                        title: `/${spec.name}`,
-                        subtitle: spec.description,
-                        kind: 'slash',
-                        value: `/${spec.name}`,
-                        meta: { type: 'slash' },
-                    }))
-
-                    setMode('slash')
-                    setItems(mapped)
-                    setActiveIndex((prev) =>
-                        mapped.length ? Math.min(prev, mapped.length - 1) : 0,
-                    )
-                }
+                const { mode: nextMode, items: nextItems } = await buildSuggestionsForTrigger({
+                    trigger,
+                    cwd,
+                    sessionsDir,
+                    currentSessionFile,
+                    providers,
+                    contextLimit,
+                    toolPermissionMode,
+                })
+                if (cancelled || requestId !== requestIdRef.current) return
+                setMode(nextMode)
+                setItems(nextItems)
+                setActiveIndex((prev) =>
+                    nextItems.length ? Math.min(prev, nextItems.length - 1) : 0,
+                )
             } finally {
                 if (!cancelled && requestId === requestIdRef.current) {
                     setLoading(false)
@@ -361,7 +441,16 @@ export function Composer({
         return () => {
             cancelled = true
         }
-    }, [trigger, cwd, sessionsDir, currentSessionFile, providers, contextLimit, closeSuggestions])
+    }, [
+        trigger,
+        cwd,
+        sessionsDir,
+        currentSessionFile,
+        providers,
+        contextLimit,
+        toolPermissionMode,
+        closeSuggestions,
+    ])
 
     const applySuggestion = useCallback(
         (record?: SuggestionRecord) => {
@@ -371,74 +460,59 @@ export function Composer({
                 const prefix = value.slice(0, trigger.tokenStart)
                 const suffix = value.slice(trigger.tokenStart + trigger.query.length)
                 const next = `${prefix}${record.value}${suffix}`
-                valueRef.current = next
-                setValue(next)
-                setHistoryIndex(null)
-                setDraft('')
+                setComposerValue(next)
                 if (!(record.meta?.type === 'file' && record.meta.isDir)) {
                     closeSuggestions()
                 }
                 return
             }
 
-            if (record.meta?.type === 'history') {
-                onHistorySelect(record.meta.entry)
-                valueRef.current = record.value
-                setValue(record.value)
-                setHistoryIndex(null)
-                setDraft('')
-                closeSuggestions()
-                return
-            }
+            switch (record.meta?.type) {
+                case 'history':
+                    onHistorySelect(record.meta.entry)
+                    setComposerValue(record.value)
+                    closeSuggestions()
+                    return
 
-            if (record.meta?.type === 'model') {
-                onModelSelect(record.meta.provider)
-                valueRef.current = ''
-                setValue('')
-                setHistoryIndex(null)
-                setDraft('')
-                closeSuggestions()
-                return
-            }
+                case 'model':
+                    onModelSelect(record.meta.provider)
+                    clearComposerValue()
+                    closeSuggestions()
+                    return
 
-            if (record.meta?.type === 'context') {
-                onSetContextLimit(record.meta.value)
-                onSystemMessage(
-                    'Context',
-                    `Context limit set to ${Math.floor(record.meta.value / 1000)}k`,
-                )
-                valueRef.current = ''
-                setValue('')
-                setHistoryIndex(null)
-                setDraft('')
-                closeSuggestions()
-                return
-            }
+                case 'context':
+                    onSetContextLimit(record.meta.value)
+                    clearComposerValue()
+                    closeSuggestions()
+                    return
 
-            if (record.meta?.type === 'slash') {
-                valueRef.current = `${record.value} `
-                setValue(`${record.value} `)
-                setHistoryIndex(null)
-                setDraft('')
-                closeSuggestions(false)
-                return
-            }
+                case 'tools':
+                    onSetToolPermission(record.meta.mode)
+                    clearComposerValue()
+                    closeSuggestions()
+                    return
 
-            valueRef.current = record.value
-            setValue(record.value)
-            setHistoryIndex(null)
-            setDraft('')
-            closeSuggestions()
+                case 'slash':
+                    setComposerValue(`${record.value} `)
+                    closeSuggestions(false)
+                    return
+
+                default:
+                    setComposerValue(record.value)
+                    closeSuggestions()
+            }
         },
         [
             mode,
             trigger,
             value,
             closeSuggestions,
+            setComposerValue,
+            clearComposerValue,
             onHistorySelect,
             onModelSelect,
             onSetContextLimit,
-            onSystemMessage,
+            onSetToolPermission,
         ],
     )
 

@@ -1,10 +1,10 @@
-/** @file MCP 工具注册表 */
+/** @file MCP tool registry */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 import type { McpTool, ToolRegistry, MCPServerConfig } from '../types'
 import { McpClientPool } from './pool'
 import { setActiveMcpPool } from './context'
 
-/** MCP 工具注册表 */
+/** MCP tool registry */
 export class McpToolRegistry {
     private pool: McpClientPool
     private tools: Map<string, McpTool> = new Map()
@@ -18,9 +18,9 @@ export class McpToolRegistry {
     }
 
     /**
-     * 连接并加载所有配置的 MCP Servers
-     * @param servers - server 名称到配置的映射
-     * @returns 成功加载的工具数量
+     * Connect and load all configured MCP Servers
+     * @param servers - mapping from server names to configurations
+     * @returns number of successfully loaded tools
      */
     async loadServers(servers: Record<string, MCPServerConfig> | undefined): Promise<number> {
         if (!servers || Object.keys(servers).length === 0) {
@@ -34,7 +34,7 @@ export class McpToolRegistry {
                 try {
                     const connection = await this.pool.connect(name, config)
 
-                    // 为每个工具绑定 execute 方法
+                    // Bind execute method for each tool
                     for (const toolInfo of connection.tools) {
                         const tool: McpTool = {
                             ...toolInfo,
@@ -71,17 +71,17 @@ export class McpToolRegistry {
         return totalTools
     }
 
-    /** 获取工具 */
+    /** Get tool */
     get(name: string): McpTool | undefined {
         return this.tools.get(name)
     }
 
-    /** 获取所有工具 */
+    /** Get all tools */
     getAll(): McpTool[] {
         return Array.from(this.tools.values())
     }
 
-    /** 转换为 ToolRegistry 格式 */
+    /** Convert to ToolRegistry format */
     toRegistry(): ToolRegistry {
         const registry: ToolRegistry = {}
         for (const [name, tool] of this.tools) {
@@ -90,24 +90,24 @@ export class McpToolRegistry {
         return registry
     }
 
-    /** 检查工具是否存在 */
+    /** Check if tool exists */
     has(name: string): boolean {
         return this.tools.has(name)
     }
 
-    /** 获取工具数量 */
+    /** Get tool count */
     get size(): number {
         return this.tools.size
     }
 
-    /** 关闭所有 MCP 连接 */
+    /** Close all MCP connections */
     async dispose(): Promise<void> {
         await this.pool.closeAll()
         this.tools.clear()
         setActiveMcpPool(null)
     }
 
-    /** 获取内部 pool（用于测试或高级用法） */
+    /** Get internal pool (for testing or advanced usage) */
     getPool(): McpClientPool {
         return this.pool
     }

@@ -102,25 +102,25 @@ export class McpClientPool {
     private connections: Map<string, McpClientConnection> = new Map()
 
     /**
-     * 连接指定的 MCP Server
-     * @param name - server 名称（配置中的 key）
-     * @param config - server 配置
-     * @returns 连接信息（包含 client、transport 和工具列表）
+     * Connect to specified MCP Server
+     * @param name - server name (key in configuration)
+     * @param config - server configuration
+     * @returns connection info (contains client, transport, and tool list)
      */
     async connect(name: string, config: MCPServerConfig): Promise<McpClientConnection> {
-        // 如果已连接，直接返回
+        // If already connected, return directly
         const existing = this.connections.get(name)
         if (existing) {
             return existing
         }
 
-        // 建立新连接
+        // Establish new connection
         const { client, transport } = await connectWithConfig(config)
 
-        // 获取工具列表
+        // Get tool list
         const toolsResult = await client.listTools()
 
-        // 构建 McpTool 数组（暂不填充 execute，由 Registry 处理）
+        // Build McpTool array (execute not filled yet, handled by Registry)
         const connection: McpClientConnection = {
             name,
             client,
@@ -141,17 +141,17 @@ export class McpClientPool {
         return connection
     }
 
-    /** 获取已连接的 client */
+    /** Get connected client */
     get(name: string): McpClientConnection | undefined {
         return this.connections.get(name)
     }
 
-    /** 获取所有连接 */
+    /** Get all connections */
     getAll(): McpClientConnection[] {
         return Array.from(this.connections.values())
     }
 
-    /** 获取所有工具（跨所有 connections） */
+    /** Get all tools (across all connections) */
     getAllTools() {
         const allTools: {
             name: string
@@ -178,7 +178,7 @@ export class McpClientPool {
         return allTools
     }
 
-    /** 关闭所有连接 */
+    /** Close all connections */
     async closeAll(): Promise<void> {
         const closePromises = Array.from(this.connections.values()).map(async (conn) => {
             try {
@@ -192,7 +192,7 @@ export class McpClientPool {
         this.connections.clear()
     }
 
-    /** 获取连接数量 */
+    /** Get connection count */
     get size(): number {
         return this.connections.size
     }

@@ -1,4 +1,4 @@
-/** @file Session 生命周期 Hook 聚合与运行辅助，方便统一扩展。 */
+/** @file Session lifecycle Hook aggregation and execution helpers for unified extension. */
 import type {
     ActionHookPayload,
     AgentHookHandler,

@@ -23,7 +23,7 @@ export default defineConfig({
         js: '#!/usr/bin/env node',
     },
     async onSuccess() {
-        // 复制 prompt.md 到 dist 目录
+        // Copy prompt.md to dist directory
         copyFileSync(join('packages/core/src/runtime/prompt.md'), join('dist/prompt.md'))
         console.log('✓ Copied prompt.md to dist/')
     },

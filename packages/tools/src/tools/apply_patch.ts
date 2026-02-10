@@ -12,7 +12,7 @@ type PatchOperation =
 
 const APPLY_PATCH_INPUT_SCHEMA = z
     .object({
-        input: z.string().min(1, 'patch input 不能为空'),
+        input: z.string().min(1, 'patch input cannot be empty'),
     })
     .strict()
 

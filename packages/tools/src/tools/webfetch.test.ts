@@ -27,13 +27,13 @@ describe('webfetch tool', () => {
     test('rejects unsupported protocol', async () => {
         const res = await webfetchTool.execute({ url: 'file:///etc/hosts' })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
-        assert.ok(text.includes('不支持的协议'), 'should block file:// scheme')
+        assert.ok(text.includes('Unsupported protocol'), 'should block file:// scheme')
     })
 
     test('aborts when body is too large', async () => {
         const large = 'a'.repeat(600_000)
         const res = await webfetchTool.execute({ url: `data:text/plain,${large}` })
         const text = res.content?.[0]?.type === 'text' ? res.content[0].text : ''
-        assert.ok(text.includes('响应体超过'), 'should enforce size limit')
+        assert.ok(text.includes('response body exceeds'), 'should enforce size limit')
     })
 })

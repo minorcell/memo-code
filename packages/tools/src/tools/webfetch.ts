@@ -67,11 +67,12 @@ const htmlToPlainText = (html: string) => {
 const sanitizePreview = (text: string) => text.replace(/\s+/g, ' ').trim()
 
 /**
- * WebFetch：受限 HTTP GET，返回纯文本（会对 HTML 进行去标签与解码），带超时与大小限制。
+ * WebFetch: limited HTTP GET, returns plain text (strips and decodes HTML), with timeout and size limits.
  */
 export const webfetchTool = defineMcpTool<WebFetchInput>({
     name: 'webfetch',
-    description: 'HTTP GET 请求，返回处理后的纯文本正文（自动剥离 HTML 标签）',
+    description:
+        'HTTP GET request, returns processed plain text body (automatically strips HTML tags)',
     inputSchema: WEBFETCH_INPUT_SCHEMA,
     supportsParallelToolCalls: true,
     isMutating: false,
@@ -80,10 +81,10 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
         try {
             url = new URL(input.url)
         } catch {
-            return textResult(`无效 URL: ${input.url}`, true)
+            return textResult(`Invalid URL: ${input.url}`, true)
         }
         if (!ALLOWED_PROTOCOLS.has(url.protocol)) {
-            return textResult(`不支持的协议: ${url.protocol}`, true)
+            return textResult(`Unsupported protocol: ${url.protocol}`, true)
         }
 
         const controller = new AbortController()
@@ -93,7 +94,10 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
             const lengthHeader = res.headers.get('content-length')
             const declaredLength = lengthHeader ? Number(lengthHeader) : undefined
             if (declaredLength && declaredLength > MAX_BODY_BYTES) {
-                return textResult(`请求被拒绝: 响应体过大（${declaredLength} bytes）`, true)
+                return textResult(
+                    `Request rejected: response body too large (${declaredLength} bytes)`,
+                    true,
+                )
             }
 
             let consumedBytes = 0
@@ -109,7 +113,10 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
                     consumedBytes += value.byteLength
                     if (consumedBytes > MAX_BODY_BYTES) {
                         controller.abort()
-                        return textResult(`请求被中止: 响应体超过 ${MAX_BODY_BYTES} bytes`, true)
+                        return textResult(
+                            `Request aborted: response body exceeds ${MAX_BODY_BYTES} bytes`,
+                            true,
+                        )
                     }
                     chunks.push(value)
                 }
@@ -124,7 +131,10 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
                 bodyText = await res.text()
                 consumedBytes = new TextEncoder().encode(bodyText).byteLength
                 if (consumedBytes > MAX_BODY_BYTES) {
-                    return textResult(`请求被拒绝: 响应体超过 ${MAX_BODY_BYTES} bytes`, true)
+                    return textResult(
+                        `Request rejected: response body exceeds ${MAX_BODY_BYTES} bytes`,
+                        true,
+                    )
                 }
             }
 
@@ -150,9 +160,9 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
             )
         } catch (err) {
             if ((err as Error).name === 'AbortError') {
-                return textResult(`请求超时或被中止（${WEBFETCH_TIMEOUT_MS}ms）`, true)
+                return textResult(`Request timeout or aborted (${WEBFETCH_TIMEOUT_MS}ms)`, true)
             }
-            return textResult(`请求失败: ${(err as Error).message}`, true)
+            return textResult(`Request failed: ${(err as Error).message}`, true)
         } finally {
             clearTimeout(timer)
         }
