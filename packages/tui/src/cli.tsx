@@ -131,18 +131,18 @@ async function runPlainMode(parsed: ParsedArgs) {
         dangerous: parsed.options.dangerous,
     }
 
-    // 危险模式下显示警告
+    // Show warning in dangerous mode
     if (parsed.options.dangerous) {
         console.log('⚠️  DANGEROUS MODE: All tool approvals are bypassed!')
     }
 
     const deps: AgentSessionDeps = {
-        // 非危险模式下，plain 模式不支持交互式审批，所以不设置 requestApproval
-        // 当工具需要审批时会返回错误
+        // In non-dangerous mode, plain mode does not support interactive approval, so don't set requestApproval
+        // Returns error when tool needs approval
         requestApproval: parsed.options.dangerous
             ? undefined
             : (request) => {
-                  // Plain 模式下无法交互，直接拒绝
+                  // Plain mode cannot interact, deny directly
                   console.log(`\n[approval required] ${request.toolName}: ${request.reason}`)
                   console.log(`[approval] Run with --dangerous to bypass approval`)
                   return Promise.resolve('deny')
@@ -155,7 +155,7 @@ async function runPlainMode(parsed: ParsedArgs) {
                 }
             },
             onObservation: () => {
-                // 不显示结果，只显示工具调用参数
+                // Don't show results, only show tool call parameters
             },
         },
     }

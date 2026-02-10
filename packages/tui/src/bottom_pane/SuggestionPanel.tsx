@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink'
 
-export type SuggestionKind = 'file' | 'history' | 'slash' | 'model' | 'context'
+export type SuggestionKind = 'file' | 'history' | 'slash' | 'model' | 'context' | 'tools'
 
 export type SuggestionItem = {
     id: string
