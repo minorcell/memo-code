@@ -1,0 +1,54 @@
+import type { TokenUsage, TurnStatus } from '@memo/core'
+
+export const TOOL_STATUS = {
+    PENDING: 'pending',
+    EXECUTING: 'executing',
+    SUCCESS: 'success',
+    ERROR: 'error',
+} as const
+
+export type ToolStatus = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS]
+
+export type ToolAction = {
+    tool: string
+    input: unknown
+}
+
+export type StepView = {
+    index: number
+    assistantText: string
+    thinking?: string
+    action?: ToolAction
+    parallelActions?: ToolAction[]
+    parallelToolStatuses?: ToolStatus[]
+    observation?: string
+    toolStatus?: ToolStatus
+}
+
+export type TurnView = {
+    index: number
+    userInput: string
+    steps: StepView[]
+    status?: TurnStatus
+    errorMessage?: string
+    tokenUsage?: TokenUsage
+    contextPromptTokens?: number
+    finalText?: string
+    startedAt?: number
+    durationMs?: number
+    sequence?: number
+}
+
+export type SystemMessageTone = 'info' | 'warning' | 'error'
+
+export type SystemMessage = {
+    id: string
+    title: string
+    content: string
+    sequence: number
+    tone?: SystemMessageTone
+}
+
+export type TimelineItem =
+    | { type: 'system'; sequence: number; message: SystemMessage }
+    | { type: 'turn'; sequence: number; turn: TurnView }

@@ -3,7 +3,9 @@ import { copyFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export default defineConfig({
-    entry: ['packages/cli/src/index.tsx'],
+    entry: {
+        index: 'packages/tui/src/cli.tsx',
+    },
     outDir: 'dist',
     format: ['esm'],
     target: 'node18',
