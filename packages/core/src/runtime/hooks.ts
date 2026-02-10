@@ -10,6 +10,7 @@ import type {
     TurnStartHookPayload,
     ApprovalHookPayload,
     ApprovalResponseHookPayload,
+    TitleGeneratedHookPayload,
 } from '@memo/core/types'
 
 export type HookName =
@@ -19,6 +20,7 @@ export type HookName =
     | 'onFinal'
     | 'onApprovalRequest'
     | 'onApprovalResponse'
+    | 'onTitleGenerated'
 
 export type HookPayloadMap = {
     onTurnStart: TurnStartHookPayload
@@ -27,6 +29,7 @@ export type HookPayloadMap = {
     onFinal: FinalHookPayload
     onApprovalRequest: ApprovalHookPayload
     onApprovalResponse: ApprovalResponseHookPayload
+    onTitleGenerated: TitleGeneratedHookPayload
 }
 
 export type HookRunnerMap = {
@@ -41,6 +44,7 @@ function emptyHookMap(): HookRunnerMap {
         onFinal: [],
         onApprovalRequest: [],
         onApprovalResponse: [],
+        onTitleGenerated: [],
     }
 }
 
@@ -52,6 +56,7 @@ function registerMiddleware(target: HookRunnerMap, middleware?: AgentMiddleware)
     if (middleware.onFinal) target.onFinal.push(middleware.onFinal)
     if (middleware.onApprovalRequest) target.onApprovalRequest.push(middleware.onApprovalRequest)
     if (middleware.onApprovalResponse) target.onApprovalResponse.push(middleware.onApprovalResponse)
+    if (middleware.onTitleGenerated) target.onTitleGenerated.push(middleware.onTitleGenerated)
 }
 
 export function buildHookRunners(deps: AgentSessionDeps): HookRunnerMap {

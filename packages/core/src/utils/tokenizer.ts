@@ -23,8 +23,12 @@ function safeEncodingFactory(model?: string): { model: string; factory: Encoding
 }
 
 function messagePayloadForCounting(message: ChatMessage): string {
-    if (message.role === 'assistant' && message.tool_calls?.length) {
-        return `${message.content}\n${JSON.stringify(message.tool_calls)}`
+    if (message.role === 'assistant') {
+        const reasoning = message.reasoning_content ? `\n${message.reasoning_content}` : ''
+        if (message.tool_calls?.length) {
+            return `${message.content}${reasoning}\n${JSON.stringify(message.tool_calls)}`
+        }
+        return `${message.content}${reasoning}`
     }
     if (message.role === 'tool') {
         return `${message.content}\n${message.tool_call_id}\n${message.name ?? ''}`

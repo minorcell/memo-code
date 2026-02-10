@@ -30,9 +30,11 @@ function formatSessionFileName(filePath: string): string {
 
 function extractSessionSummary(raw: string): {
     firstPrompt: string | null
+    sessionTitle: string | null
     sessionCwd: string | null
 } {
     let firstPrompt: string | null = null
+    let sessionTitle: string | null = null
     let sessionCwd: string | null = null
 
     for (const line of raw.split('\n')) {
@@ -60,9 +62,14 @@ function extractSessionSummary(raw: string): {
             const content = typeof event.content === 'string' ? event.content.trim() : ''
             if (content) firstPrompt = content
         }
+
+        if (event.type === 'session_title' && !sessionTitle) {
+            const content = typeof event.content === 'string' ? event.content.trim() : ''
+            if (content) sessionTitle = content
+        }
     }
 
-    return { firstPrompt, sessionCwd }
+    return { firstPrompt, sessionTitle, sessionCwd }
 }
 
 async function buildHistoryEntryFromFile(
@@ -72,15 +79,18 @@ async function buildHistoryEntryFromFile(
 ): Promise<SessionHistoryEntry | null> {
     try {
         const raw = await readFile(filePath, 'utf8')
-        const { firstPrompt, sessionCwd } = extractSessionSummary(raw)
+        const { firstPrompt, sessionTitle, sessionCwd } = extractSessionSummary(raw)
         if (!matchSessionCwd(cwd, sessionCwd)) {
             return null
         }
 
+        const displayTitle =
+            sessionTitle?.trim() || firstPrompt?.trim() || formatSessionFileName(filePath)
+
         return {
             id: filePath,
             cwd,
-            input: firstPrompt?.trim() || formatSessionFileName(filePath),
+            input: displayTitle,
             ts: mtimeMs,
             sessionFile: filePath,
         }

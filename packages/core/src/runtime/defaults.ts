@@ -53,7 +53,9 @@ export function parseToolArguments(
 
 function toOpenAIMessage(message: ChatMessage): OpenAI.Chat.Completions.ChatCompletionMessageParam {
     if (message.role === 'assistant') {
-        return {
+        const assistantMessage: OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam & {
+            reasoning_content?: string
+        } = {
             role: 'assistant',
             content: message.content,
             tool_calls: message.tool_calls?.map((toolCall) => ({
@@ -65,6 +67,10 @@ function toOpenAIMessage(message: ChatMessage): OpenAI.Chat.Completions.ChatComp
                 },
             })),
         }
+        if (message.reasoning_content) {
+            assistantMessage.reasoning_content = message.reasoning_content
+        }
+        return assistantMessage as OpenAI.Chat.Completions.ChatCompletionMessageParam
     }
     if (message.role === 'tool') {
         return {
@@ -77,6 +83,15 @@ function toOpenAIMessage(message: ChatMessage): OpenAI.Chat.Completions.ChatComp
         role: message.role,
         content: message.content,
     }
+}
+
+function extractReasoningContent(
+    message: OpenAI.Chat.Completions.ChatCompletionMessage | undefined,
+): string | undefined {
+    const raw = (message as { reasoning_content?: unknown } | undefined)?.reasoning_content
+    if (typeof raw !== 'string') return undefined
+    const trimmed = raw.trim()
+    return trimmed.length > 0 ? trimmed : undefined
 }
 
 /**
@@ -173,9 +188,10 @@ export async function withDefaultDeps(
                 const openAIMessages = messages.map(toOpenAIMessage)
 
                 // Build OpenAI format tool definitions
+                const effectiveToolDefinitions = callOptions?.tools ?? toolDefinitions
                 const tools =
-                    toolDefinitions.length > 0
-                        ? toolDefinitions.map((tool) => ({
+                    effectiveToolDefinitions.length > 0
+                        ? effectiveToolDefinitions.map((tool) => ({
                               type: 'function' as const,
                               function: {
                                   name: tool.name,
@@ -196,6 +212,7 @@ export async function withDefaultDeps(
                 )
 
                 const message = data.choices?.[0]?.message
+                const reasoningContent = extractReasoningContent(message)
 
                 // 检查是否有工具调用
                 if (message?.tool_calls && message.tool_calls.length > 0) {
@@ -232,6 +249,7 @@ export async function withDefaultDeps(
                     const hasToolUse = content.some((c) => c.type === 'tool_use')
                     return {
                         content,
+                        reasoning_content: reasoningContent,
                         stop_reason: hasToolUse ? 'tool_use' : 'end_turn',
                         usage: {
                             prompt: data.usage?.prompt_tokens ?? undefined,
@@ -248,6 +266,7 @@ export async function withDefaultDeps(
                 }
                 return {
                     content: [{ type: 'text', text: content }],
+                    reasoning_content: reasoningContent,
                     stop_reason: 'end_turn',
                     usage: {
                         prompt: data.usage?.prompt_tokens ?? undefined,
