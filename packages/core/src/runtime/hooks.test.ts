@@ -22,6 +22,7 @@ describe('buildHookRunners', () => {
             onFinal: [],
             onApprovalRequest: [],
             onApprovalResponse: [],
+            onTitleGenerated: [],
         })
     })
 
@@ -117,6 +118,7 @@ describe('runHook', () => {
             onFinal: [],
             onApprovalRequest: [],
             onApprovalResponse: [],
+            onTitleGenerated: [],
         }
         const payload: TurnStartHookPayload = {
             sessionId: 's1',
@@ -137,6 +139,7 @@ describe('runHook', () => {
             onFinal: [],
             onApprovalRequest: [],
             onApprovalResponse: [],
+            onTitleGenerated: [],
         }
         const payload: TurnStartHookPayload = {
             sessionId: 's1',
@@ -169,6 +172,7 @@ describe('runHook', () => {
             onFinal: [],
             onApprovalRequest: [],
             onApprovalResponse: [],
+            onTitleGenerated: [],
         }
         const payload: ActionHookPayload = {
             sessionId: 's1',
@@ -201,6 +205,7 @@ describe('runHook', () => {
             onObservation: [],
             onApprovalRequest: [],
             onApprovalResponse: [],
+            onTitleGenerated: [],
         }
         const payload: FinalHookPayload = {
             sessionId: 's1',
@@ -230,6 +235,7 @@ describe('runHook', () => {
             onFinal: [],
             onApprovalRequest: [],
             onApprovalResponse: [],
+            onTitleGenerated: [],
         }
         const payload: ObservationHookPayload = {
             sessionId: 's1',

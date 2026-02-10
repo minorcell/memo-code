@@ -44,6 +44,13 @@ const DEFAULT_MAX_PROMPT_TOKENS = 120_000
 const TOOL_ACTION_SUCCESS_STATUS: ToolActionStatus = 'success'
 const TOOL_DISABLED_ERROR_MESSAGE =
     'Tool usage is disabled in the current permission mode. Switch to /tools once or /tools full to enable tools.'
+const SESSION_TITLE_SYSTEM_PROMPT = `Generate a concise session title based on the user's first prompt.
+Requirements:
+- 3 to 8 words when possible
+- Keep it specific and descriptive
+- Return title only, no quotes, no punctuation-only output
+`
+const SESSION_TITLE_MAX_CHARS = 60
 
 type ResolvedToolPermission = {
     mode: ToolPermissionMode | 'auto'
@@ -106,6 +113,7 @@ function accumulateUsage(target: TokenUsage, delta?: Partial<TokenUsage>) {
 function normalizeLLMResponse(raw: LLMResponse): {
     textContent: string
     toolUseBlocks: Array<{ id: string; name: string; input: unknown }>
+    reasoningContent?: string
     stopReason?: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
     usage?: Partial<TokenUsage>
 } {
@@ -121,6 +129,10 @@ function normalizeLLMResponse(raw: LLMResponse): {
             name: b.name,
             input: b.input,
         })),
+        reasoningContent:
+            typeof raw.reasoning_content === 'string' && raw.reasoning_content.trim().length > 0
+                ? raw.reasoning_content
+                : undefined,
         stopReason: raw.stop_reason,
         usage: raw.usage,
     }
@@ -195,8 +207,39 @@ function parseTextToolCall(
     return null
 }
 
+function truncateSessionTitle(input: string): string {
+    if (input.length <= SESSION_TITLE_MAX_CHARS) return input
+    return `${input.slice(0, SESSION_TITLE_MAX_CHARS - 3).trimEnd()}...`
+}
+
+function normalizeSessionTitle(raw: string): string {
+    const compact = raw
+        .replace(/\r?\n+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    if (!compact) return ''
+    const unquoted = compact.replace(/^["'`“”‘’]+|["'`“”‘’]+$/g, '').trim()
+    if (!unquoted) return ''
+    return truncateSessionTitle(unquoted)
+}
+
+function fallbackSessionTitleFromPrompt(input: string): string {
+    const compact = input.replace(/\s+/g, ' ').trim()
+    if (!compact) return 'New Session'
+
+    // Keep short CJK/non-space prompts readable.
+    if (!compact.includes(' ')) {
+        return compact.length <= 20 ? compact : `${compact.slice(0, 20).trimEnd()}...`
+    }
+
+    const words = compact.split(' ').filter(Boolean)
+    const short = words.slice(0, 8).join(' ')
+    return truncateSessionTitle(short || compact)
+}
+
 /** In-process conversation Session, implements multi-turn execution and log writing. */
 class AgentSessionImpl implements AgentSession {
+    public title?: string
     public id: string
     public mode: SessionMode
     public history: ChatMessage[]
@@ -317,6 +360,58 @@ class AgentSessionImpl implements AgentSession {
         )
     }
 
+    private async maybeGenerateSessionTitle(
+        turn: number,
+        originalPrompt: string,
+        signal: AbortSignal,
+    ) {
+        if (turn !== 1 || this.title) return
+
+        let title = fallbackSessionTitleFromPrompt(originalPrompt)
+        let source: 'llm' | 'fallback' = 'fallback'
+
+        try {
+            const response = await this.deps.callLLM(
+                [
+                    { role: 'system', content: SESSION_TITLE_SYSTEM_PROMPT },
+                    { role: 'user', content: originalPrompt },
+                ],
+                undefined,
+                { signal, tools: [] },
+            )
+            const generated = normalizeSessionTitle(
+                response.content
+                    .filter((block): block is TextBlock => block.type === 'text')
+                    .map((block) => block.text)
+                    .join(' '),
+            )
+            if (generated) {
+                title = generated
+                source = 'llm'
+            }
+        } catch (err) {
+            if (isAbortError(err)) {
+                return
+            }
+        }
+
+        this.title = title
+        await this.emitEvent('session_title', {
+            turn,
+            content: title,
+            meta: {
+                source,
+                original_prompt: originalPrompt,
+            },
+        })
+        await runHook(this.hooks, 'onTitleGenerated', {
+            sessionId: this.id,
+            turn,
+            title,
+            originalPrompt,
+        })
+    }
+
     /** 执行一次 Turn：接受用户输入，走 ReAct 循环，返回最终结果与步骤轨迹。 */
     async runTurn(input: string): Promise<TurnResult> {
         const abortController = new AbortController()
@@ -364,6 +459,9 @@ class AgentSessionImpl implements AgentSession {
                 promptTokens,
                 history: snapshotHistory(this.history),
             })
+            if (this.options.generateSessionTitle) {
+                await this.maybeGenerateSessionTitle(turn, input, abortController.signal)
+            }
 
             let finalText = ''
             let status: TurnStatus = 'ok'
@@ -411,6 +509,7 @@ class AgentSessionImpl implements AgentSession {
                 let toolUseBlocks: Array<{ id: string; name: string; input: unknown }> = []
                 let usageFromLLM: Partial<TokenUsage> | undefined
                 let stopReason: string | undefined
+                let reasoningContent: string | undefined
                 try {
                     const llmResult = await this.deps.callLLM(
                         this.history,
@@ -422,6 +521,7 @@ class AgentSessionImpl implements AgentSession {
                     toolUseBlocks = normalized.toolUseBlocks
                     stopReason = normalized.stopReason
                     usageFromLLM = normalized.usage
+                    reasoningContent = normalized.reasoningContent
                     if (assistantText.trim().length > 0) {
                         lastNonEmptyAssistantText = assistantText
                         lastNonEmptyAssistantStep = step
@@ -495,6 +595,7 @@ class AgentSessionImpl implements AgentSession {
                         assistantHistoryMessage = {
                             role: 'assistant',
                             content: assistantText,
+                            reasoning_content: reasoningContent,
                             tool_calls: buildAssistantToolCalls(toolUseBlocks),
                         }
                     } else {
@@ -502,7 +603,11 @@ class AgentSessionImpl implements AgentSession {
                     }
                 } else if (assistantText) {
                     parsed = { final: assistantText }
-                    assistantHistoryMessage = { role: 'assistant', content: assistantText }
+                    assistantHistoryMessage = {
+                        role: 'assistant',
+                        content: assistantText,
+                        reasoning_content: reasoningContent,
+                    }
                 } else {
                     // 没有内容，视为空响应
                     parsed = {}

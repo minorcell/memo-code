@@ -38,6 +38,8 @@ export type ChatMessage =
           role: 'assistant'
           /** Assistant text; can be empty string for pure tool calls. */
           content: string
+          /** Optional DeepSeek thinking trace required for subsequent tool-call rounds. */
+          reasoning_content?: string
           /** Structured tool calls list (if any). */
           tool_calls?: AssistantToolCall[]
       }
@@ -113,6 +115,8 @@ export type ContentBlock = TextBlock | ToolUseBlock
 export type LLMResponse = {
     /** Structured content blocks (text + tool calls). */
     content: ContentBlock[]
+    /** Optional DeepSeek thinking trace for protocol-compatible follow-up requests. */
+    reasoning_content?: string
     /** Stop reason. */
     stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence'
     /** Token usage returned by model (optional). */
@@ -200,6 +204,8 @@ export type AgentSessionOptions = {
     maxPromptTokens?: number
     /** Active MCP server names for current session (undefined means all configured servers). */
     activeMcpServers?: string[]
+    /** Generate a session title from the first user prompt (enabled by CLI). */
+    generateSessionTitle?: boolean
     /** Dangerous mode: skip approval (not equivalent to disabling sandbox). */
     dangerous?: boolean
     /** 工具权限模式：禁用工具 / 每次审批 / 全部放行。 */
@@ -281,7 +287,6 @@ export type ApprovalHookPayload = {
     request: ApprovalRequest
 }
 
-
 export type ApprovalResponseHookPayload = {
     sessionId: string
     turn: number
@@ -336,6 +341,7 @@ export type AgentSession = {
 /** 日志事件类型，用于 JSONL。 */
 export type HistoryEventType =
     | 'session_start'
+    | 'session_title'
     | 'session_end'
     | 'turn_start'
     | 'assistant'

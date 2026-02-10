@@ -167,6 +167,39 @@ describe('createTokenCounter', () => {
             expect(withCalls).toBeGreaterThan(withoutCalls)
         })
 
+        test('counts reasoning_content in assistant message', () => {
+            const messagesWithReasoning: ChatMessage[] = [
+                {
+                    role: 'assistant',
+                    content: '',
+                    reasoning_content: 'I should inspect file A before using read_file.',
+                    tool_calls: [
+                        {
+                            id: 'call-1',
+                            type: 'function',
+                            function: { name: 'read_file', arguments: '{"path":"README.md"}' },
+                        },
+                    ],
+                },
+            ]
+            const messagesWithoutReasoning: ChatMessage[] = [
+                {
+                    role: 'assistant',
+                    content: '',
+                    tool_calls: [
+                        {
+                            id: 'call-1',
+                            type: 'function',
+                            function: { name: 'read_file', arguments: '{"path":"README.md"}' },
+                        },
+                    ],
+                },
+            ]
+            const withReasoning = counter.countMessages(messagesWithReasoning)
+            const withoutReasoning = counter.countMessages(messagesWithoutReasoning)
+            expect(withReasoning).toBeGreaterThan(withoutReasoning)
+        })
+
         test('includes tool_call_id in tool message counting', () => {
             const messages: ChatMessage[] = [
                 {

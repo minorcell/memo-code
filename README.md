@@ -57,6 +57,7 @@ memo
 - Version: `memo --version` or `memo -v`.
 - Startup project guidance: if `AGENTS.md` exists in the startup root, Memo appends it to the system prompt automatically.
 - MCP activation selection: when MCP servers are configured, startup shows a multi-select to activate servers for this run.
+- Session titles: Memo generates a short title from the first user prompt and uses it in history/resume lists.
 
 ## Configuration
 

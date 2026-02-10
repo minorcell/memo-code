@@ -129,6 +129,7 @@ async function runPlainMode(parsed: ParsedArgs) {
         mode: 'interactive',
         maxPromptTokens: loaded.config.max_prompt_tokens,
         activeMcpServers: loaded.config.active_mcp_servers,
+        generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
     }
 
@@ -197,6 +198,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
         mode: 'interactive',
         maxPromptTokens: loaded.config.max_prompt_tokens,
         activeMcpServers: loaded.config.active_mcp_servers,
+        generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
     }
     const sessionsDir = getSessionsDir(loaded, sessionOptions)
