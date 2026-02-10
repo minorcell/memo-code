@@ -67,6 +67,15 @@ describe('codex shell family', () => {
         assert.ok(text.includes('hello-codex'), 'should include command output')
     })
 
+    test('exec_command blocks dangerous shell command with xml hint', async () => {
+        const result = await execCommandTool.execute({ cmd: 'rm -rf /' })
+        const text = textPayload(result)
+
+        assert.ok(text.startsWith('<system_hint '))
+        assert.ok(text.includes('reason="dangerous_command"'))
+        assert.ok(text.includes('tool="exec_command"'))
+    })
+
     test('write_stdin continues interactive session', async () => {
         const started = await execCommandTool.execute({
             cmd: 'read line; echo "$line"',
@@ -85,6 +94,34 @@ describe('codex shell family', () => {
 
         const resumedText = textPayload(resumed)
         assert.ok(resumedText.includes('interactive-ok'))
+    })
+
+    test('write_stdin blocks dangerous input and keeps session alive', async () => {
+        const started = await execCommandTool.execute({
+            cmd: 'read line; echo "$line"',
+            yield_time_ms: 50,
+        })
+        const startedText = textPayload(started)
+        const match = startedText.match(/session ID (\d+)/)
+        assert.ok(match, `expected running session id, got: ${startedText}`)
+
+        const sessionId = Number(match?.[1])
+        const blocked = await writeStdinTool.execute({
+            session_id: sessionId,
+            chars: 'rm -rf /\n',
+            yield_time_ms: 50,
+        })
+        const blockedText = textPayload(blocked)
+        assert.ok(blockedText.startsWith('<system_hint '))
+        assert.ok(blockedText.includes('tool="write_stdin"'))
+
+        const resumed = await writeStdinTool.execute({
+            session_id: sessionId,
+            chars: 'still-alive\n',
+            yield_time_ms: 1000,
+        })
+        const resumedText = textPayload(resumed)
+        assert.ok(resumedText.includes('still-alive'))
     })
 })
 

@@ -21,6 +21,17 @@ describe('shell wrappers and update_plan', () => {
         assert.ok(text.includes('shell-wrapper-ok'))
     })
 
+    test('shell tool blocks dangerous argv command', async () => {
+        const result = await shellTool.execute({
+            command: ['mkfs.ext4', '/dev/sda'],
+        })
+
+        const text = textPayload(result)
+        assert.ok(text.startsWith('<system_hint '))
+        assert.ok(text.includes('tool="shell"'))
+        assert.ok(text.includes('reason="dangerous_command"'))
+    })
+
     test('shell_command executes script command form', async () => {
         const result = await shellCommandTool.execute({
             command: 'echo shell-command-ok',
@@ -31,6 +42,19 @@ describe('shell wrappers and update_plan', () => {
         const text = textPayload(result)
         assert.ok(!result.isError)
         assert.ok(text.includes('shell-command-ok'))
+    })
+
+    test('shell_command blocks dangerous script command', async () => {
+        const result = await shellCommandTool.execute({
+            command: 'dd if=/dev/zero of=/dev/sda bs=1M',
+            login: false,
+            timeout_ms: 1000,
+        })
+
+        const text = textPayload(result)
+        assert.ok(text.startsWith('<system_hint '))
+        assert.ok(text.includes('tool="shell_command"'))
+        assert.ok(text.includes('reason="dangerous_command"'))
     })
 
     test('write_stdin fails for unknown session id', async () => {

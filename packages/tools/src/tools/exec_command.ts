@@ -29,7 +29,10 @@ export const execCommandTool = defineMcpTool<ExecCommandInput>({
     isMutating: true,
     execute: async (input) => {
         try {
-            const content = await startExecSession(input)
+            const content = await startExecSession({
+                ...input,
+                source_tool: 'exec_command',
+            })
             return textResult(content)
         } catch (err) {
             return textResult(`exec_command failed: ${(err as Error).message}`, true)

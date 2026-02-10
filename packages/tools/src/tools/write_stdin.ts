@@ -22,7 +22,10 @@ export const writeStdinTool = defineMcpTool<WriteStdinInput>({
     isMutating: true,
     execute: async (input) => {
         try {
-            const content = await writeExecSession(input)
+            const content = await writeExecSession({
+                ...input,
+                source_tool: 'write_stdin',
+            })
             return textResult(content)
         } catch (err) {
             return textResult(`write_stdin failed: ${(err as Error).message}`, true)
