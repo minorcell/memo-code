@@ -668,6 +668,9 @@ export function Composer({
             const next = `${valueRef.current}${input}`
             valueRef.current = next
             setValue(next)
+            if (input.includes('\n')) {
+                closeSuggestions(false)
+            }
         }
     })
 
@@ -685,7 +688,7 @@ export function Composer({
                     <Box key={`line-${index}`}>
                         <Text color="gray"> </Text>
                         <Text>{line}</Text>
-                        {index === lines.length - 2 && !disabled ? (
+                        {index === lines.length - 2 && !disabled && line === '' ? (
                             <Text color="cyan">▊</Text>
                         ) : null}
                     </Box>
