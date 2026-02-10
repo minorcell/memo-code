@@ -88,11 +88,17 @@ export const ChatWidget = memo(function ChatWidget({
                         return <SystemCell key={item.data.id} message={item.data} />
                     }
 
-                    return <TurnCell key={`turn-${item.data.index}`} turn={item.data} />
+                    return (
+                        <TurnCell
+                            key={`turn-${item.data.index}`}
+                            turn={item.data}
+                            cwd={header.cwd}
+                        />
+                    )
                 }}
             </Static>
 
-            {inProgressTurn ? <TurnCell turn={inProgressTurn} /> : null}
+            {inProgressTurn ? <TurnCell turn={inProgressTurn} cwd={header.cwd} /> : null}
         </Box>
     )
 })
