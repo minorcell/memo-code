@@ -6,7 +6,7 @@ import {
     type ToolStatus,
     type TurnView,
 } from '../types'
-import { safeStringify, truncate } from '../utils'
+import { looksLikePathInput, safeStringify, toRelativeDisplayPath, truncate } from '../utils'
 
 function statusColor(status?: ToolStatus): string {
     if (status === TOOL_STATUS.ERROR) return 'red'
@@ -14,18 +14,25 @@ function statusColor(status?: ToolStatus): string {
     return 'green'
 }
 
-function mainParam(input: unknown): string | null {
+function mainParam(input: unknown, cwd: string): string | null {
     if (input === undefined || input === null) return null
-    if (typeof input === 'string') return truncate(input, 70)
+    if (typeof input === 'string') {
+        const display = looksLikePathInput(input) ? toRelativeDisplayPath(input, cwd) : input
+        return truncate(display, 70)
+    }
     if (typeof input !== 'object' || Array.isArray(input)) return truncate(String(input), 70)
 
     const record = input as Record<string, unknown>
     const keys = ['cmd', 'path', 'file_path', 'dir_path', 'query', 'pattern', 'url', 'content']
+    const pathKeys = new Set(['path', 'file_path', 'dir_path'])
 
     for (const key of keys) {
         const raw = record[key]
         if (raw === undefined || raw === null || raw === '') continue
-        return truncate(String(raw), 70)
+
+        const value = String(raw)
+        const display = pathKeys.has(key) ? toRelativeDisplayPath(value, cwd) : value
+        return truncate(display, 70)
     }
 
     return truncate(safeStringify(record), 70)
@@ -42,8 +49,9 @@ export function SystemCell({ message }: { message: SystemMessage }) {
     )
 }
 
-function StepCell({ step }: { step: StepView }) {
+function StepCell({ step, cwd }: { step: StepView; cwd: string }) {
     const isParallel = Boolean(step.parallelActions && step.parallelActions.length > 1)
+    const singleActionParam = !isParallel && step.action ? mainParam(step.action.input, cwd) : null
 
     return (
         <Box flexDirection="column">
@@ -55,22 +63,23 @@ function StepCell({ step }: { step: StepView }) {
             ) : null}
 
             {isParallel
-                ? step.parallelActions?.map((action, index) => (
-                      <Box key={`${action.tool}-${index}`}>
-                          <Text
-                              color={statusColor(
-                                  step.parallelToolStatuses?.[index] ?? step.toolStatus,
-                              )}
-                          >
-                              ●{' '}
-                          </Text>
-                          <Text color="gray">Used </Text>
-                          <Text color="cyan">{action.tool}</Text>
-                          {mainParam(action.input) ? (
-                              <Text color="gray"> ({mainParam(action.input)})</Text>
-                          ) : null}
-                      </Box>
-                  ))
+                ? step.parallelActions?.map((action, index) => {
+                      const param = mainParam(action.input, cwd)
+                      return (
+                          <Box key={`${action.tool}-${index}`}>
+                              <Text
+                                  color={statusColor(
+                                      step.parallelToolStatuses?.[index] ?? step.toolStatus,
+                                  )}
+                              >
+                                  ●{' '}
+                              </Text>
+                              <Text color="gray">Used </Text>
+                              <Text color="cyan">{action.tool}</Text>
+                              {param ? <Text color="gray"> ({param})</Text> : null}
+                          </Box>
+                      )
+                  })
                 : null}
 
             {!isParallel && step.action ? (
@@ -78,16 +87,14 @@ function StepCell({ step }: { step: StepView }) {
                     <Text color={statusColor(step.toolStatus)}>● </Text>
                     <Text color="gray">Used </Text>
                     <Text color="cyan">{step.action.tool}</Text>
-                    {mainParam(step.action.input) ? (
-                        <Text color="gray"> ({mainParam(step.action.input)})</Text>
-                    ) : null}
+                    {singleActionParam ? <Text color="gray"> ({singleActionParam})</Text> : null}
                 </Box>
             ) : null}
         </Box>
     )
 }
 
-export function TurnCell({ turn }: { turn: TurnView }) {
+export function TurnCell({ turn, cwd }: { turn: TurnView; cwd: string }) {
     return (
         <Box flexDirection="column">
             <Box>
@@ -96,7 +103,7 @@ export function TurnCell({ turn }: { turn: TurnView }) {
             </Box>
 
             {turn.steps.map((step) => (
-                <StepCell key={`${turn.index}-${step.index}`} step={step} />
+                <StepCell key={`${turn.index}-${step.index}`} step={step} cwd={cwd} />
             ))}
 
             {turn.finalText ? (

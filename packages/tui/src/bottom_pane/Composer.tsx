@@ -6,7 +6,12 @@ import type { SlashContext } from '../slash/types'
 import { getFileSuggestions } from '../controllers/file_suggestions'
 import { loadSessionHistoryEntries, type SessionHistoryEntry } from '../controllers/session_history'
 import { SuggestionPanel, type SuggestionItem } from './SuggestionPanel'
-import { CONTEXT_LIMIT_CHOICES, formatSlashCommand, SLASH_COMMANDS } from '../constants'
+import {
+    CONTEXT_LIMIT_CHOICES,
+    formatSlashCommand,
+    SLASH_COMMANDS,
+    type ToolPermissionMode,
+} from '../constants'
 
 const DOUBLE_ESC_WINDOW_MS = 400
 const MODELS_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.MODELS)
@@ -25,6 +30,7 @@ type ComposerProps = {
     providerName: string
     model: string
     contextLimit: number
+    toolPermissionMode: ToolPermissionMode
     mcpServers: Record<string, MCPServerConfig>
     onSubmit: (value: string) => void
     onExit: () => void
@@ -34,6 +40,7 @@ type ComposerProps = {
     onHistorySelect: (entry: SessionHistoryEntry) => void
     onModelSelect: (provider: ProviderConfig) => void
     onSetContextLimit: (limit: number) => void
+    onSetToolPermission: (mode: ToolPermissionMode) => void
     onSystemMessage: (title: string, content: string) => void
 }
 
@@ -160,6 +167,7 @@ export function Composer({
     providerName,
     model,
     contextLimit,
+    toolPermissionMode,
     mcpServers,
     onSubmit,
     onExit,
@@ -169,6 +177,7 @@ export function Composer({
     onHistorySelect,
     onModelSelect,
     onSetContextLimit,
+    onSetToolPermission,
     onSystemMessage,
 }: ComposerProps) {
     const [value, setValue] = useState('')
@@ -199,8 +208,9 @@ export function Composer({
             mcpServers,
             providers,
             contextLimit,
+            toolPermissionMode,
         }),
-        [configPath, providerName, model, mcpServers, providers, contextLimit],
+        [configPath, providerName, model, mcpServers, providers, contextLimit, toolPermissionMode],
     )
 
     const trigger = useMemo(() => {
@@ -551,6 +561,8 @@ export function Composer({
                     onModelSelect(result.provider)
                 } else if (result.kind === 'set_context_limit') {
                     onSetContextLimit(result.limit)
+                } else if (result.kind === 'set_tool_permission') {
+                    onSetToolPermission(result.mode)
                 } else if (result.kind === 'init_agents_md') {
                     onSubmit(INIT_SLASH_COMMAND)
                 }

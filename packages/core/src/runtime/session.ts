@@ -15,6 +15,7 @@ import type {
     LLMResponse,
     ParsedAssistant,
     SessionMode,
+    ToolPermissionMode,
     TokenCounter,
     TokenUsage,
     ToolRegistry,
@@ -41,6 +42,52 @@ import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 const DEFAULT_SESSION_MODE: SessionMode = 'interactive'
 const DEFAULT_MAX_PROMPT_TOKENS = 120_000
 const TOOL_ACTION_SUCCESS_STATUS: ToolActionStatus = 'success'
+const TOOL_DISABLED_ERROR_MESSAGE =
+    'Tool usage is disabled in the current permission mode. Switch to /tools once or /tools full to enable tools.'
+
+type ResolvedToolPermission = {
+    mode: ToolPermissionMode | 'auto'
+    toolsDisabled: boolean
+    dangerous: boolean
+    approvalMode: 'auto' | 'strict'
+}
+
+function resolveToolPermission(options: AgentSessionOptions): ResolvedToolPermission {
+    if (options.toolPermissionMode === 'none') {
+        return {
+            mode: 'none',
+            toolsDisabled: true,
+            dangerous: false,
+            approvalMode: 'auto',
+        }
+    }
+
+    if (options.toolPermissionMode === 'once') {
+        return {
+            mode: 'once',
+            toolsDisabled: false,
+            dangerous: false,
+            approvalMode: 'strict',
+        }
+    }
+
+    if (options.toolPermissionMode === 'full') {
+        return {
+            mode: 'full',
+            toolsDisabled: false,
+            dangerous: true,
+            approvalMode: 'auto',
+        }
+    }
+
+    const dangerous = options.dangerous ?? false
+    return {
+        mode: dangerous ? 'full' : 'auto',
+        toolsDisabled: false,
+        dangerous,
+        approvalMode: 'auto',
+    }
+}
 
 function emptyUsage(): TokenUsage {
     return { prompt: 0, completion: 0, total: 0 }
@@ -168,6 +215,8 @@ class AgentSessionImpl implements AgentSession {
     private lastActionSignature: string | null = null
     private repeatedActionCount = 0
     private toolOrchestrator: ToolOrchestrator
+    private toolsDisabled = false
+    private toolPermissionMode: ToolPermissionMode | 'auto' = 'auto'
 
     constructor(
         private deps: AgentSessionDeps & {
@@ -186,11 +235,14 @@ class AgentSessionImpl implements AgentSession {
         this.sinks = deps.historySinks ?? []
         this.hooks = buildHookRunners(deps)
         this.historyFilePath = historyFilePath
+        const resolvedPermission = resolveToolPermission(options)
+        this.toolsDisabled = resolvedPermission.toolsDisabled
+        this.toolPermissionMode = resolvedPermission.mode
         this.toolOrchestrator = createToolOrchestrator({
             tools: deps.tools,
             approval: {
-                dangerous: options.dangerous ?? false,
-                mode: 'auto',
+                dangerous: resolvedPermission.dangerous,
+                mode: resolvedPermission.approvalMode,
             },
         })
     }
@@ -289,6 +341,7 @@ class AgentSessionImpl implements AgentSession {
                     tokenizer: this.tokenCounter.model,
                     warnPromptTokens: this.options.warnPromptTokens,
                     maxPromptTokens: effectiveMaxPromptTokens,
+                    toolPermissionMode: this.toolPermissionMode,
                 },
             })
             this.sessionStartEmitted = true
@@ -526,6 +579,37 @@ class AgentSessionImpl implements AgentSession {
 
                 if (assistantHistoryMessage) {
                     this.history.push(assistantHistoryMessage)
+                }
+
+                if (toolUseBlocks.length > 0 && this.toolsDisabled) {
+                    status = 'error'
+                    finalText = TOOL_DISABLED_ERROR_MESSAGE
+                    errorMessage = TOOL_DISABLED_ERROR_MESSAGE
+                    this.history.push({ role: 'assistant', content: TOOL_DISABLED_ERROR_MESSAGE })
+                    await this.emitEvent('final', {
+                        turn,
+                        step,
+                        content: TOOL_DISABLED_ERROR_MESSAGE,
+                        role: 'assistant',
+                        meta: {
+                            error_type: 'tool_disabled',
+                            tool_count: toolUseBlocks.length,
+                            tools: toolUseBlocks.map((block) => block.name).join(','),
+                            tokens: stepUsage,
+                        },
+                    })
+                    await runHook(this.hooks, 'onFinal', {
+                        sessionId: this.id,
+                        turn,
+                        step,
+                        finalText: TOOL_DISABLED_ERROR_MESSAGE,
+                        status,
+                        errorMessage,
+                        tokenUsage: stepUsage,
+                        turnUsage: { ...turnUsage },
+                        steps,
+                    })
+                    break
                 }
 
                 // 处理工具调用（支持并发执行多个工具）

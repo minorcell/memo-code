@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
 import type { ApprovalDecision, ApprovalRequest } from '@memo/tools/approval'
 
 type ApprovalOverlayProps = {
     request: ApprovalRequest
     onDecision: (decision: ApprovalDecision) => void
+    allowSessionGrant?: boolean
 }
 
 type Option = {
@@ -12,7 +13,7 @@ type Option = {
     decision: ApprovalDecision
 }
 
-const OPTIONS: Option[] = [
+const DEFAULT_OPTIONS: Option[] = [
     { label: 'Allow once', decision: 'once' },
     { label: 'Allow for this session', decision: 'session' },
     { label: 'Deny', decision: 'deny' },
@@ -29,22 +30,34 @@ function shortParam(params: unknown): string {
     return `${key}=${raw?.slice(0, 60) ?? ''}${raw && raw.length > 60 ? '...' : ''}`
 }
 
-export function ApprovalOverlay({ request, onDecision }: ApprovalOverlayProps) {
+export function ApprovalOverlay({
+    request,
+    onDecision,
+    allowSessionGrant = true,
+}: ApprovalOverlayProps) {
     const [selected, setSelected] = useState(0)
+    const options = allowSessionGrant
+        ? DEFAULT_OPTIONS
+        : DEFAULT_OPTIONS.filter((option) => option.decision !== 'session')
+
+    useEffect(() => {
+        if (selected < options.length) return
+        setSelected(Math.max(0, options.length - 1))
+    }, [options.length, selected])
 
     useInput((input, key) => {
         if (key.upArrow) {
-            setSelected((prev) => (prev <= 0 ? OPTIONS.length - 1 : prev - 1))
+            setSelected((prev) => (prev <= 0 ? options.length - 1 : prev - 1))
             return
         }
 
         if (key.downArrow) {
-            setSelected((prev) => (prev + 1) % OPTIONS.length)
+            setSelected((prev) => (prev + 1) % options.length)
             return
         }
 
         if (key.return) {
-            const option = OPTIONS[selected]
+            const option = options[selected]
             if (option) {
                 onDecision(option.decision)
             }
@@ -69,7 +82,7 @@ export function ApprovalOverlay({ request, onDecision }: ApprovalOverlayProps) {
             </Text>
             <Text color="gray">{request.reason}</Text>
             <Box marginTop={1} flexDirection="column">
-                {OPTIONS.map((option, index) => (
+                {options.map((option, index) => (
                     <Text key={option.decision} color={selected === index ? 'green' : 'gray'}>
                         {selected === index ? '> ' : '  '}
                         {option.label}

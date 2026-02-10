@@ -221,6 +221,31 @@ describe('session hooks & middleware', () => {
         }
     })
 
+    test('blocks tool calls when tool permission mode is none', async () => {
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'blocked' }),
+            endTurnResponse('done'),
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            { toolPermissionMode: 'none' },
+        )
+        try {
+            const result = await session.runTurn('go')
+            assert.strictEqual(result.status, 'error')
+            assert.ok(result.finalText.includes('Tool usage is disabled'))
+            assert.strictEqual(result.steps[0]?.observation, undefined)
+        } finally {
+            await session.close()
+        }
+    })
+
     test('rejects native tool input via validateInput before execute', async () => {
         const outputs: LLMResponse[] = [
             toolUseResponse('action-1', 'read_file', {}),

@@ -179,6 +179,7 @@ export type AgentDeps = {
 
 /** Session 模式：当前仅支持交互式。 */
 export type SessionMode = 'interactive'
+export type ToolPermissionMode = 'none' | 'once' | 'full'
 
 /** Session 级别的配置项。 */
 export type AgentSessionOptions = {
@@ -198,6 +199,8 @@ export type AgentSessionOptions = {
     maxPromptTokens?: number
     /** 危险模式：跳过审批（不等于关闭沙箱）。 */
     dangerous?: boolean
+    /** 工具权限模式：禁用工具 / 每次审批 / 全部放行。 */
+    toolPermissionMode?: ToolPermissionMode
 }
 
 /** Session 运行需要的依赖（含扩展项）。 */

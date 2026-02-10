@@ -10,11 +10,20 @@ export const SLASH_COMMANDS = {
     RESUME: 'resume',
     MODELS: 'models',
     CONTEXT: 'context',
+    TOOLS: 'tools',
     MCP: 'mcp',
     INIT: 'init',
 } as const
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[keyof typeof SLASH_COMMANDS]
+
+export const TOOL_PERMISSION_MODES = {
+    NONE: 'none',
+    ONCE: 'once',
+    FULL: 'full',
+} as const
+
+export type ToolPermissionMode = (typeof TOOL_PERMISSION_MODES)[keyof typeof TOOL_PERMISSION_MODES]
 
 export function formatSlashCommand(command: SlashCommandName): string {
     return `/${command}`

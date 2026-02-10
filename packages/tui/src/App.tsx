@@ -39,6 +39,8 @@ import {
     formatSlashCommand,
     PLAIN_EXIT_COMMAND,
     SLASH_COMMANDS,
+    TOOL_PERMISSION_MODES,
+    type ToolPermissionMode,
 } from './constants'
 
 export type AppProps = {
@@ -67,6 +69,9 @@ export function App({
     needsSetup = false,
 }: AppProps) {
     const { exit } = useApp()
+    const defaultToolPermissionMode: ToolPermissionMode =
+        sessionOptions.toolPermissionMode ??
+        (dangerous ? TOOL_PERMISSION_MODES.FULL : TOOL_PERMISSION_MODES.ONCE)
 
     const [timeline, dispatchTimeline] = useReducer(
         chatTimelineReducer,
@@ -77,10 +82,14 @@ export function App({
     const [currentProvider, setCurrentProvider] = useState(providerName)
     const [currentModel, setCurrentModel] = useState(model)
     const [providersState, setProvidersState] = useState(providers)
+    const [toolPermissionMode, setToolPermissionMode] =
+        useState<ToolPermissionMode>(defaultToolPermissionMode)
 
     const [sessionOptionsState, setSessionOptionsState] = useState<AgentSessionOptions>({
         ...sessionOptions,
         providerName,
+        dangerous: defaultToolPermissionMode === TOOL_PERMISSION_MODES.FULL,
+        toolPermissionMode: defaultToolPermissionMode,
     })
 
     const [busy, setBusy] = useState(false)
@@ -125,13 +134,15 @@ export function App({
                 if (!turn) return
                 dispatch({ type: 'assistant_chunk', turn, step, chunk })
             },
-            requestApproval: dangerous
-                ? undefined
-                : (request: ApprovalRequest) =>
-                      new Promise((resolve) => {
-                          setPendingApproval(request)
-                          approvalResolverRef.current = resolve
-                      }),
+            requestApproval:
+                toolPermissionMode === TOOL_PERMISSION_MODES.FULL ||
+                toolPermissionMode === TOOL_PERMISSION_MODES.NONE
+                    ? undefined
+                    : (request: ApprovalRequest) =>
+                          new Promise((resolve) => {
+                              setPendingApproval(request)
+                              approvalResolverRef.current = resolve
+                          }),
             hooks: {
                 onTurnStart: ({ turn, input, promptTokens }) => {
                     currentTurnRef.current = turn
@@ -192,7 +203,7 @@ export function App({
                 },
             },
         }),
-        [dispatch, dangerous],
+        [dispatch, toolPermissionMode],
     )
 
     useEffect(() => {
@@ -366,6 +377,49 @@ export function App({
             void persistContextLimit(limit)
         },
         [appendSystemMessage, persistContextLimit],
+    )
+
+    const toolPermissionLabel = useCallback((mode: ToolPermissionMode): string => {
+        if (mode === TOOL_PERMISSION_MODES.NONE) return 'none (no tools)'
+        if (mode === TOOL_PERMISSION_MODES.ONCE) return 'once (single approval)'
+        return 'full (no approval)'
+    }, [])
+
+    const handleSetToolPermission = useCallback(
+        (mode: ToolPermissionMode) => {
+            if (busy) {
+                appendSystemMessage(
+                    'Tools',
+                    'Cancel current run before changing tool permission mode.',
+                    'warning',
+                )
+                return
+            }
+
+            if (pendingApproval) {
+                appendSystemMessage(
+                    'Tools',
+                    'Resolve current approval request before changing tool permission mode.',
+                    'warning',
+                )
+                return
+            }
+
+            if (mode === toolPermissionMode) {
+                appendSystemMessage('Tools', `Already using ${toolPermissionLabel(mode)}.`)
+                return
+            }
+
+            setToolPermissionMode(mode)
+            setSessionOptionsState((prev) => ({
+                ...prev,
+                sessionId: randomUUID(),
+                dangerous: mode === TOOL_PERMISSION_MODES.FULL,
+                toolPermissionMode: mode,
+            }))
+            appendSystemMessage('Tools', `Tool permission set to ${toolPermissionLabel(mode)}.`)
+        },
+        [appendSystemMessage, busy, pendingApproval, toolPermissionLabel, toolPermissionMode],
     )
 
     const handleHistorySelect = useCallback(
@@ -552,6 +606,7 @@ Keep the result concise and actionable.`
                 providerName={currentProvider}
                 model={currentModel}
                 contextLimit={contextLimit}
+                toolPermissionMode={toolPermissionMode}
                 mcpServers={mcpServers}
                 onSubmit={(input) => {
                     void handleSubmit(input)
@@ -569,11 +624,16 @@ Keep the result concise and actionable.`
                     void handleModelSelect(provider)
                 }}
                 onSetContextLimit={handleSetContextLimit}
+                onSetToolPermission={handleSetToolPermission}
                 onSystemMessage={appendSystemMessage}
             />
 
             {pendingApproval ? (
-                <ApprovalOverlay request={pendingApproval} onDecision={handleApprovalDecision} />
+                <ApprovalOverlay
+                    request={pendingApproval}
+                    onDecision={handleApprovalDecision}
+                    allowSessionGrant={toolPermissionMode !== TOOL_PERMISSION_MODES.ONCE}
+                />
             ) : null}
 
             <Footer busy={busy} contextPercent={contextPercent} tokenLine={tokenLine} />

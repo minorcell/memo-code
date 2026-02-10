@@ -3,6 +3,8 @@ import {
     CONTEXT_LIMIT_CHOICES,
     formatSlashCommand,
     SLASH_COMMANDS,
+    TOOL_PERMISSION_MODES,
+    type ToolPermissionMode,
     type ContextLimitChoice,
 } from '../constants'
 
@@ -16,9 +18,41 @@ export const SLASH_SPECS: SlashSpec[] = [
         name: SLASH_COMMANDS.CONTEXT,
         description: 'Set context window (80k/120k/150k/200k)',
     },
+    {
+        name: SLASH_COMMANDS.TOOLS,
+        description: 'Set tool permission mode (none/once/full)',
+    },
     { name: SLASH_COMMANDS.MCP, description: 'Show configured MCP servers' },
     { name: SLASH_COMMANDS.INIT, description: 'Generate AGENTS.md with agent instructions' },
 ]
+
+const TOOL_PERMISSION_MODE_ALIASES: Record<string, ToolPermissionMode> = {
+    none: TOOL_PERMISSION_MODES.NONE,
+    off: TOOL_PERMISSION_MODES.NONE,
+    disabled: TOOL_PERMISSION_MODES.NONE,
+    'no-tools': TOOL_PERMISSION_MODES.NONE,
+    once: TOOL_PERMISSION_MODES.ONCE,
+    ask: TOOL_PERMISSION_MODES.ONCE,
+    single: TOOL_PERMISSION_MODES.ONCE,
+    strict: TOOL_PERMISSION_MODES.ONCE,
+    full: TOOL_PERMISSION_MODES.FULL,
+    all: TOOL_PERMISSION_MODES.FULL,
+    dangerous: TOOL_PERMISSION_MODES.FULL,
+    'full-access': TOOL_PERMISSION_MODES.FULL,
+}
+
+function parseToolPermissionMode(input: string | undefined): ToolPermissionMode | null {
+    if (!input) return null
+    const normalized = input.trim().toLowerCase()
+    if (!normalized) return null
+    return TOOL_PERMISSION_MODE_ALIASES[normalized] ?? null
+}
+
+function toolPermissionLabel(mode: ToolPermissionMode): string {
+    if (mode === TOOL_PERMISSION_MODES.NONE) return 'none (no tools)'
+    if (mode === TOOL_PERMISSION_MODES.ONCE) return 'once (single approval)'
+    return 'full (no approval)'
+}
 
 export function buildHelpText(): string {
     const maxName = SLASH_SPECS.reduce((max, item) => Math.max(max, item.name.length), 0)
@@ -132,6 +166,41 @@ export function resolveSlashCommand(raw: string, context: SlashContext): SlashCo
             return {
                 kind: 'set_context_limit',
                 limit: parsed,
+            }
+        }
+
+        case SLASH_COMMANDS.TOOLS: {
+            const rawMode = rest.join(' ').trim()
+            const parsedMode = parseToolPermissionMode(rawMode)
+            const options = ['none', 'once', 'full'].join(', ')
+
+            if (!rawMode) {
+                return {
+                    kind: 'message',
+                    title: 'Tools',
+                    content: `Current: ${toolPermissionLabel(context.toolPermissionMode)}\nUsage: ${formatSlashCommand(SLASH_COMMANDS.TOOLS)} <mode>\nModes: ${options}`,
+                }
+            }
+
+            if (!parsedMode) {
+                return {
+                    kind: 'message',
+                    title: 'Tools',
+                    content: `Unsupported mode: ${rawMode}\nChoose one of: ${options}`,
+                }
+            }
+
+            if (parsedMode === context.toolPermissionMode) {
+                return {
+                    kind: 'message',
+                    title: 'Tools',
+                    content: `Already using ${toolPermissionLabel(parsedMode)}.`,
+                }
+            }
+
+            return {
+                kind: 'set_tool_permission',
+                mode: parsedMode,
             }
         }
 
