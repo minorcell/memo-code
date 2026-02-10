@@ -50,6 +50,17 @@ describe('apply_patch tool', () => {
         assert.ok(textPayload(result).includes('patch must start with'))
     })
 
+    test('returns line-aware parser error hints for unknown markers', async () => {
+        const patch = `*** Begin Patch\n*** Unknown Op: x\n*** End Patch\n`
+        const result = await applyPatchTool.execute({ input: patch })
+
+        assert.strictEqual(result.isError, true)
+        const text = textPayload(result)
+        assert.ok(text.includes('line 2'))
+        assert.ok(text.includes('Expected markers'))
+        assert.ok(text.includes('Format hint'))
+    })
+
     test('supports move + update in one operation', async () => {
         const source = join(tempDir, 'source.txt')
         const target = join(tempDir, 'nested', 'target.txt')
@@ -72,6 +83,42 @@ describe('apply_patch tool', () => {
 
         assert.strictEqual(result.isError, true)
         assert.ok(textPayload(result).includes('context not found'))
+    })
+
+    test('fails fast when hunk context is ambiguous', async () => {
+        const target = join(tempDir, 'context-ambiguous.txt')
+        await writeFile(target, 'a\nrepeat\nb\nrepeat\nc\n', 'utf8')
+
+        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n-repeat\n+changed\n*** End Patch\n`
+        const result = await applyPatchTool.execute({ input: patch })
+
+        assert.strictEqual(result.isError, true)
+        const text = textPayload(result)
+        assert.ok(text.includes('ambiguous'))
+        assert.ok(text.includes('Add more context'))
+    })
+
+    test('uses @@ line anchor to select nearby unique match', async () => {
+        const target = join(tempDir, 'anchored-match.txt')
+        await writeFile(target, 'line-1\nrepeat\nline-3\nline-4\nrepeat\nline-6\n', 'utf8')
+
+        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@ -5,1 +5,1 @@\n-repeat\n+anchored\n*** End Patch\n`
+        const result = await applyPatchTool.execute({ input: patch })
+
+        assert.ok(!result.isError)
+        const updated = await readText(target)
+        assert.strictEqual(updated, 'line-1\nrepeat\nline-3\nline-4\nanchored\nline-6\n')
+    })
+
+    test('falls back to context match when @@ anchor is inaccurate', async () => {
+        const target = join(tempDir, 'anchor-fallback.txt')
+        await writeFile(target, 'before\nonly-once\nafter\n', 'utf8')
+
+        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@ -99,1 +99,1 @@\n-only-once\n+still-updated\n*** End Patch\n`
+        const result = await applyPatchTool.execute({ input: patch })
+
+        assert.ok(!result.isError)
+        assert.strictEqual(await readText(target), 'before\nstill-updated\nafter\n')
     })
 
     test('denies writes outside writable roots', async () => {

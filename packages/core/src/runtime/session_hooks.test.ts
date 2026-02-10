@@ -46,6 +46,24 @@ function toolUseResponse(id: string, name: string, input: unknown, text?: string
     }
 }
 
+function multiToolUseResponse(
+    calls: Array<{ id: string; name: string; input: unknown }>,
+    text?: string,
+): LLMResponse {
+    return {
+        content: [
+            ...(text ? [{ type: 'text' as const, text }] : []),
+            ...calls.map((call) => ({
+                type: 'tool_use' as const,
+                id: call.id,
+                name: call.name,
+                input: call.input,
+            })),
+        ],
+        stop_reason: 'tool_use',
+    }
+}
+
 function endTurnResponse(text: string = 'done'): LLMResponse {
     return {
         content: [{ type: 'text' as const, text }],
@@ -283,6 +301,16 @@ describe('session hooks & middleware', () => {
             assert.strictEqual(result.status, 'error')
             assert.ok(result.finalText.includes('Tool usage is disabled'))
             assert.strictEqual(result.steps[0]?.observation, undefined)
+            const deniedToolMessage = session.history.find(
+                (message) => message.role === 'tool' && message.tool_call_id === 'action-1',
+            )
+            assert.ok(deniedToolMessage, 'tool message should be recorded for denied tool_call_id')
+            if (deniedToolMessage?.role === 'tool') {
+                assert.ok(
+                    deniedToolMessage.content.includes('tools are disabled'),
+                    'tool message should explain why execution was skipped',
+                )
+            }
         } finally {
             await session.close()
         }
@@ -465,6 +493,10 @@ describe('session hooks & middleware', () => {
         try {
             const result = await session.runTurn('meta')
             assert.strictEqual(result.status, 'cancelled')
+            const toolMessage = session.history.find(
+                (message) => message.role === 'tool' && message.tool_call_id === 'reject-1',
+            )
+            assert.ok(toolMessage, 'tool message should exist for rejected tool_call_id')
             const finalEvent = [...events].reverse().find((event) => event.type === 'final')
             assert.ok(finalEvent, 'final event should exist')
             assert.strictEqual(finalEvent?.meta?.rejected, true)
@@ -472,6 +504,47 @@ describe('session hooks & middleware', () => {
             assert.strictEqual(finalEvent?.meta?.error_type, 'approval_denied')
             assert.strictEqual(finalEvent?.meta?.action_id, 'reject-1')
             assert.strictEqual(typeof finalEvent?.meta?.duration_ms, 'number')
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('records tool messages for all tool_call_ids on fail_fast rejection', async () => {
+        const outputs: LLMResponse[] = [
+            multiToolUseResponse([
+                { id: 'reject-1', name: 'echo', input: { text: 'a' } },
+                { id: 'reject-2', name: 'echo', input: { text: 'b' } },
+            ]),
+        ]
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'deny',
+            },
+            {},
+        )
+
+        try {
+            const result = await session.runTurn('meta')
+            assert.strictEqual(result.status, 'cancelled')
+
+            const first = session.history.find(
+                (message) => message.role === 'tool' && message.tool_call_id === 'reject-1',
+            )
+            const second = session.history.find(
+                (message) => message.role === 'tool' && message.tool_call_id === 'reject-2',
+            )
+            assert.ok(first, 'first tool_call_id should have a matching tool message')
+            assert.ok(second, 'second tool_call_id should have a matching tool message')
+            if (second?.role === 'tool') {
+                assert.ok(
+                    second.content.includes('Skipped tool execution after previous rejection'),
+                    'missing tool execution should be represented as skipped observation',
+                )
+            }
         } finally {
             await session.close()
         }

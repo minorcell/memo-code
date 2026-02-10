@@ -51,6 +51,9 @@ Requirements:
 - Return title only, no quotes, no punctuation-only output
 `
 const SESSION_TITLE_MAX_CHARS = 60
+const TOOL_SKIPPED_AFTER_REJECTION_MESSAGE = 'Skipped tool execution after previous rejection.'
+const TOOL_SKIPPED_DISABLED_MESSAGE =
+    'Tool execution skipped: tools are disabled in current permission mode.'
 
 type ResolvedToolPermission = {
     mode: ToolPermissionMode | 'auto'
@@ -235,6 +238,41 @@ function fallbackSessionTitleFromPrompt(input: string): string {
     const words = compact.split(' ').filter(Boolean)
     const short = words.slice(0, 8).join(' ')
     return truncateSessionTitle(short || compact)
+}
+
+function toToolHistoryMessage(result: ToolActionResult): ChatMessage {
+    return {
+        role: 'tool',
+        content: result.observation,
+        tool_call_id: result.actionId,
+        name: result.tool,
+    }
+}
+
+function completeToolResultsForProtocol(
+    requested: Array<{ id: string; name: string }>,
+    actual: ToolActionResult[],
+    hasRejection: boolean,
+): ToolActionResult[] {
+    const byActionId = new Map(actual.map((result) => [result.actionId, result]))
+    return requested.map((block) => {
+        const found = byActionId.get(block.id)
+        if (found) {
+            return found
+        }
+        return {
+            actionId: block.id,
+            tool: block.name,
+            status: hasRejection ? 'approval_denied' : 'execution_failed',
+            errorType: hasRejection ? 'approval_denied' : 'execution_failed',
+            success: false,
+            observation: hasRejection
+                ? `${TOOL_SKIPPED_AFTER_REJECTION_MESSAGE} ${block.name}`
+                : `Tool result missing for ${block.name}; execution aborted before producing output.`,
+            durationMs: 0,
+            rejected: hasRejection ? true : undefined,
+        }
+    })
 }
 
 /** In-process conversation Session, implements multi-turn execution and log writing. */
@@ -687,6 +725,14 @@ class AgentSessionImpl implements AgentSession {
                 }
 
                 if (toolUseBlocks.length > 0 && this.toolsDisabled) {
+                    for (const block of toolUseBlocks) {
+                        this.history.push({
+                            role: 'tool',
+                            content: TOOL_SKIPPED_DISABLED_MESSAGE,
+                            tool_call_id: block.id,
+                            name: block.name,
+                        })
+                    }
                     status = 'error'
                     finalText = TOOL_DISABLED_ERROR_MESSAGE
                     errorMessage = TOOL_DISABLED_ERROR_MESSAGE
@@ -786,13 +832,14 @@ class AgentSessionImpl implements AgentSession {
                         },
                     )
 
-                    for (const [idx, result] of execution.results.entries()) {
-                        this.history.push({
-                            role: 'tool',
-                            content: result.observation,
-                            tool_call_id: result.actionId,
-                            name: result.tool,
-                        })
+                    const protocolResults = completeToolResultsForProtocol(
+                        toolUseBlocks,
+                        execution.results,
+                        execution.hasRejection,
+                    )
+
+                    for (const [idx, result] of protocolResults.entries()) {
+                        this.history.push(toToolHistoryMessage(result))
                         await this.emitEvent('observation', {
                             turn,
                             step,
@@ -810,8 +857,10 @@ class AgentSessionImpl implements AgentSession {
                         })
                     }
 
-                    const combinedObservation = execution.combinedObservation
-                    const parallelResultStatuses = execution.results.map((result) => result.status)
+                    const combinedObservation = protocolResults
+                        .map((result) => `[${result.tool}]: ${result.observation}`)
+                        .join('\n\n')
+                    const parallelResultStatuses = protocolResults.map((result) => result.status)
                     const resultStatus =
                         parallelResultStatuses.find(
                             (candidate) => candidate !== TOOL_ACTION_SUCCESS_STATUS,
@@ -834,7 +883,7 @@ class AgentSessionImpl implements AgentSession {
 
                     // 如果被拒绝，停止本轮次
                     if (execution.hasRejection) {
-                        const rejectionResult = execution.results.find((result) => result.rejected)
+                        const rejectionResult = protocolResults.find((result) => result.rejected)
                         status = 'cancelled'
                         finalText = '用户拒绝了工具执行，已停止当前操作。'
                         await this.emitEvent('final', {
@@ -902,6 +951,14 @@ class AgentSessionImpl implements AgentSession {
 
                     // 如果被拒绝，停止本轮次
                     if (result.rejected) {
+                        this.history.push(
+                            toToolHistoryMessage({
+                                ...result,
+                                observation:
+                                    result.observation ||
+                                    `User denied tool execution: ${parsed.action.tool}`,
+                            }),
+                        )
                         status = 'cancelled'
                         finalText = '用户拒绝了工具执行，已停止当前操作。'
                         await this.emitEvent('final', {
