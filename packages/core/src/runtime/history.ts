@@ -1,9 +1,9 @@
-/** @file 历史事件定义与 JSONL Sink 实现。 */
+/** @file History event definition and JSONL Sink implementation. */
 import { appendFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { HistoryEvent, HistorySink, Role } from '@memo/core/types'
 
-/** JSONL 历史写入器：一行一个事件。 */
+/** JSONL history writer: one event per line. */
 export class JsonlHistorySink implements HistorySink {
     private ready = false
 
@@ -18,12 +18,12 @@ export class JsonlHistorySink implements HistorySink {
     }
 
     async flush() {
-        // appendFile 已确保落盘，这里仅保留接口兼容
+        // appendFile already ensures persistence, here only for interface compatibility
         return Promise.resolve()
     }
 }
 
-/** 辅助生成结构化历史事件。 */
+/** Helper to generate structured history events. */
 export function createHistoryEvent(params: {
     sessionId: string
     type: HistoryEvent['type']

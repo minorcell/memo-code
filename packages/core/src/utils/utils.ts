@@ -1,8 +1,8 @@
-/** @file Runtime 公用辅助函数集合。 */
+/** @file Runtime common utility functions. */
 
 /**
- * 提取/清理思考标签（<think> 或 <thinking>）内的文本。
- * 返回去除标签后的文本以及累积的思考内容。
+ * Extract/clean text within thinking tags (<think> or <thinking>).
+ * Returns text without tags and accumulated thinking content.
  */
 function extractThinkingText(raw: string): { thinkingParts: string[]; cleaned: string } {
     const thinkingParts: string[] = []

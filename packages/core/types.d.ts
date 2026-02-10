@@ -1,4 +1,4 @@
-// 声明提示词等文本导入的模块类型，便于在 TS 中直接 import 文本。
+// Declare module type for prompt text imports, enabling direct text import in TS.
 declare module '*.md' {
     const content: string
     export default content

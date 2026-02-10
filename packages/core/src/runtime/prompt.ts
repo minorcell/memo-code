@@ -1,4 +1,4 @@
-/** @file 系统提示词加载：默认读取内置 Markdown 模板。 */
+/** @file System prompt loading: reads built-in Markdown template by default. */
 import os from 'node:os'
 import { readFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
@@ -19,8 +19,8 @@ function resolveUsername(): string {
 }
 
 /**
- * 读取内置的系统提示词模板。
- * 可在外部通过依赖注入覆盖。
+ * Load built-in system prompt template.
+ * Can be overridden externally via dependency injection.
  */
 export async function loadSystemPrompt(): Promise<string> {
     const __dirname = dirname(fileURLToPath(import.meta.url))

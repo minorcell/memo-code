@@ -1,4 +1,4 @@
-/** @file Session/Turn 运行时核心：负责 ReAct 循环、工具调度与事件记录。 */
+/** @file Session/Turn runtime core: handles ReAct loop, tool scheduling, and event logging. */
 import { randomUUID } from 'node:crypto'
 import { createHistoryEvent } from '@memo/core/runtime/history'
 import { withDefaultDeps } from '@memo/core/runtime/defaults'
@@ -140,7 +140,7 @@ function isAbortError(err: unknown): err is Error {
     return err instanceof Error && err.name === 'AbortError'
 }
 
-// 稳定序列化用于重复动作检测（确保键顺序一致）
+// Stable serialization for duplicate action detection (ensures consistent key ordering)
 function stableStringify(value: unknown): string {
     if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
     if (Array.isArray(value)) {
@@ -188,14 +188,14 @@ function parseTextToolCall(
             if (!tool || !Object.prototype.hasOwnProperty.call(tools, tool)) continue
             return { tool, input: obj.input ?? {} }
         } catch {
-            // ignore invalid json
+            // Ignore invalid json
         }
     }
 
     return null
 }
 
-/** 进程内的对话 Session，实现多轮运行与日志写入。 */
+/** In-process conversation Session, implements multi-turn execution and log writing. */
 class AgentSessionImpl implements AgentSession {
     public id: string
     public mode: SessionMode

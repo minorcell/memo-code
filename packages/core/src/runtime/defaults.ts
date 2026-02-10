@@ -1,4 +1,4 @@
-/** @file Session 默认依赖装配：工具集、LLM、历史 sink、tokenizer 等。 */
+/** @file Session default dependency assembly: toolset, LLM, history sinks, tokenizer, etc. */
 import { NATIVE_TOOLS } from '@memo/tools'
 import OpenAI from 'openai'
 import { createTokenCounter } from '@memo/core/utils/tokenizer'
@@ -60,8 +60,8 @@ function toOpenAIMessage(message: ChatMessage): OpenAI.Chat.Completions.ChatComp
 }
 
 /**
- * 根据缺省策略补全依赖项（工具、callLLM、prompt、history sinks、tokenizer）。
- * 调用方可仅提供回调/覆盖项，其余使用默认实现。
+ * Complete dependencies with default strategy (tools, callLLM, prompt, history sinks, tokenizer).
+ * Caller can provide only callbacks/overrides, rest use default implementations.
  */
 export async function withDefaultDeps(
     deps: AgentSessionDeps,
@@ -79,37 +79,37 @@ export async function withDefaultDeps(
     const loaded = await loadMemoConfig()
     const config = loaded.config
 
-    // 1. 初始化 ToolRouter
+    // 1. Initialize ToolRouter
     const router = new ToolRouter()
 
-    // 2. 注册内置工具
+    // 2. Register built-in tools
     router.registerNativeTools(NATIVE_TOOLS)
 
-    // 3. 加载外部 MCP 工具（遵循 MEMO_HOME）
+    // 3. Load external MCP tools (follows MEMO_HOME)
     await router.loadMcpServers(config.mcp_servers)
 
-    // 4. 合并用户自定义工具（deps.tools 优先级最高）
+    // 4. Merge user custom tools (deps.tools has highest priority)
     if (deps.tools) {
         for (const [name, tool] of Object.entries(deps.tools)) {
-            // 用户自定义工具覆盖 router 中的同名工具
+            // User custom tools override同名 tools in router
             router.registerNativeTool({
                 name,
                 description: tool.description,
                 source: 'native',
-                inputSchema: { type: 'object' }, // 简化处理，实际应该从 tool 转换
+                inputSchema: { type: 'object' }, // Simplified, should convert from tool in practice
                 execute: tool.execute,
             })
         }
     }
 
-    // 5. 获取最终工具注册表
+    // 5. Get final tool registry
     const combinedTools = router.toRegistry()
 
-    // 6. 构建 loadPrompt（包含工具描述）
+    // 6. Build loadPrompt (includes tool descriptions)
     const loadPrompt = async () => {
         let basePrompt = await (deps.loadPrompt ?? defaultLoadPrompt)()
 
-        // 注入工具描述到 prompt（用于非 Tool Use API 模式）
+        // Inject tool descriptions into prompt (for non-Tool Use API mode)
         const toolDescriptions = router.generateToolDescriptions()
         if (toolDescriptions) {
             basePrompt += `\n\n${toolDescriptions}`
@@ -118,7 +118,7 @@ export async function withDefaultDeps(
         return basePrompt
     }
 
-    // 7. 生成工具定义（用于 Tool Use API）
+    // 7. Generate tool definitions (for Tool Use API)
     const toolDefinitions = router.generateToolDefinitions()
 
     const sessionsDir = getSessionsDir(loaded, options)
@@ -150,7 +150,7 @@ export async function withDefaultDeps(
                 })
                 const openAIMessages = messages.map(toOpenAIMessage)
 
-                // 构建 OpenAI 格式的工具定义
+                // Build OpenAI format tool definitions
                 const tools =
                     toolDefinitions.length > 0
                         ? toolDefinitions.map((tool) => ({
