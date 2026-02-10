@@ -166,9 +166,10 @@ pnpm run build  # generates dist/index.js
 ### Test
 
 ```bash
-pnpm test                   # all tests
-pnpm test packages/core     # core package
-pnpm test packages/tools    # tools package
+pnpm test            # all tests
+pnpm run test:core   # core package
+pnpm run test:tools  # tools package
+pnpm run test:tui    # tui package
 ```
 
 ### Format
@@ -185,7 +186,7 @@ memo-cli/
 ├── packages/
 │   ├── core/       # core logic: Session, tool routing, config
 │   ├── tools/      # built-in tool implementations
-│   └── cli/        # TUI interface
+│   └── tui/        # terminal runtime (CLI entry, interactive TUI, slash, MCP command)
 ├── docs/           # technical docs
 └── dist/           # build output
 ```
@@ -214,6 +215,7 @@ memo-cli/
 
 - [User Guide](./web/content/docs/README.md) - User-facing docs by module
 - [Core Architecture](./docs/core.md) - Core implementation details
+- [TUI Rewrite Design](./docs/tui-rewrite-design.md) - Codex-aligned TUI architecture and migration notes
 - [CLI Adaptation History](./docs/cli-update.md) - Historical migration notes (Tool Use API)
 - [Contributing](./CONTRIBUTING.md) - Contribution guide
 - [Project Guidelines](./AGENTS.md) - Coding conventions and development process

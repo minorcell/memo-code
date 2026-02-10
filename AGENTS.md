@@ -2,7 +2,7 @@
 
 ## Project Structure and Modules
 
-- `packages/cli/`: TUI entry and command orchestration (`src/index.tsx`), build output goes to `dist/`.
+- `packages/tui/`: terminal runtime package (`src/cli.tsx` entry, interactive App, chat timeline, slash registry, approval/setup overlays).
 - `packages/core/`: Session state machine, provider/config handling, shared types.
 - `packages/tools/`: Built-in MCP-like tools; tests live next to implementations and use `*.test.ts`.
 - `docs/`: Development docs and design direction; `public/`: static TUI assets.
@@ -15,13 +15,13 @@
 - Run locally: `pnpm start` (interactive TUI). Non-TTY stdin uses plain mode automatically.
 - Build distributable package: `pnpm run build` (outputs `dist/index.js` and `dist/prompt.md` for npm publish).
 - Format: `pnpm run format` (write) / `pnpm run format:check` (CI check only).
-- Test: `pnpm test` for all; per package: `pnpm run test:core`, `pnpm run test:tools`, `pnpm run test:cli`. CI runs `pnpm run ci` for format check, core/tools tests, and build.
+- Test: `pnpm test` for all; per package: `pnpm run test:core`, `pnpm run test:tools`, `pnpm run test:tui`. CI runs `pnpm run ci` for format check, core/tools tests, and build.
 - Common local issues: missing `OPENAI_API_KEY`/`DEEPSEEK_API_KEY` triggers interactive prompt; non-TTY environments automatically use plain mode.
 - For faster dev loops: `pnpm test -- --watch path/to/file.test.ts`.
 
 ## Code Style and Naming
 
-- Language: TypeScript + ESM. Keep boundaries clear: Core (logic), Tools (capabilities), CLI (UI/wiring).
+- Language: TypeScript + ESM. Keep boundaries clear: Core (logic), Tools (capabilities), TUI package (CLI entry + interactive UI/state).
 - Use Prettier for formatting with 2-space indentation. Follow `pnpm run format`; do not manually change style rules.
 - Keep existing naming conventions (e.g., `config.ts`, `webfetch.test.ts`) and prefer explicit exports.
 - Prefer pure functions. Keep side effects in CLI entry or tool adapters. Add brief comments for non-obvious behavior.

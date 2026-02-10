@@ -2,6 +2,11 @@
 
 Memo has two run modes: interactive TUI for daily development, and plain mode for non-interactive pipelines.
 
+## Runtime Architecture (Current)
+
+- `packages/tui`: terminal runtime package (`memo` entry, argv parsing, mode dispatch, plain mode + interactive TUI runtime).
+- `packages/core`: session state machine and tool-calling runtime used by both modes.
+
 ## Run Modes
 
 ### Interactive TUI

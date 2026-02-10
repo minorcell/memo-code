@@ -30,3 +30,4 @@ This documentation reflects the current behavior of Memo CLI and focuses on prac
 
 - These pages are user-facing and intentionally avoid deep implementation internals.
 - Behavior described here is based on the current code in this repository.
+- Current terminal runtime is consolidated in `packages/tui` (`src/cli.tsx` + interactive UI modules).

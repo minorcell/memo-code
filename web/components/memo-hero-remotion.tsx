@@ -36,7 +36,7 @@ const toolEvents: ToolEvent[] = [
     { tool: 'read_file', args: 'README.md' },
     { tool: 'read_file', args: 'tsconfig.json' },
     { tool: 'list_dir', args: 'packages' },
-    { tool: 'read_file', args: 'packages/cli/src/index.tsx' },
+    { tool: 'read_file', args: 'packages/tui/src/cli.tsx' },
     { tool: 'read_file', args: 'packages/core/src/index.ts' },
     { tool: 'update_plan' },
 ]
@@ -45,7 +45,7 @@ const responseLines = [
     'Memo Code is a TypeScript monorepo CLI tool with three main packages:',
     '',
     'Core Structure:',
-    '- packages/cli/: TUI entry point using Ink (React for terminals)',
+    '- packages/tui/: terminal runtime (CLI entry + interactive TUI, built with Ink/React)',
     '- packages/core/: Session management, config handling, shared types',
     '- packages/tools/: Built-in MCP-like tools (exec_command, read_file, etc.)',
     '',
