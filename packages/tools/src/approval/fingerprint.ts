@@ -1,9 +1,9 @@
-/** @file 工具请求指纹生成 */
+/** @file Tool request fingerprint generation */
 
 import { createHash } from 'node:crypto'
 import type { ApprovalKey } from './types'
 
-/** 稳定序列化对象（确保相同参数生成相同字符串） */
+/** Stable serialize object (ensures same parameters generate same string) */
 export function stableStringify(value: unknown): string {
     if (value === null || typeof value !== 'object') {
         return JSON.stringify(value)
@@ -19,14 +19,14 @@ export function stableStringify(value: unknown): string {
     return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`
 }
 
-/** 生成工具请求的指纹 */
+/** Generate tool request fingerprint */
 export function generateFingerprint(toolName: string, params: unknown): ApprovalKey {
     const normalized = stableStringify(params)
     const raw = `${toolName}:${normalized}`
     return createHash('sha256').update(raw).digest('hex').slice(0, 16)
 }
 
-/** 生成部分参数指纹（用于模糊匹配） */
+/** Generate partial parameter fingerprint (for fuzzy matching) */
 export function generatePartialFingerprint(
     toolName: string,
     params: unknown,

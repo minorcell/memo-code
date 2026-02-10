@@ -145,12 +145,12 @@ export class ToolRouter {
             lines.push('')
         }
 
-        // MCP 工具
+        // MCP tools
         if (mcpTools.length > 0) {
             lines.push('### External MCP Tools')
             lines.push('')
 
-            // 按 server 分组
+            // Group by server
             const grouped = this.groupByServer(mcpTools)
             for (const [serverName, serverTools] of Object.entries(grouped)) {
                 lines.push(`**Server: ${serverName}**`)
@@ -165,7 +165,7 @@ export class ToolRouter {
         return lines.join('\n')
     }
 
-    /** 格式化单个工具描述 */
+    /** Format single tool description */
     private formatToolDescription(tool: Tool): string {
         const lines: string[] = []
         lines.push(`#### ${tool.name}`)
@@ -178,7 +178,7 @@ export class ToolRouter {
         return lines.join('\n')
     }
 
-    /** 按 server 分组 MCP 工具 */
+    /** Group MCP tools by server */
     private groupByServer(tools: Tool[]): Record<string, Tool[]> {
         const grouped: Record<string, Tool[]> = {}
         for (const tool of tools) {

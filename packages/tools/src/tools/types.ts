@@ -2,16 +2,16 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 import type { NativeTool } from '@memo/tools/router/types'
 import type { ZodTypeAny } from 'zod'
 
-// 工具相关的类型声明
+// Tool-related type declarations
 
-/** 工具名称枚举，作为 Agent action 中的 tool 字段。 */
-/** 工具名称（字符串），支持内置与动态扩展工具。 */
+/** Tool name enum, used as tool field in Agent action. */
+/** Tool name (string), supports built-in and dynamically extended tools. */
 export type ToolName = string
 
-/** 统一工具定义（与路由层 Tool 格式一致）。 */
+/** Unified tool definition (consistent with router layer Tool format). */
 export type McpTool = NativeTool
 
-/** 基于 zod schema 定义工具，输出统一的 MCP/Router 工具格式。 */
+/** Define tool based on zod schema, outputs unified MCP/Router tool format. */
 export function defineMcpTool<Input>(tool: {
     name: ToolName
     description: string

@@ -5,7 +5,7 @@ import { startExecSession } from '@memo/tools/tools/exec_runtime'
 
 const SHELL_COMMAND_INPUT_SCHEMA = z
     .object({
-        command: z.string().min(1, 'command 不能为空'),
+        command: z.string().min(1, 'command cannot be empty'),
         workdir: z.string().optional(),
         login: z.boolean().optional(),
         timeout_ms: z.number().int().positive().optional(),

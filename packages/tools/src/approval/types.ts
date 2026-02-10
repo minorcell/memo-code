@@ -1,18 +1,18 @@
-/** @file 工具审批系统类型定义 */
+/** @file Tool approval system type definitions */
 
-/** 工具风险等级 */
+/** Tool risk level */
 export type RiskLevel = 'read' | 'write' | 'execute'
 
-/** 用户审批决策 */
+/** User approval decision */
 export type ApprovalDecision = 'once' | 'session' | 'deny'
 
-/** 审批模式 */
+/** Approval mode */
 export type ApprovalMode = 'dangerous' | 'auto' | 'strict'
 
-/** 授权缓存键（指纹） */
+/** Authorization cache key (fingerprint) */
 export type ApprovalKey = string
 
-/** 审批检查结果 */
+/** Approval check result */
 export type ApprovalCheckResult =
     | { needApproval: false; decision: 'auto-execute' }
     | {
@@ -24,7 +24,7 @@ export type ApprovalCheckResult =
           params: unknown
       }
 
-/** 审批请求（用于 UI 展示） */
+/** Approval request (for UI display) */
 export interface ApprovalRequest {
     toolName: string
     params: unknown
@@ -33,36 +33,36 @@ export interface ApprovalRequest {
     reason: string
 }
 
-/** 审批管理器配置 */
+/** Approval manager configuration */
 export interface ApprovalManagerConfig {
-    /** 审批模式 */
+    /** Approval mode */
     mode?: ApprovalMode
-    /** 是否危险模式（绕过所有审批） */
+    /** Whether dangerous mode (bypass all approvals) */
     dangerous?: boolean
-    /** 自定义工具风险等级映射 */
+    /** Custom tool risk level mapping */
     toolRiskLevels?: Record<string, RiskLevel>
 }
 
-/** 审批管理器接口 */
+/** Approval manager interface */
 export interface ApprovalManager {
-    /** 是否危险模式 */
+    /** Whether dangerous mode */
     readonly isDangerousMode: boolean
 
-    /** 获取工具的风险等级 */
+    /** Get tool risk level */
     getRiskLevel(toolName: string): RiskLevel
 
-    /** 检查工具调用是否需要审批 */
+    /** Check if tool call requires approval */
     check(toolName: string, params: unknown): ApprovalCheckResult
 
-    /** 记录用户决策 */
+    /** Record user decision */
     recordDecision(fingerprint: ApprovalKey, decision: ApprovalDecision): void
 
-    /** 检查某个指纹是否已被授权 */
+    /** Check if a fingerprint is already authorized */
     isGranted(fingerprint: ApprovalKey): boolean
 
-    /** 清除单次授权（Turn 结束时调用） */
+    /** Clear once authorization (called when Turn ends) */
     clearOnceApprovals(): void
 
-    /** 清除所有授权（Session 结束时调用） */
+    /** Clear all authorizations (called when Session ends) */
     dispose(): void
 }

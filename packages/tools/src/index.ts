@@ -87,13 +87,13 @@ function indexByName(tools: McpTool[]): Record<ToolName, McpTool> {
     return toolkit
 }
 
-/** 对外暴露的工具集合，供 Agent 通过 tool name 查找。 */
+/** Exposed tool collection for Agent lookup by tool name. */
 export const TOOLKIT: Record<ToolName, McpTool> = indexByName(buildCodexTools())
 
-/** 工具数组形式，便于直接注册到 MCP Server 等场景。 */
+/** Tool array form, convenient for direct registration to MCP Server etc. */
 export const TOOL_LIST: McpTool[] = Object.values(TOOLKIT)
 
-/** 内置工具（已是统一 Tool 格式，无需适配）。 */
+/** Built-in tools (already unified Tool format, no adaptation needed). */
 export const NATIVE_TOOLS = TOOL_LIST
 
 export type { McpTool }

@@ -1,11 +1,11 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 
-/** 快捷构造文本型 CallToolResult。 */
+/** Quick constructor for text-based CallToolResult. */
 export function textResult(text: string, isError = false): CallToolResult {
     return { content: [{ type: 'text', text }], isError }
 }
 
-/** 将 CallToolResult 的文本内容拍平成字符串，便于 observation。 */
+/** Flatten CallToolResult text content to string for observation. */
 export function flattenText(result: CallToolResult): string {
     const texts =
         result.content?.flatMap((item) => {

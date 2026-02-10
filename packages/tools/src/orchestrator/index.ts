@@ -49,7 +49,7 @@ function estimateCallToolResultChars(result: CallToolResult) {
 }
 
 function buildOversizeHintXml(toolName: string, actualChars: number, maxChars: number) {
-    return `<system_hint type="tool_output_omitted" tool="${escapeXmlAttr(toolName)}" reason="too_long" actual_chars="${actualChars}" max_chars="${maxChars}">工具返回内容过长，已自动省略。请缩小范围或增加限制参数后重试。</system_hint>`
+    return `<system_hint type="tool_output_omitted" tool="${escapeXmlAttr(toolName)}" reason="too_long" actual_chars="${actualChars}" max_chars="${maxChars}">Tool output too long, automatically omitted. Please narrow the scope or add limit parameters and try again.</system_hint>`
 }
 
 function guardToolResultSize(toolName: string, result: CallToolResult): CallToolResult {
@@ -158,7 +158,7 @@ class ToolOrchestratorImpl implements ToolOrchestrator {
                     status: 'approval_denied',
                     errorType: 'approval_denied',
                     success: false,
-                    observation: `用户拒绝了工具执行: ${action.name}`,
+                    observation: `User denied tool execution: ${action.name}`,
                     durationMs: Date.now() - startedAt,
                     rejected: true,
                 }

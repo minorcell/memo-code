@@ -1,4 +1,4 @@
-/** @file 工具风险分类器 */
+/** @file Tool risk classifier */
 
 import type { RiskLevel } from './types'
 import {
@@ -11,22 +11,22 @@ import {
 } from './constants'
 
 export interface ToolClassifier {
-    /** 获取工具的风险等级 */
+    /** Get tool risk level */
     getRiskLevel(toolName: string): RiskLevel
 
-    /** 比较两个风险等级 */
+    /** Compare two risk levels */
     compareRisk(a: RiskLevel, b: RiskLevel): number
 
-    /** 检查是否需要审批 */
+    /** Check if approval is needed */
     needsApproval(riskLevel: RiskLevel, mode: 'auto' | 'strict'): boolean
 }
 
 export interface ToolClassifierConfig {
-    /** 自定义工具风险等级映射 */
+    /** Custom tool risk level mapping */
     customLevels?: Record<string, RiskLevel>
 }
 
-/** 创建工具风险分类器 */
+/** Create tool risk classifier */
 export function createToolClassifier(config?: ToolClassifierConfig): ToolClassifier {
     const riskLevels: Record<string, RiskLevel> = {
         ...DEFAULT_TOOL_RISK_LEVELS,

@@ -1,33 +1,33 @@
-/** @file 内置工具注册表 */
+/** @file Built-in tool registry */
 import type { NativeTool, ToolRegistry } from '../types'
 
-/** 内置工具注册表 */
+/** Built-in tool registry */
 export class NativeToolRegistry {
     private tools: Map<string, NativeTool> = new Map()
 
-    /** 注册单个工具 */
+    /** Register a single tool */
     register(tool: NativeTool): void {
         this.tools.set(tool.name, tool)
     }
 
-    /** 批量注册工具 */
+    /** Register multiple tools in batch */
     registerMany(tools: NativeTool[]): void {
         for (const tool of tools) {
             this.register(tool)
         }
     }
 
-    /** 获取工具 */
+    /** Get tool */
     get(name: string): NativeTool | undefined {
         return this.tools.get(name)
     }
 
-    /** 获取所有工具 */
+    /** Get all tools */
     getAll(): NativeTool[] {
         return Array.from(this.tools.values())
     }
 
-    /** 转换为 ToolRegistry 格式 */
+    /** Convert to ToolRegistry format */
     toRegistry(): ToolRegistry {
         const registry: ToolRegistry = {}
         for (const [name, tool] of this.tools) {
@@ -36,12 +36,12 @@ export class NativeToolRegistry {
         return registry
     }
 
-    /** 检查工具是否存在 */
+    /** Check if tool exists */
     has(name: string): boolean {
         return this.tools.has(name)
     }
 
-    /** 获取工具数量 */
+    /** Get tool count */
     get size(): number {
         return this.tools.size
     }

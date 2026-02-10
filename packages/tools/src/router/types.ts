@@ -1,10 +1,10 @@
-/** @file ToolRouter 统一类型定义 */
+/** @file ToolRouter unified type definitions */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 
-/** 工具来源类型 */
+/** Tool source type */
 export type ToolSource = 'native' | 'mcp'
 
-/** JSON Schema 基础类型 */
+/** JSON Schema basic type */
 export interface JSONSchema {
     type?: string
     properties?: Record<string, unknown>
@@ -13,44 +13,44 @@ export interface JSONSchema {
     [key: string]: unknown
 }
 
-/** 统一工具接口 */
+/** Unified tool interface */
 export interface Tool {
-    /** 工具唯一名称（MCP 工具会加上 serverName_ 前缀） */
+    /** Unique tool name (MCP tools have serverName_ prefix) */
     name: string
-    /** 工具描述 */
+    /** Tool description */
     description: string
-    /** 工具来源 */
+    /** Tool source */
     source: ToolSource
-    /** 输入参数的 JSON Schema */
+    /** JSON Schema for input parameters */
     inputSchema: JSONSchema
-    /** 是否支持并行调用（默认 false，保守串行）。 */
+    /** Whether parallel calls are supported (default false, conservative serial). */
     supportsParallelToolCalls?: boolean
-    /** 是否会修改外部状态（文件、进程、网络写操作等）。 */
+    /** Whether it modifies external state (files, processes, network writes, etc.). */
     isMutating?: boolean
-    /** 可选的输入校验器（通常由 native/zod 适配层提供） */
+    /** Optional input validator (usually provided by native/zod adapter layer) */
     validateInput?: (input: unknown) => { ok: true; data: unknown } | { ok: false; error: string }
-    /** 执行工具 */
+    /** Execute tool */
     execute: (input: unknown) => Promise<CallToolResult>
 }
 
-/** 内置工具 */
+/** Built-in tool */
 export interface NativeTool extends Tool {
     source: 'native'
 }
 
-/** MCP 外部工具 */
+/** MCP external tool */
 export interface McpTool extends Tool {
     source: 'mcp'
-    /** 来源 server 名称 */
+    /** Source server name */
     serverName: string
-    /** server 端原始工具名 */
+    /** Original tool name on server side */
     originalName: string
 }
 
-/** 工具注册表 */
+/** Tool registry */
 export type ToolRegistry = Record<string, Tool>
 
-/** 工具描述（用于 Prompt 生成） */
+/** Tool description (for Prompt generation) */
 export interface ToolDescription {
     name: string
     description: string
@@ -59,14 +59,14 @@ export interface ToolDescription {
     inputSchema: JSONSchema
 }
 
-/** MCP Server 配置（复用 config.ts 中的定义） */
+/** MCP Server configuration (reuses definition from config.ts) */
 export type MCPServerConfig =
     | {
           type?: 'stdio'
           command: string
           args?: string[]
           env?: Record<string, string>
-          /** 子进程 stderr 行为（默认在 TTY 中静默）。 */
+          /** Subprocess stderr behavior (silent in TTY by default). */
           stderr?: 'inherit' | 'pipe' | 'ignore'
       }
     | {
@@ -77,7 +77,7 @@ export type MCPServerConfig =
           bearer_token_env_var?: string
       }
 
-/** MCP Client 连接信息 */
+/** MCP Client connection info */
 export interface McpClientConnection {
     name: string
     client: import('@modelcontextprotocol/sdk/client/index.js').Client
