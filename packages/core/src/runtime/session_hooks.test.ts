@@ -18,6 +18,19 @@ const echoTool: Tool = {
     },
 }
 
+const readNoteTool: Tool = {
+    name: 'read_note',
+    description: 'read note',
+    source: 'native',
+    inputSchema: { type: 'object', properties: { topic: { type: 'string' } } },
+    execute: async (input: unknown) => {
+        const { topic } = input as { topic: string }
+        return {
+            content: [{ type: 'text' as const, text: `note:${topic}` }],
+        }
+    },
+}
+
 function toolUseResponse(id: string, name: string, input: unknown, text?: string): LLMResponse {
     return {
         content: [
@@ -216,6 +229,35 @@ describe('session hooks & middleware', () => {
             const result = await session.runTurn('go')
             assert.strictEqual(result.finalText, 'done')
             assert.strictEqual(result.steps[0]?.observation, 'echo:safe')
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('uses risk-based approvals in once tool permission mode', async () => {
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'read_note', { topic: 'memo' }),
+            endTurnResponse('done'),
+        ]
+        let approvalAsked = false
+        const session = await createAgentSession(
+            {
+                tools: { read_note: readNoteTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => {
+                    approvalAsked = true
+                    return 'deny'
+                },
+            },
+            { toolPermissionMode: 'once' },
+        )
+        try {
+            const result = await session.runTurn('go')
+            assert.strictEqual(result.finalText, 'done')
+            assert.strictEqual(result.steps[0]?.observation, 'note:memo')
+            assert.strictEqual(approvalAsked, false)
         } finally {
             await session.close()
         }

@@ -381,7 +381,7 @@ export function App({
 
     const toolPermissionLabel = useCallback((mode: ToolPermissionMode): string => {
         if (mode === TOOL_PERMISSION_MODES.NONE) return 'none (no tools)'
-        if (mode === TOOL_PERMISSION_MODES.ONCE) return 'once (single approval)'
+        if (mode === TOOL_PERMISSION_MODES.ONCE) return 'once (approval required)'
         return 'full (no approval)'
     }, [])
 
@@ -629,11 +629,7 @@ Keep the result concise and actionable.`
             />
 
             {pendingApproval ? (
-                <ApprovalOverlay
-                    request={pendingApproval}
-                    onDecision={handleApprovalDecision}
-                    allowSessionGrant={toolPermissionMode !== TOOL_PERMISSION_MODES.ONCE}
-                />
+                <ApprovalOverlay request={pendingApproval} onDecision={handleApprovalDecision} />
             ) : null}
 
             <Footer busy={busy} contextPercent={contextPercent} tokenLine={tokenLine} />

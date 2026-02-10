@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Box, Text, useInput } from 'ink'
 import type { ApprovalDecision, ApprovalRequest } from '@memo/tools/approval'
 
 type ApprovalOverlayProps = {
     request: ApprovalRequest
     onDecision: (decision: ApprovalDecision) => void
-    allowSessionGrant?: boolean
 }
 
 type Option = {
@@ -30,20 +29,9 @@ function shortParam(params: unknown): string {
     return `${key}=${raw?.slice(0, 60) ?? ''}${raw && raw.length > 60 ? '...' : ''}`
 }
 
-export function ApprovalOverlay({
-    request,
-    onDecision,
-    allowSessionGrant = true,
-}: ApprovalOverlayProps) {
+export function ApprovalOverlay({ request, onDecision }: ApprovalOverlayProps) {
     const [selected, setSelected] = useState(0)
-    const options = allowSessionGrant
-        ? DEFAULT_OPTIONS
-        : DEFAULT_OPTIONS.filter((option) => option.decision !== 'session')
-
-    useEffect(() => {
-        if (selected < options.length) return
-        setSelected(Math.max(0, options.length - 1))
-    }, [options.length, selected])
+    const options = DEFAULT_OPTIONS
 
     useInput((input, key) => {
         if (key.upArrow) {

@@ -21,7 +21,7 @@ const TOOLS_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.TOOLS)
 const INIT_SLASH_COMMAND = formatSlashCommand(SLASH_COMMANDS.INIT)
 const TOOL_MODE_OPTIONS: Array<{ mode: ToolPermissionMode; description: string }> = [
     { mode: TOOL_PERMISSION_MODES.NONE, description: 'Disable all tool calls' },
-    { mode: TOOL_PERMISSION_MODES.ONCE, description: 'Require per-call approval' },
+    { mode: TOOL_PERMISSION_MODES.ONCE, description: 'Require approval when needed' },
     { mode: TOOL_PERMISSION_MODES.FULL, description: 'Run tools without approval' },
 ]
 
