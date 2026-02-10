@@ -5,6 +5,7 @@ import { tmpdir, userInfo } from 'node:os'
 import { describe, test, beforeAll, afterAll } from 'vitest'
 import { writeFile, rm, mkdir } from 'node:fs/promises'
 import { createAgentSession, createTokenCounter } from '@memo/core'
+import { loadSystemPrompt } from '@memo/core/runtime/prompt'
 
 let tempHome: string
 let prevMemoHome: string | undefined
@@ -86,6 +87,36 @@ describe('runtime prompt injection', () => {
             assert.ok(!systemPrompt.includes('{{date}}'), 'template variables should be rendered')
         } finally {
             await session.close()
+        }
+    })
+
+    test('appends startup root AGENTS.md into system prompt', async () => {
+        const projectRoot = await makeTempDir('memo-core-project')
+        const agentsPath = join(projectRoot, 'AGENTS.md')
+        const marker = 'memo-test-guideline-keep-shell-safe'
+        await writeFile(agentsPath, `# Project Rules\n\n- ${marker}\n`, 'utf-8')
+
+        const session = await createAgentSession(
+            {
+                callLLM: async () => ({
+                    content: [{ type: 'text', text: 'ok' }],
+                    stop_reason: 'end_turn',
+                }),
+                loadPrompt: () => loadSystemPrompt({ cwd: projectRoot }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+            },
+            { mode: 'interactive' },
+        )
+
+        try {
+            const systemPrompt = session.history[0]?.content ?? ''
+            assert.ok(systemPrompt.includes('Project AGENTS.md (Startup Root)'))
+            assert.ok(systemPrompt.includes(agentsPath))
+            assert.ok(systemPrompt.includes(marker))
+        } finally {
+            await session.close()
+            await removeDir(projectRoot)
         }
     })
 })

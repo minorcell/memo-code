@@ -30,6 +30,7 @@ export const shellCommandTool = defineMcpTool<ShellCommandInput>({
                 workdir,
                 login,
                 yield_time_ms: timeout_ms,
+                source_tool: 'shell_command',
             })
             return textResult(content)
         } catch (err) {

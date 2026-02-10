@@ -42,6 +42,8 @@ export type MemoConfig = {
     max_prompt_tokens?: number
     /** Map of server name to server configuration */
     mcp_servers?: Record<string, MCPServerConfig>
+    /** Persisted default active MCP servers for interactive sessions. */
+    active_mcp_servers?: string[]
     providers: ProviderConfig[]
 }
 
@@ -156,6 +158,9 @@ function serializeConfig(config: MemoConfig) {
     if (typeof config.max_prompt_tokens === 'number' && Number.isFinite(config.max_prompt_tokens)) {
         mainLines.push(`max_prompt_tokens = ${Math.floor(config.max_prompt_tokens)}`)
     }
+    if (Array.isArray(config.active_mcp_servers)) {
+        mainLines.push(`active_mcp_servers = ${JSON.stringify(config.active_mcp_servers)}`)
+    }
     const mainConfig = mainLines.join('\n')
 
     return [mainConfig, providers, mcpSection].filter(Boolean).join('\n\n')
@@ -187,11 +192,17 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
             parsed.max_prompt_tokens > 0
                 ? Math.floor(parsed.max_prompt_tokens)
                 : undefined
+        const activeMcpServers = Array.isArray(parsed.active_mcp_servers)
+            ? parsed.active_mcp_servers.filter(
+                  (name): name is string => typeof name === 'string' && name.trim().length > 0,
+              )
+            : undefined
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
             max_prompt_tokens: maxPromptTokens ?? DEFAULT_CONFIG.max_prompt_tokens,
             providers,
             mcp_servers: parsed.mcp_servers ?? {},
+            active_mcp_servers: activeMcpServers,
         }
         const needsSetup = !merged.providers.length
         return { config: needsSetup ? DEFAULT_CONFIG : merged, home, configPath, needsSetup }

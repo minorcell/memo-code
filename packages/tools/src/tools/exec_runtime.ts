@@ -1,6 +1,11 @@
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { resolve } from 'node:path'
+import {
+    guardDangerousCommand,
+    splitStdinLines,
+    trimPendingStdinBuffer,
+} from '@memo/tools/tools/command_guard'
 
 const DEFAULT_EXEC_YIELD_TIME_MS = 10_000
 const DEFAULT_WRITE_YIELD_TIME_MS = 250
@@ -15,6 +20,7 @@ type StartExecRequest = {
     tty?: boolean
     yield_time_ms?: number
     max_output_tokens?: number
+    source_tool?: string
 }
 
 type WriteStdinRequest = {
@@ -22,12 +28,14 @@ type WriteStdinRequest = {
     chars?: string
     yield_time_ms?: number
     max_output_tokens?: number
+    source_tool?: string
 }
 
 type SessionState = {
     id: number
     output: string
     readOffset: number
+    pendingStdinInput: string
     startedAtMs: number
     exited: boolean
     exitCode: number | null
@@ -167,6 +175,14 @@ class UnifiedExecManager {
             throw new Error('cmd must not be empty')
         }
 
+        const blocked = guardDangerousCommand({
+            toolName: request.source_tool ?? 'exec_command',
+            command: cmd,
+        })
+        if (blocked.blocked) {
+            return blocked.xml
+        }
+
         const id = this.nextId++
         const startedAtMs = Date.now()
         const shellInvocation = toShellInvocation({
@@ -190,6 +206,7 @@ class UnifiedExecManager {
             id,
             output: '',
             readOffset: 0,
+            pendingStdinInput: '',
             startedAtMs,
             exited: false,
             exitCode: null,
@@ -231,6 +248,24 @@ class UnifiedExecManager {
         }
 
         if (!session.exited && request.chars && request.chars.length > 0) {
+            const combinedInput = trimPendingStdinBuffer(
+                `${session.pendingStdinInput}${request.chars}`,
+            )
+            const { completedLines, remainder } = splitStdinLines(combinedInput)
+            for (const line of completedLines) {
+                if (!line.trim()) continue
+                const blocked = guardDangerousCommand({
+                    toolName: request.source_tool ?? 'write_stdin',
+                    command: line,
+                    sessionId: session.id,
+                })
+                if (blocked.blocked) {
+                    session.pendingStdinInput = ''
+                    return blocked.xml
+                }
+            }
+
+            session.pendingStdinInput = trimPendingStdinBuffer(remainder)
             session.proc.stdin?.write(request.chars)
         }
 

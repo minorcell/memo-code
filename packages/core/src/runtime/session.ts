@@ -67,7 +67,7 @@ function resolveToolPermission(options: AgentSessionOptions): ResolvedToolPermis
             mode: 'once',
             toolsDisabled: false,
             dangerous: false,
-            approvalMode: 'strict',
+            approvalMode: 'auto',
         }
     }
 

@@ -20,6 +20,26 @@ import type {
     TokenCounter,
     ToolRegistry,
 } from '@memo/core/types'
+import type { MCPServerConfig } from '@memo/core/config/config'
+
+export function filterMcpServersBySelection(
+    servers: Record<string, MCPServerConfig> | undefined,
+    activeNames: string[] | undefined,
+): Record<string, MCPServerConfig> | undefined {
+    if (!servers) return servers
+    if (!activeNames) return servers
+
+    const selected = new Set(activeNames.map((name) => name.trim()).filter(Boolean))
+    if (selected.size === 0) return {}
+
+    const filtered: Record<string, MCPServerConfig> = {}
+    for (const [name, config] of Object.entries(servers)) {
+        if (selected.has(name)) {
+            filtered[name] = config
+        }
+    }
+    return filtered
+}
 
 export function parseToolArguments(
     raw: string,
@@ -86,7 +106,9 @@ export async function withDefaultDeps(
     router.registerNativeTools(NATIVE_TOOLS)
 
     // 3. Load external MCP tools (follows MEMO_HOME)
-    await router.loadMcpServers(config.mcp_servers)
+    await router.loadMcpServers(
+        filterMcpServersBySelection(config.mcp_servers, options.activeMcpServers),
+    )
 
     // 4. Merge user custom tools (deps.tools has highest priority)
     if (deps.tools) {

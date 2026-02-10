@@ -198,6 +198,8 @@ export type AgentSessionOptions = {
     warnPromptTokens?: number
     /** Prompt hard limit, rejects if exceeded. */
     maxPromptTokens?: number
+    /** Active MCP server names for current session (undefined means all configured servers). */
+    activeMcpServers?: string[]
     /** Dangerous mode: skip approval (not equivalent to disabling sandbox). */
     dangerous?: boolean
     /** 工具权限模式：禁用工具 / 每次审批 / 全部放行。 */
@@ -279,12 +281,20 @@ export type ApprovalHookPayload = {
     request: ApprovalRequest
 }
 
+
 export type ApprovalResponseHookPayload = {
     sessionId: string
     turn: number
     step: number
     fingerprint: string
     decision: ApprovalDecision
+}
+
+export type TitleGeneratedHookPayload = {
+    sessionId: string
+    turn: number
+    title: string
+    originalPrompt: string
 }
 
 export type AgentHookHandler<Payload> = (payload: Payload) => Promise<void> | void
@@ -296,6 +306,7 @@ export type AgentHooks = {
     onFinal?: AgentHookHandler<FinalHookPayload>
     onApprovalRequest?: AgentHookHandler<ApprovalHookPayload>
     onApprovalResponse?: AgentHookHandler<ApprovalResponseHookPayload>
+    onTitleGenerated?: AgentHookHandler<TitleGeneratedHookPayload>
 }
 
 export type AgentMiddleware = AgentHooks & {
@@ -304,6 +315,8 @@ export type AgentMiddleware = AgentHooks & {
 
 /** Session 对象，持有历史并可执行多轮对话。 */
 export type AgentSession = {
+    /** Session 标题（LLM 生成）。 */
+    title?: string
     /** Session 唯一标识。 */
     id: string
     /** 运行模式。 */

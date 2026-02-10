@@ -7,6 +7,7 @@ import {
     type TurnView,
 } from '../types'
 import { looksLikePathInput, safeStringify, toRelativeDisplayPath, truncate } from '../utils'
+import { MarkdownRenderer } from './MarkdownRenderer'
 
 function statusColor(status?: ToolStatus): string {
     if (status === TOOL_STATUS.ERROR) return 'red'
@@ -108,7 +109,7 @@ export function TurnCell({ turn, cwd }: { turn: TurnView; cwd: string }) {
 
             {turn.finalText ? (
                 <Box marginTop={0}>
-                    <Text>{turn.finalText}</Text>
+                    <MarkdownRenderer content={turn.finalText} />
                 </Box>
             ) : null}
 

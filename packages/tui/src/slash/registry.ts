@@ -50,7 +50,7 @@ function parseToolPermissionMode(input: string | undefined): ToolPermissionMode 
 
 function toolPermissionLabel(mode: ToolPermissionMode): string {
     if (mode === TOOL_PERMISSION_MODES.NONE) return 'none (no tools)'
-    if (mode === TOOL_PERMISSION_MODES.ONCE) return 'once (single approval)'
+    if (mode === TOOL_PERMISSION_MODES.ONCE) return 'once (approval required)'
     return 'full (no approval)'
 }
 
