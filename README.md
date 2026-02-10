@@ -55,6 +55,7 @@ memo
 - Plain mode (non-TTY): `echo "your prompt" | memo` (plain text output; useful for scripts).
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
+- Startup project guidance: if `AGENTS.md` exists in the startup root, Memo appends it to the system prompt automatically.
 
 ## Configuration
 
