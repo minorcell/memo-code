@@ -83,7 +83,7 @@ export function accumulateUsage(target: TokenUsage, delta?: Partial<TokenUsage>)
     if (!delta) return
     const promptDelta = delta.prompt ?? 0
     const completionDelta = delta.completion ?? 0
-    const totalDelta = delta.total ?? promptDelta + completionDelta
+    const totalDelta = delta.total ?? (promptDelta + completionDelta)
     target.prompt += promptDelta
     target.completion += completionDelta
     target.total += totalDelta
