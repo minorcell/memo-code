@@ -132,12 +132,12 @@ describe('codex file/search family', () => {
         const addPatch = `*** Begin Patch\n*** Add File: ${target}\n+hello\n*** End Patch\n`
         const addRes = await applyPatchTool.execute({ input: addPatch })
         assert.ok(!addRes.isError)
-        assert.strictEqual(await readText(target), 'hello')
+        assert.strictEqual(await readText(target), 'hello\n')
 
         const updatePatch = `*** Begin Patch\n*** Update File: ${target}\n@@\n-hello\n+world\n*** End Patch\n`
         const updateRes = await applyPatchTool.execute({ input: updatePatch })
         assert.ok(!updateRes.isError)
-        assert.strictEqual(await readText(target), 'world')
+        assert.strictEqual(await readText(target), 'world\n')
 
         const deletePatch = `*** Begin Patch\n*** Delete File: ${target}\n*** End Patch\n`
         const deleteRes = await applyPatchTool.execute({ input: deletePatch })

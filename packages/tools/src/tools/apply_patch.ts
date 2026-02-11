@@ -1,9 +1,9 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
-import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
 import { normalizePath, writePathDenyReason } from '@memo/tools/tools/helpers'
+import { defineMcpTool } from '@memo/tools/tools/types'
 
 const PATCH_MARKER_HINT =
     'Expected markers: "*** Add File:", "*** Update File:", "*** Delete File:", "*** End Patch".'
@@ -11,16 +11,28 @@ const PATCH_FORMAT_HINT =
     'Format hint: start with "*** Begin Patch", include one or more operations, and end with "*** End Patch". Update hunks use "@@" headers and body lines prefixed by " ", "+", or "-".'
 const HUNK_ANCHOR_WINDOW = 2
 
+const BEGIN_PATCH_MARKER = '*** Begin Patch'
+const END_PATCH_MARKER = '*** End Patch'
+const ADD_FILE_MARKER = '*** Add File: '
+const DELETE_FILE_MARKER = '*** Delete File: '
+const UPDATE_FILE_MARKER = '*** Update File: '
+const MOVE_TO_MARKER = '*** Move to: '
+const END_OF_FILE_MARKER = '*** End of File'
+
 type PatchHunk = {
     header: string
     sourceStart?: number
+    contextHint?: string
     lines: string[]
+    isEndOfFile: boolean
 }
 
 type PatchOperation =
     | { type: 'add'; file: string; lines: string[] }
     | { type: 'delete'; file: string }
     | { type: 'update'; file: string; moveTo?: string; hunks: PatchHunk[] }
+
+type MatchMode = 'exact' | 'trim_end' | 'trim' | 'normalized'
 
 const APPLY_PATCH_INPUT_SCHEMA = z
     .object({
@@ -34,26 +46,52 @@ function withFormatHint(message: string): string {
     return `${message} ${PATCH_FORMAT_HINT}`
 }
 
-function parseHunkHeader(line: string, lineNo: number): { header: string; sourceStart?: number } {
-    if (/^@@\s*$/.test(line)) {
+function trimLine(value: string): string {
+    return value.trim()
+}
+
+function extractMarkerValue(line: string, marker: string): string | null {
+    if (!line.startsWith(marker)) return null
+    const value = line.slice(marker.length).trim()
+    return value.length > 0 ? value : null
+}
+
+function parseHunkHeader(
+    line: string,
+    lineNo: number,
+): { header: string; sourceStart?: number; contextHint?: string } {
+    if (line === '@@') {
         return { header: line }
     }
 
-    const matched = line.match(/^@@\s*-(\d+)(?:,\d+)?\s+\+\d+(?:,\d+)?\s*@@(?:\s.*)?$/)
-    if (!matched) {
-        throw new Error(
-            withFormatHint(
-                `Invalid hunk header at line ${lineNo}: "${line}". Use "@@" or "@@ -start,count +start,count @@".`,
-            ),
-        )
+    const numbered = line.match(/^@@\s*-(\d+)(?:,\d+)?\s+\+\d+(?:,\d+)?\s*@@(?:\s*(.*))?$/)
+    if (numbered) {
+        const contextHint = numbered[2]?.trim()
+        return {
+            header: line,
+            sourceStart: Number(numbered[1]),
+            contextHint: contextHint ? contextHint : undefined,
+        }
     }
 
-    return { header: line, sourceStart: Number(matched[1]) }
+    if (line.startsWith('@@ ')) {
+        const contextHint = line.slice(3).trim()
+        return {
+            header: line,
+            contextHint: contextHint ? contextHint : undefined,
+        }
+    }
+
+    throw new Error(
+        withFormatHint(
+            `Invalid hunk header at line ${lineNo}: "${line}". Use "@@", "@@ <context>", or "@@ -start,count +start,count @@".`,
+        ),
+    )
 }
 
 function parsePatch(raw: string): PatchOperation[] {
     const lines = raw.replace(/\r/g, '').split('\n')
-    if (lines[0] !== '*** Begin Patch') {
+    if (trimLine(lines[0] ?? '') !== BEGIN_PATCH_MARKER) {
         throw new Error(withFormatHint('patch must start with "*** Begin Patch".'))
     }
 
@@ -62,8 +100,10 @@ function parsePatch(raw: string): PatchOperation[] {
     let sawEndPatch = false
 
     while (i < lines.length) {
-        const line = lines[i] ?? ''
-        if (line === '*** End Patch') {
+        const rawLine = lines[i] ?? ''
+        const line = trimLine(rawLine)
+
+        if (line === END_PATCH_MARKER) {
             sawEndPatch = true
             break
         }
@@ -73,61 +113,76 @@ function parsePatch(raw: string): PatchOperation[] {
             continue
         }
 
-        if (line.startsWith('*** Add File: ')) {
-            const file = line.slice('*** Add File: '.length).trim()
-            if (!file) {
-                throw new Error(withFormatHint(`Add File requires a path at line ${i + 1}.`))
-            }
+        const addFile = extractMarkerValue(line, ADD_FILE_MARKER)
+        if (addFile !== null) {
             i += 1
             const addLines: string[] = []
+
             while (i < lines.length) {
-                const current = lines[i]
-                if (current === undefined) break
-                if (current.startsWith('*** ')) break
-                if (!current.startsWith('+')) {
+                const currentRaw = lines[i]
+                if (currentRaw === undefined) break
+                if (trimLine(currentRaw).startsWith('*** ')) break
+                if (!currentRaw.startsWith('+')) {
                     throw new Error(
                         withFormatHint(
                             `Invalid Add File content at line ${i + 1}: each content line must start with "+".`,
                         ),
                     )
                 }
-                addLines.push(current.slice(1))
+                addLines.push(currentRaw.slice(1))
                 i += 1
             }
-            operations.push({ type: 'add', file, lines: addLines })
+
+            operations.push({ type: 'add', file: addFile, lines: addLines })
             continue
         }
 
-        if (line.startsWith('*** Delete File: ')) {
-            const file = line.slice('*** Delete File: '.length).trim()
-            if (!file) {
-                throw new Error(withFormatHint(`Delete File requires a path at line ${i + 1}.`))
-            }
-            operations.push({ type: 'delete', file })
+        const deleteFile = extractMarkerValue(line, DELETE_FILE_MARKER)
+        if (deleteFile !== null) {
+            operations.push({ type: 'delete', file: deleteFile })
             i += 1
             continue
         }
 
-        if (line.startsWith('*** Update File: ')) {
-            const file = line.slice('*** Update File: '.length).trim()
-            if (!file) {
-                throw new Error(withFormatHint(`Update File requires a path at line ${i + 1}.`))
-            }
+        const updateFile = extractMarkerValue(line, UPDATE_FILE_MARKER)
+        if (updateFile !== null) {
             i += 1
 
             let moveTo: string | undefined
-            const maybeMove = lines[i]
-            if (maybeMove && maybeMove.startsWith('*** Move to: ')) {
-                moveTo = maybeMove.slice('*** Move to: '.length).trim()
+            const moveLine = trimLine(lines[i] ?? '')
+            const moveValue = extractMarkerValue(moveLine, MOVE_TO_MARKER)
+            if (moveValue !== null) {
+                moveTo = moveValue
                 i += 1
             }
 
-            const parsedHunks: PatchHunk[] = []
+            const hunks: PatchHunk[] = []
             let currentHunk: PatchHunk | null = null
 
             while (i < lines.length) {
-                const current = lines[i]
-                if (current === undefined) break
+                const currentRaw = lines[i]
+                if (currentRaw === undefined) break
+                const current = trimLine(currentRaw)
+
+                if (!current) {
+                    i += 1
+                    continue
+                }
+
+                if (current === END_OF_FILE_MARKER) {
+                    if (!currentHunk) {
+                        currentHunk = {
+                            header: '@@',
+                            lines: [],
+                            isEndOfFile: true,
+                        }
+                    } else {
+                        currentHunk.isEndOfFile = true
+                    }
+                    i += 1
+                    continue
+                }
+
                 if (current.startsWith('*** ')) break
 
                 if (current.startsWith('@@')) {
@@ -135,37 +190,42 @@ function parsePatch(raw: string): PatchOperation[] {
                         if (currentHunk.lines.length === 0) {
                             throw new Error(
                                 withFormatHint(
-                                    `Update File ${file} has an empty hunk at line ${i}.`,
+                                    `Update File ${updateFile} has an empty hunk at line ${i}.`,
                                 ),
                             )
                         }
-                        parsedHunks.push(currentHunk)
+                        hunks.push(currentHunk)
                     }
+
                     currentHunk = {
                         ...parseHunkHeader(current, i + 1),
                         lines: [],
+                        isEndOfFile: false,
                     }
                     i += 1
                     continue
                 }
 
-                if (current === '*** End of File') {
-                    i += 1
-                    continue
-                }
-
-                if (current.startsWith('+') || current.startsWith('-') || current.startsWith(' ')) {
+                if (
+                    currentRaw.startsWith('+') ||
+                    currentRaw.startsWith('-') ||
+                    currentRaw.startsWith(' ')
+                ) {
                     if (!currentHunk) {
-                        currentHunk = { header: '@@', lines: [] }
+                        currentHunk = {
+                            header: '@@',
+                            lines: [],
+                            isEndOfFile: false,
+                        }
                     }
-                    currentHunk.lines.push(current)
+                    currentHunk.lines.push(currentRaw)
                     i += 1
                     continue
                 }
 
                 throw new Error(
                     withFormatHint(
-                        `Unexpected patch line at line ${i + 1}: "${current}". Hunk lines must start with " ", "+", "-", or "@@".`,
+                        `Unexpected patch line at line ${i + 1}: "${currentRaw}". Hunk lines must start with " ", "+", "-", or "@@".`,
                     ),
                 )
             }
@@ -173,16 +233,19 @@ function parsePatch(raw: string): PatchOperation[] {
             if (currentHunk) {
                 if (currentHunk.lines.length === 0) {
                     throw new Error(
-                        withFormatHint(`Update File ${file} has an empty hunk near line ${i}.`),
+                        withFormatHint(
+                            `Update File ${updateFile} has an empty hunk near line ${i}.`,
+                        ),
                     )
                 }
-                parsedHunks.push(currentHunk)
-            }
-            if (parsedHunks.length === 0) {
-                throw new Error(withFormatHint(`Update File ${file} has no hunks.`))
+                hunks.push(currentHunk)
             }
 
-            operations.push({ type: 'update', file, moveTo, hunks: parsedHunks })
+            if (hunks.length === 0) {
+                throw new Error(withFormatHint(`Update File ${updateFile} has no hunks.`))
+            }
+
+            operations.push({ type: 'update', file: updateFile, moveTo, hunks })
             continue
         }
 
@@ -211,33 +274,147 @@ function splitContent(content: string): { lines: string[]; trailingNewline: bool
     return { lines, trailingNewline }
 }
 
-function joinContent(lines: string[], trailingNewline: boolean): string {
+function joinContent(
+    lines: string[],
+    trailingNewline: boolean,
+    options: { forceTrailingNewline?: boolean } = {},
+): string {
     const body = lines.join('\n')
-    if (trailingNewline && body.length > 0) {
+    if (body.length === 0) return ''
+    if (options.forceTrailingNewline || trailingNewline) {
         return `${body}\n`
     }
     return body
 }
 
-function findMatchingStarts(fileLines: string[], oldLines: string[]): number[] {
+function normalizeLineForLooseMatch(input: string): string {
+    return input
+        .trim()
+        .split('')
+        .map((char) => {
+            if (
+                char === '\u2010' ||
+                char === '\u2011' ||
+                char === '\u2012' ||
+                char === '\u2013' ||
+                char === '\u2014' ||
+                char === '\u2015' ||
+                char === '\u2212'
+            ) {
+                return '-'
+            }
+            if (char === '\u2018' || char === '\u2019' || char === '\u201A' || char === '\u201B') {
+                return "'"
+            }
+            if (char === '\u201C' || char === '\u201D' || char === '\u201E' || char === '\u201F') {
+                return '"'
+            }
+            if (
+                char === '\u00A0' ||
+                char === '\u2002' ||
+                char === '\u2003' ||
+                char === '\u2004' ||
+                char === '\u2005' ||
+                char === '\u2006' ||
+                char === '\u2007' ||
+                char === '\u2008' ||
+                char === '\u2009' ||
+                char === '\u200A' ||
+                char === '\u202F' ||
+                char === '\u205F' ||
+                char === '\u3000'
+            ) {
+                return ' '
+            }
+            return char
+        })
+        .join('')
+}
+
+function linesEqual(fileLine: string, patchLine: string, mode: MatchMode): boolean {
+    switch (mode) {
+        case 'exact':
+            return fileLine === patchLine
+        case 'trim_end':
+            return fileLine.trimEnd() === patchLine.trimEnd()
+        case 'trim':
+            return fileLine.trim() === patchLine.trim()
+        case 'normalized':
+            return normalizeLineForLooseMatch(fileLine) === normalizeLineForLooseMatch(patchLine)
+        default:
+            return false
+    }
+}
+
+function buildSearchPositions(maxStart: number, startIndex: number, preferEnd: boolean): number[] {
+    if (maxStart < 0) return []
+
+    const start = Math.max(0, Math.min(startIndex, maxStart))
+    const positions: number[] = []
+    const seen = new Set<number>()
+
+    const push = (value: number) => {
+        if (value < start || value > maxStart || seen.has(value)) return
+        seen.add(value)
+        positions.push(value)
+    }
+
+    if (preferEnd) {
+        push(maxStart)
+    }
+
+    for (let idx = start; idx <= maxStart; idx += 1) {
+        push(idx)
+    }
+
+    return positions
+}
+
+function findMatchingStarts(
+    fileLines: string[],
+    oldLines: string[],
+    options: { startIndex?: number; preferEnd?: boolean } = {},
+): number[] {
     if (oldLines.length === 0) return []
+
     const maxStart = fileLines.length - oldLines.length
     if (maxStart < 0) return []
 
-    const starts: number[] = []
-    for (let start = 0; start <= maxStart; start += 1) {
-        let matched = true
-        for (let offset = 0; offset < oldLines.length; offset += 1) {
-            if (fileLines[start + offset] !== oldLines[offset]) {
-                matched = false
-                break
+    const positions = buildSearchPositions(
+        maxStart,
+        options.startIndex ?? 0,
+        options.preferEnd ?? false,
+    )
+    const modes: MatchMode[] = ['exact', 'trim_end', 'trim', 'normalized']
+
+    for (const mode of modes) {
+        const matches: number[] = []
+
+        for (const start of positions) {
+            let matched = true
+            for (let offset = 0; offset < oldLines.length; offset += 1) {
+                const fileLine = fileLines[start + offset]
+                const patchLine = oldLines[offset]
+                if (
+                    fileLine === undefined ||
+                    patchLine === undefined ||
+                    !linesEqual(fileLine, patchLine, mode)
+                ) {
+                    matched = false
+                    break
+                }
+            }
+            if (matched) {
+                matches.push(start)
             }
         }
-        if (matched) {
-            starts.push(start)
+
+        if (matches.length > 0) {
+            return matches
         }
     }
-    return starts
+
+    return []
 }
 
 function resolveStartIndex(
@@ -274,6 +451,29 @@ function resolveStartIndex(
     )
 }
 
+function resolveContextStartIndex(fileLines: string[], hunk: PatchHunk, file: string): number {
+    if (!hunk.contextHint) {
+        return 0
+    }
+
+    const matches = findMatchingStarts(fileLines, [hunk.contextHint], {
+        preferEnd: hunk.isEndOfFile,
+    })
+    if (matches.length === 0) {
+        throw new Error(
+            `patch hunk context not found in ${file} (header: "${hunk.header}", context: "${hunk.contextHint}").`,
+        )
+    }
+
+    if (matches.length > 1) {
+        throw new Error(
+            `patch hunk context is ambiguous in ${file}: matched ${matches.length} locations for "${hunk.contextHint}".`,
+        )
+    }
+
+    return matches[0]! + 1
+}
+
 function applyHunkByReplace(content: string, hunk: PatchHunk, file: string): string {
     const oldLines = hunk.lines
         .filter((line) => line.startsWith(' ') || line.startsWith('-'))
@@ -283,21 +483,34 @@ function applyHunkByReplace(content: string, hunk: PatchHunk, file: string): str
         .map((line) => line.slice(1))
 
     const split = splitContent(content)
+    const contextStart = resolveContextStartIndex(split.lines, hunk, file)
 
     if (oldLines.length === 0) {
         if (newLines.length === 0) return content
-        const rawInsert =
-            hunk.sourceStart !== undefined ? Math.max(0, hunk.sourceStart - 1) : split.lines.length
-        const insertAt = Math.min(rawInsert, split.lines.length)
+
+        let insertAt = split.lines.length
+        if (hunk.sourceStart !== undefined) {
+            insertAt = Math.max(0, hunk.sourceStart - 1)
+        }
+        if (hunk.isEndOfFile) {
+            insertAt = split.lines.length
+        }
+
+        insertAt = Math.min(Math.max(insertAt, contextStart), split.lines.length)
+
         const updatedLines = [
             ...split.lines.slice(0, insertAt),
             ...newLines,
             ...split.lines.slice(insertAt),
         ]
-        return joinContent(updatedLines, split.trailingNewline)
+
+        return joinContent(updatedLines, split.trailingNewline, { forceTrailingNewline: true })
     }
 
-    const starts = findMatchingStarts(split.lines, oldLines)
+    const starts = findMatchingStarts(split.lines, oldLines, {
+        startIndex: contextStart,
+        preferEnd: hunk.isEndOfFile,
+    })
     const startIndex = resolveStartIndex(starts, hunk.sourceStart, file, hunk.header)
 
     const updatedLines = [
@@ -305,7 +518,8 @@ function applyHunkByReplace(content: string, hunk: PatchHunk, file: string): str
         ...newLines,
         ...split.lines.slice(startIndex + oldLines.length),
     ]
-    return joinContent(updatedLines, split.trailingNewline)
+
+    return joinContent(updatedLines, split.trailingNewline, { forceTrailingNewline: true })
 }
 
 function ensureWritable(absPath: string) {
@@ -340,7 +554,7 @@ Supported operations:
 3) Delete file
 *** Delete File: path/to/file.ts
 
-Update hunks may use "@@" or "@@ -start,count +start,count @@" headers.
+Update hunks may use "@@", "@@ <context>", or "@@ -start,count +start,count @@" headers.
 Hunk body lines must start with " ", "+", or "-".`,
     inputSchema: APPLY_PATCH_INPUT_SCHEMA,
     supportsParallelToolCalls: false,
@@ -354,7 +568,8 @@ Hunk body lines must start with " ", "+", or "-".`,
                     const filePath = normalizePath(op.file)
                     ensureWritable(filePath)
                     await mkdir(dirname(filePath), { recursive: true })
-                    await writeFile(filePath, op.lines.join('\n'), 'utf8')
+                    const content = op.lines.length > 0 ? `${op.lines.join('\n')}\n` : ''
+                    await writeFile(filePath, content, 'utf8')
                     continue
                 }
 
