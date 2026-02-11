@@ -20,6 +20,7 @@ import { Composer } from './bottom_pane/Composer'
 import { Footer } from './bottom_pane/Footer'
 import { ApprovalOverlay } from './overlays/ApprovalOverlay'
 import { McpActivationOverlay } from './overlays/McpActivationOverlay'
+import { notifyApprovalRequested } from './notifications/approval_notification'
 import { SetupWizard } from './setup/SetupWizard'
 import { parseHistoryLog } from './controllers/history_parser'
 import {
@@ -184,6 +185,7 @@ export function App({
                     ? undefined
                     : (request: ApprovalRequest) =>
                           new Promise((resolve) => {
+                              void notifyApprovalRequested(request)
                               setPendingApproval(request)
                               approvalResolverRef.current = resolve
                           }),

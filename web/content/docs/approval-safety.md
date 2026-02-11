@@ -19,23 +19,24 @@ Special case:
 When approval is required, you can choose:
 
 - `Allow once`
-- `Allow all session`
-- `Reject this time`
+- `Allow for this session`
+- `Deny`
+- Memo rings a terminal bell and attempts a desktop notification when an approval request appears.
 
-## What "same request" means
+## What approval target means
 
-Memo uses a fingerprint derived from:
+Memo approval matching is based on:
 
 - tool name
-- tool parameters
 
-If either changes, Memo treats it as a new approval target.
+Parameter changes do not create a new approval target.
+Memo still records request fingerprints for tracing and hooks.
 
 ## Approval Lifetime
 
-- `Allow once`: valid until current turn ends.
-- `Allow all session`: valid for matching requests in the current session.
-- `Reject this time`: rejects current request; matching requests remain non-auto-approved.
+- `Allow once`: valid until current turn ends, for the same tool.
+- `Allow for this session`: valid for the same tool in the current session.
+- `Deny`: keeps the same tool denied until you approve it again.
 
 ## Dangerous Mode
 

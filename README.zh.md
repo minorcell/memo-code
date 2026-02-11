@@ -131,9 +131,10 @@ memo mcp remove remote
 - **自动审批**：读类工具（如 `read_file`、`list_dir`、`grep_files`、`webfetch` 等）
 - **手动审批**：高风险工具（如 `apply_patch`、`exec_command`、`write_stdin`）
 - **审批选项**：
-    - `once`：仅批准当前操作
-    - `session`：批准本次会话中的所有同类操作
-    - `deny`：拒绝操作
+    - `once`：批准该工具直到当前 turn 结束
+    - `session`：在本次会话内批准该工具
+    - `deny`：拒绝该工具，直到再次批准
+- **审批提醒（TUI）**：当需要审批时，Memo 会触发终端提示音，并尝试发送桌面通知。
 - **危险模式**：`--dangerous` 参数跳过所有审批（仅限信任场景）
 
 ## 会话历史
@@ -203,6 +204,7 @@ memo-cli/
 - `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
 - 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。
 - **工具审批**：危险操作会弹出审批对话框，可选择 `once`/`session`/`deny`。
+- **审批提醒**：交互式 TUI 中出现审批请求时，会触发提示音并尝试发送桌面通知。
 
 > 仅当会话包含用户消息时才写入 `sessions/` JSONL 日志，避免空会话文件。
 

@@ -116,7 +116,18 @@ memo mcp help
 
 ## Runtime Environment Variables
 
+### Required for model calls
+
+- `<provider.env_api_key>`: the env var name configured in provider config, used as first priority for API key lookup.
+- `OPENAI_API_KEY`: fallback API key when provider-specific key is missing.
+- `DEEPSEEK_API_KEY`: fallback API key when provider-specific key and `OPENAI_API_KEY` are missing.
+
+### Common optional
+
 - `MEMO_HOME`: override Memo home directory.
+
+### Advanced tool/runtime switches
+
 - `MEMO_SHELL_TOOL_TYPE`: `unified_exec` (default) / `shell` / `shell_command` / `disabled`.
 - `MEMO_EXPERIMENTAL_TOOLS`: comma-separated subset of `read_file,list_dir,grep_files`.
     - empty value means all three are enabled.
@@ -125,6 +136,15 @@ memo mcp help
 - `MEMO_SUBAGENT_COMMAND`: command used to spawn subagents.
 - `MEMO_SUBAGENT_MAX_AGENTS`: max concurrently running subagents (default `4`).
 - `MEMO_TOOL_RESULT_MAX_CHARS`: max chars kept from a single tool result before omission hint.
+- `MEMO_SANDBOX_WRITABLE_ROOTS`: comma-separated absolute paths appended to writable sandbox roots for local write tools.
+
+### MCP auth by configuration
+
+- `<bearer_token_env_var>`: if set in an MCP server config, Memo reads this env var and injects `Authorization: Bearer <token>` for that server.
+
+### Notes
+
+- `SHELL`, `USER`, and `USERNAME` are system env vars read as runtime fallback; they are not Memo-specific feature switches.
 
 ## Related
 

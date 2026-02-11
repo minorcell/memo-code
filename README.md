@@ -135,9 +135,10 @@ Memo includes a tool-approval mechanism to reduce risky operations:
 - **Auto-approve**: safe read tools (`read_file`, `list_dir`, `grep_files`, `webfetch`, `get_memory`, etc.)
 - **Manual approval**: risky tools (`apply_patch`, `exec_command`, etc.)
 - **Approval options**:
-    - `once`: approve current operation only
-    - `session`: approve all matching operations for this session
-    - `deny`: reject operation
+    - `once`: approve this tool until current turn ends
+    - `session`: approve this tool for the current session
+    - `deny`: deny this tool until you re-approve it
+- **Approval reminders (TUI)**: when approval is required, Memo rings the terminal bell and attempts a desktop notification.
 - **Dangerous mode**: `--dangerous` skips all approvals (trusted scenarios only)
 
 ## Session History
@@ -207,6 +208,7 @@ memo-cli/
 - `resume` history: type `resume` to list and load past sessions for current directory.
 - Exit and clear: `exit` / `/exit`, `Ctrl+L` for new session, `Esc Esc` to cancel current run or clear input.
 - **Tool approval**: risky operations open an approval dialog with `once`/`session`/`deny`.
+- **Approval reminder**: risky approval prompts ring a bell and attempt a desktop notification in interactive TUI.
 
 > Session logs are written only when a session contains user messages, to avoid empty files.
 

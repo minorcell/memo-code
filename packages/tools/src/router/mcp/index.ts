@@ -13,8 +13,7 @@ export class McpToolRegistry {
     constructor() {
         this.pool = new McpClientPool()
         setActiveMcpPool(this.pool)
-        this.shouldLog =
-            process.env.MEMO_MCP_LOG === '1' || !(process.stdout.isTTY && process.stdin.isTTY)
+        this.shouldLog = !(process.stdout.isTTY && process.stdin.isTTY)
     }
 
     /**

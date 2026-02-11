@@ -95,7 +95,8 @@ Notes:
 When a tool needs approval, a modal appears with:
 
 - `Allow once`
-- `Allow all session`
-- `Reject this time`
+- `Allow for this session`
+- `Deny`
+- Memo also rings a terminal bell and attempts a desktop notification when approval is requested.
 
 See [Safety & Approvals](./approval-safety.md) for policy details.
