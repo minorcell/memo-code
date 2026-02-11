@@ -5,34 +5,16 @@ import { textResult } from '@memo/tools/tools/mcp'
 import { normalizePath, writePathDenyReason } from '@memo/tools/tools/helpers'
 import { defineMcpTool } from '@memo/tools/tools/types'
 
-const PATCH_MARKER_HINT =
-    'Expected markers: "*** Add File:", "*** Update File:", "*** Delete File:", "*** End Patch".'
-const PATCH_FORMAT_HINT =
-    'Format hint: start with "*** Begin Patch", include one or more operations, and end with "*** End Patch". Update hunks use "@@" headers and body lines prefixed by " ", "+", or "-".'
-const HUNK_ANCHOR_WINDOW = 2
-
 const BEGIN_PATCH_MARKER = '*** Begin Patch'
 const END_PATCH_MARKER = '*** End Patch'
 const ADD_FILE_MARKER = '*** Add File: '
 const DELETE_FILE_MARKER = '*** Delete File: '
 const UPDATE_FILE_MARKER = '*** Update File: '
 const MOVE_TO_MARKER = '*** Move to: '
-const END_OF_FILE_MARKER = '*** End of File'
+const EOF_MARKER = '*** End of File'
 
-type PatchHunk = {
-    header: string
-    sourceStart?: number
-    contextHint?: string
-    lines: string[]
-    isEndOfFile: boolean
-}
-
-type PatchOperation =
-    | { type: 'add'; file: string; lines: string[] }
-    | { type: 'delete'; file: string }
-    | { type: 'update'; file: string; moveTo?: string; hunks: PatchHunk[] }
-
-type MatchMode = 'exact' | 'trim_end' | 'trim' | 'normalized'
+const PATCH_FORMAT_HINT =
+    'Format hint: start with "*** Begin Patch", include one or more file operations, then end with "*** End Patch".'
 
 const APPLY_PATCH_INPUT_SCHEMA = z
     .object({
@@ -42,252 +24,35 @@ const APPLY_PATCH_INPUT_SCHEMA = z
 
 type ApplyPatchInput = z.infer<typeof APPLY_PATCH_INPUT_SCHEMA>
 
-function withFormatHint(message: string): string {
+type UpdateFileChunk = {
+    changeContext: string | null
+    oldLines: string[]
+    newLines: string[]
+    isEndOfFile: boolean
+}
+
+type ParsedHunk =
+    | { type: 'add'; path: string; contents: string }
+    | { type: 'delete'; path: string }
+    | { type: 'update'; path: string; moveTo: string | null; chunks: UpdateFileChunk[] }
+
+type AffectedPaths = {
+    added: string[]
+    modified: string[]
+    deleted: string[]
+}
+
+type Replacement = {
+    start: number
+    oldLen: number
+    newLines: string[]
+}
+
+function withHint(message: string): string {
     return `${message} ${PATCH_FORMAT_HINT}`
 }
 
-function trimLine(value: string): string {
-    return value.trim()
-}
-
-function extractMarkerValue(line: string, marker: string): string | null {
-    if (!line.startsWith(marker)) return null
-    const value = line.slice(marker.length).trim()
-    return value.length > 0 ? value : null
-}
-
-function parseHunkHeader(
-    line: string,
-    lineNo: number,
-): { header: string; sourceStart?: number; contextHint?: string } {
-    if (line === '@@') {
-        return { header: line }
-    }
-
-    const numbered = line.match(/^@@\s*-(\d+)(?:,\d+)?\s+\+\d+(?:,\d+)?\s*@@(?:\s*(.*))?$/)
-    if (numbered) {
-        const contextHint = numbered[2]?.trim()
-        return {
-            header: line,
-            sourceStart: Number(numbered[1]),
-            contextHint: contextHint ? contextHint : undefined,
-        }
-    }
-
-    if (line.startsWith('@@ ')) {
-        const contextHint = line.slice(3).trim()
-        return {
-            header: line,
-            contextHint: contextHint ? contextHint : undefined,
-        }
-    }
-
-    throw new Error(
-        withFormatHint(
-            `Invalid hunk header at line ${lineNo}: "${line}". Use "@@", "@@ <context>", or "@@ -start,count +start,count @@".`,
-        ),
-    )
-}
-
-function parsePatch(raw: string): PatchOperation[] {
-    const lines = raw.replace(/\r/g, '').split('\n')
-    if (trimLine(lines[0] ?? '') !== BEGIN_PATCH_MARKER) {
-        throw new Error(withFormatHint('patch must start with "*** Begin Patch".'))
-    }
-
-    const operations: PatchOperation[] = []
-    let i = 1
-    let sawEndPatch = false
-
-    while (i < lines.length) {
-        const rawLine = lines[i] ?? ''
-        const line = trimLine(rawLine)
-
-        if (line === END_PATCH_MARKER) {
-            sawEndPatch = true
-            break
-        }
-
-        if (!line) {
-            i += 1
-            continue
-        }
-
-        const addFile = extractMarkerValue(line, ADD_FILE_MARKER)
-        if (addFile !== null) {
-            i += 1
-            const addLines: string[] = []
-
-            while (i < lines.length) {
-                const currentRaw = lines[i]
-                if (currentRaw === undefined) break
-                if (trimLine(currentRaw).startsWith('*** ')) break
-                if (!currentRaw.startsWith('+')) {
-                    throw new Error(
-                        withFormatHint(
-                            `Invalid Add File content at line ${i + 1}: each content line must start with "+".`,
-                        ),
-                    )
-                }
-                addLines.push(currentRaw.slice(1))
-                i += 1
-            }
-
-            operations.push({ type: 'add', file: addFile, lines: addLines })
-            continue
-        }
-
-        const deleteFile = extractMarkerValue(line, DELETE_FILE_MARKER)
-        if (deleteFile !== null) {
-            operations.push({ type: 'delete', file: deleteFile })
-            i += 1
-            continue
-        }
-
-        const updateFile = extractMarkerValue(line, UPDATE_FILE_MARKER)
-        if (updateFile !== null) {
-            i += 1
-
-            let moveTo: string | undefined
-            const moveLine = trimLine(lines[i] ?? '')
-            const moveValue = extractMarkerValue(moveLine, MOVE_TO_MARKER)
-            if (moveValue !== null) {
-                moveTo = moveValue
-                i += 1
-            }
-
-            const hunks: PatchHunk[] = []
-            let currentHunk: PatchHunk | null = null
-
-            while (i < lines.length) {
-                const currentRaw = lines[i]
-                if (currentRaw === undefined) break
-                const current = trimLine(currentRaw)
-
-                if (!current) {
-                    i += 1
-                    continue
-                }
-
-                if (current === END_OF_FILE_MARKER) {
-                    if (!currentHunk) {
-                        currentHunk = {
-                            header: '@@',
-                            lines: [],
-                            isEndOfFile: true,
-                        }
-                    } else {
-                        currentHunk.isEndOfFile = true
-                    }
-                    i += 1
-                    continue
-                }
-
-                if (current.startsWith('*** ')) break
-
-                if (current.startsWith('@@')) {
-                    if (currentHunk) {
-                        if (currentHunk.lines.length === 0) {
-                            throw new Error(
-                                withFormatHint(
-                                    `Update File ${updateFile} has an empty hunk at line ${i}.`,
-                                ),
-                            )
-                        }
-                        hunks.push(currentHunk)
-                    }
-
-                    currentHunk = {
-                        ...parseHunkHeader(current, i + 1),
-                        lines: [],
-                        isEndOfFile: false,
-                    }
-                    i += 1
-                    continue
-                }
-
-                if (
-                    currentRaw.startsWith('+') ||
-                    currentRaw.startsWith('-') ||
-                    currentRaw.startsWith(' ')
-                ) {
-                    if (!currentHunk) {
-                        currentHunk = {
-                            header: '@@',
-                            lines: [],
-                            isEndOfFile: false,
-                        }
-                    }
-                    currentHunk.lines.push(currentRaw)
-                    i += 1
-                    continue
-                }
-
-                throw new Error(
-                    withFormatHint(
-                        `Unexpected patch line at line ${i + 1}: "${currentRaw}". Hunk lines must start with " ", "+", "-", or "@@".`,
-                    ),
-                )
-            }
-
-            if (currentHunk) {
-                if (currentHunk.lines.length === 0) {
-                    throw new Error(
-                        withFormatHint(
-                            `Update File ${updateFile} has an empty hunk near line ${i}.`,
-                        ),
-                    )
-                }
-                hunks.push(currentHunk)
-            }
-
-            if (hunks.length === 0) {
-                throw new Error(withFormatHint(`Update File ${updateFile} has no hunks.`))
-            }
-
-            operations.push({ type: 'update', file: updateFile, moveTo, hunks })
-            continue
-        }
-
-        throw new Error(
-            withFormatHint(
-                `Unexpected patch marker at line ${i + 1}: "${line}". ${PATCH_MARKER_HINT}`,
-            ),
-        )
-    }
-
-    if (!sawEndPatch) {
-        throw new Error(withFormatHint('patch is missing "*** End Patch".'))
-    }
-
-    if (operations.length === 0) {
-        throw new Error(withFormatHint('patch contains no operations.'))
-    }
-
-    return operations
-}
-
-function splitContent(content: string): { lines: string[]; trailingNewline: boolean } {
-    const trailingNewline = content.endsWith('\n')
-    const body = trailingNewline ? content.slice(0, -1) : content
-    const lines = body.length > 0 ? body.split('\n') : []
-    return { lines, trailingNewline }
-}
-
-function joinContent(
-    lines: string[],
-    trailingNewline: boolean,
-    options: { forceTrailingNewline?: boolean } = {},
-): string {
-    const body = lines.join('\n')
-    if (body.length === 0) return ''
-    if (options.forceTrailingNewline || trailingNewline) {
-        return `${body}\n`
-    }
-    return body
-}
-
-function normalizeLineForLooseMatch(input: string): string {
+function normalizeUnicodeForLooseMatch(input: string): string {
     return input
         .trim()
         .split('')
@@ -331,195 +96,367 @@ function normalizeLineForLooseMatch(input: string): string {
         .join('')
 }
 
-function linesEqual(fileLine: string, patchLine: string, mode: MatchMode): boolean {
-    switch (mode) {
-        case 'exact':
-            return fileLine === patchLine
-        case 'trim_end':
-            return fileLine.trimEnd() === patchLine.trimEnd()
-        case 'trim':
-            return fileLine.trim() === patchLine.trim()
-        case 'normalized':
-            return normalizeLineForLooseMatch(fileLine) === normalizeLineForLooseMatch(patchLine)
-        default:
-            return false
+function splitLines(content: string): string[] {
+    const lines = content.split('\n')
+    if (lines.length > 0 && lines[lines.length - 1] === '') {
+        lines.pop()
     }
+    return lines
 }
 
-function buildSearchPositions(maxStart: number, startIndex: number, preferEnd: boolean): number[] {
-    if (maxStart < 0) return []
+function parsePatchBoundaries(raw: string): string[] {
+    const lines = raw.replace(/\r/g, '').trim().split('\n')
 
-    const start = Math.max(0, Math.min(startIndex, maxStart))
-    const positions: number[] = []
-    const seen = new Set<number>()
-
-    const push = (value: number) => {
-        if (value < start || value > maxStart || seen.has(value)) return
-        seen.add(value)
-        positions.push(value)
+    if (lines.length === 0 || lines[0]?.trim() !== BEGIN_PATCH_MARKER) {
+        throw new Error(withHint(`The first line of the patch must be "${BEGIN_PATCH_MARKER}".`))
     }
 
-    if (preferEnd) {
-        push(maxStart)
+    if (lines[lines.length - 1]?.trim() !== END_PATCH_MARKER) {
+        throw new Error(withHint(`The last line of the patch must be "${END_PATCH_MARKER}".`))
     }
 
-    for (let idx = start; idx <= maxStart; idx += 1) {
-        push(idx)
-    }
-
-    return positions
+    return lines
 }
 
-function findMatchingStarts(
-    fileLines: string[],
-    oldLines: string[],
-    options: { startIndex?: number; preferEnd?: boolean } = {},
-): number[] {
-    if (oldLines.length === 0) return []
+function parseLenientHeredoc(raw: string): string {
+    const maybe = raw.trim()
+    const lines = maybe.split('\n')
+    if (lines.length < 4) return raw
 
-    const maxStart = fileLines.length - oldLines.length
-    if (maxStart < 0) return []
+    const first = lines[0]
+    const last = lines[lines.length - 1]
+    if ((first === '<<EOF' || first === "<<'EOF'" || first === '<<"EOF"') && last.endsWith('EOF')) {
+        return lines.slice(1, -1).join('\n')
+    }
 
-    const positions = buildSearchPositions(
-        maxStart,
-        options.startIndex ?? 0,
-        options.preferEnd ?? false,
-    )
-    const modes: MatchMode[] = ['exact', 'trim_end', 'trim', 'normalized']
+    return raw
+}
 
-    for (const mode of modes) {
-        const matches: number[] = []
+function parseOneUpdateChunk(
+    lines: string[],
+    lineNumber: number,
+    allowMissingContext: boolean,
+): { chunk: UpdateFileChunk; consumed: number } {
+    if (lines.length === 0) {
+        throw new Error(
+            `Invalid patch hunk at line ${lineNumber}: update hunk does not contain any lines.`,
+        )
+    }
 
-        for (const start of positions) {
-            let matched = true
-            for (let offset = 0; offset < oldLines.length; offset += 1) {
-                const fileLine = fileLines[start + offset]
-                const patchLine = oldLines[offset]
-                if (
-                    fileLine === undefined ||
-                    patchLine === undefined ||
-                    !linesEqual(fileLine, patchLine, mode)
-                ) {
-                    matched = false
-                    break
-                }
+    let changeContext: string | null = null
+    let startIndex = 0
+
+    if (lines[0] === '@@') {
+        startIndex = 1
+    } else if ((lines[0] ?? '').startsWith('@@ ')) {
+        changeContext = (lines[0] ?? '').slice(3)
+        startIndex = 1
+    } else if (!allowMissingContext) {
+        throw new Error(
+            `Invalid patch hunk at line ${lineNumber}: expected update hunk to start with "@@" or "@@ <context>", got: "${lines[0]}".`,
+        )
+    }
+
+    if (startIndex >= lines.length) {
+        throw new Error(
+            `Invalid patch hunk at line ${lineNumber + 1}: update hunk does not contain any lines.`,
+        )
+    }
+
+    const oldLines: string[] = []
+    const newLines: string[] = []
+    let isEndOfFile = false
+    let parsedLines = 0
+
+    for (const line of lines.slice(startIndex)) {
+        if (line === EOF_MARKER) {
+            if (parsedLines === 0) {
+                throw new Error(
+                    `Invalid patch hunk at line ${lineNumber + 1}: update hunk does not contain any lines.`,
+                )
             }
-            if (matched) {
-                matches.push(start)
-            }
+            isEndOfFile = true
+            parsedLines += 1
+            break
         }
 
-        if (matches.length > 0) {
-            return matches
-        }
-    }
-
-    return []
-}
-
-function resolveStartIndex(
-    starts: number[],
-    sourceStart: number | undefined,
-    file: string,
-    hunkHeader: string,
-): number {
-    if (starts.length === 0) {
-        throw new Error(`patch hunk context not found in ${file} (header: "${hunkHeader}").`)
-    }
-
-    if (sourceStart !== undefined) {
-        const expected = Math.max(0, sourceStart - 1)
-        const anchored = starts.filter((idx) => Math.abs(idx - expected) <= HUNK_ANCHOR_WINDOW)
-
-        if (anchored.length === 1) {
-            return anchored[0]!
+        if (line.length === 0) {
+            oldLines.push('')
+            newLines.push('')
+            parsedLines += 1
+            continue
         }
 
-        if (anchored.length > 1) {
+        const marker = line[0]
+        const value = line.slice(1)
+
+        if (marker === ' ') {
+            oldLines.push(value)
+            newLines.push(value)
+            parsedLines += 1
+            continue
+        }
+
+        if (marker === '+') {
+            newLines.push(value)
+            parsedLines += 1
+            continue
+        }
+
+        if (marker === '-') {
+            oldLines.push(value)
+            parsedLines += 1
+            continue
+        }
+
+        if (parsedLines === 0) {
             throw new Error(
-                `patch hunk is ambiguous in ${file}: matched ${anchored.length} anchored locations near line ${sourceStart}. Add more context lines in this hunk.`,
+                `Invalid patch hunk at line ${lineNumber + 1}: unexpected line "${line}". Hunk lines must start with " ", "+", or "-".`,
             )
         }
+
+        // Assume this is the start of the next hunk.
+        break
     }
 
-    if (starts.length === 1) {
-        return starts[0]!
+    return {
+        chunk: {
+            changeContext,
+            oldLines,
+            newLines,
+            isEndOfFile,
+        },
+        consumed: parsedLines + startIndex,
+    }
+}
+
+function parseOneHunk(lines: string[], lineNumber: number): { hunk: ParsedHunk; consumed: number } {
+    const firstLine = (lines[0] ?? '').trim()
+
+    if (firstLine.startsWith(ADD_FILE_MARKER)) {
+        const path = firstLine.slice(ADD_FILE_MARKER.length)
+        let consumed = 1
+        let contents = ''
+
+        for (const line of lines.slice(1)) {
+            if (!line.startsWith('+')) break
+            contents += `${line.slice(1)}\n`
+            consumed += 1
+        }
+
+        return {
+            hunk: {
+                type: 'add',
+                path,
+                contents,
+            },
+            consumed,
+        }
+    }
+
+    if (firstLine.startsWith(DELETE_FILE_MARKER)) {
+        return {
+            hunk: {
+                type: 'delete',
+                path: firstLine.slice(DELETE_FILE_MARKER.length),
+            },
+            consumed: 1,
+        }
+    }
+
+    if (firstLine.startsWith(UPDATE_FILE_MARKER)) {
+        const path = firstLine.slice(UPDATE_FILE_MARKER.length)
+        let consumed = 1
+        let remaining = lines.slice(1)
+
+        let moveTo: string | null = null
+        const maybeMove = (remaining[0] ?? '').trim()
+        if (maybeMove.startsWith(MOVE_TO_MARKER)) {
+            moveTo = maybeMove.slice(MOVE_TO_MARKER.length)
+            remaining = remaining.slice(1)
+            consumed += 1
+        }
+
+        const chunks: UpdateFileChunk[] = []
+        while (remaining.length > 0) {
+            if ((remaining[0] ?? '').trim().length === 0) {
+                remaining = remaining.slice(1)
+                consumed += 1
+                continue
+            }
+
+            if ((remaining[0] ?? '').startsWith('***')) {
+                break
+            }
+
+            const parsed = parseOneUpdateChunk(
+                remaining,
+                lineNumber + consumed,
+                chunks.length === 0,
+            )
+            chunks.push(parsed.chunk)
+            consumed += parsed.consumed
+            remaining = remaining.slice(parsed.consumed)
+        }
+
+        if (chunks.length === 0) {
+            throw new Error(
+                `Invalid patch hunk at line ${lineNumber}: update file hunk for path "${path}" is empty.`,
+            )
+        }
+
+        return {
+            hunk: {
+                type: 'update',
+                path,
+                moveTo,
+                chunks,
+            },
+            consumed,
+        }
     }
 
     throw new Error(
-        `patch hunk is ambiguous in ${file}: matched ${starts.length} locations. Add more context lines or a more accurate @@ header.`,
+        `Invalid patch hunk at line ${lineNumber}: "${firstLine}" is not a valid hunk header.`,
     )
 }
 
-function resolveContextStartIndex(fileLines: string[], hunk: PatchHunk, file: string): number {
-    if (!hunk.contextHint) {
-        return 0
+function parsePatch(raw: string): ParsedHunk[] {
+    const normalized = parseLenientHeredoc(raw)
+    const lines = parsePatchBoundaries(normalized)
+
+    const hunks: ParsedHunk[] = []
+    let remaining = lines.slice(1, -1)
+    let lineNumber = 2
+
+    while (remaining.length > 0) {
+        if ((remaining[0] ?? '').trim().length === 0) {
+            remaining = remaining.slice(1)
+            lineNumber += 1
+            continue
+        }
+
+        const parsed = parseOneHunk(remaining, lineNumber)
+        hunks.push(parsed.hunk)
+        remaining = remaining.slice(parsed.consumed)
+        lineNumber += parsed.consumed
     }
 
-    const matches = findMatchingStarts(fileLines, [hunk.contextHint], {
-        preferEnd: hunk.isEndOfFile,
-    })
-    if (matches.length === 0) {
-        throw new Error(
-            `patch hunk context not found in ${file} (header: "${hunk.header}", context: "${hunk.contextHint}").`,
-        )
-    }
-
-    if (matches.length > 1) {
-        throw new Error(
-            `patch hunk context is ambiguous in ${file}: matched ${matches.length} locations for "${hunk.contextHint}".`,
-        )
-    }
-
-    return matches[0]! + 1
+    return hunks
 }
 
-function applyHunkByReplace(content: string, hunk: PatchHunk, file: string): string {
-    const oldLines = hunk.lines
-        .filter((line) => line.startsWith(' ') || line.startsWith('-'))
-        .map((line) => line.slice(1))
-    const newLines = hunk.lines
-        .filter((line) => line.startsWith(' ') || line.startsWith('+'))
-        .map((line) => line.slice(1))
+function seekSequence(
+    lines: string[],
+    pattern: string[],
+    start: number,
+    eof: boolean,
+): number | null {
+    if (pattern.length === 0) return start
+    if (pattern.length > lines.length) return null
 
-    const split = splitContent(content)
-    const contextStart = resolveContextStartIndex(split.lines, hunk, file)
+    const maxStart = lines.length - pattern.length
+    const searchStart =
+        eof && lines.length >= pattern.length ? lines.length - pattern.length : start
 
-    if (oldLines.length === 0) {
-        if (newLines.length === 0) return content
-
-        let insertAt = split.lines.length
-        if (hunk.sourceStart !== undefined) {
-            insertAt = Math.max(0, hunk.sourceStart - 1)
+    const runPass = (matcher: (line: string, pat: string) => boolean): number | null => {
+        for (let i = searchStart; i <= maxStart; i += 1) {
+            let ok = true
+            for (let p = 0; p < pattern.length; p += 1) {
+                const line = lines[i + p]
+                const pat = pattern[p]
+                if (line === undefined || pat === undefined || !matcher(line, pat)) {
+                    ok = false
+                    break
+                }
+            }
+            if (ok) return i
         }
-        if (hunk.isEndOfFile) {
-            insertAt = split.lines.length
-        }
-
-        insertAt = Math.min(Math.max(insertAt, contextStart), split.lines.length)
-
-        const updatedLines = [
-            ...split.lines.slice(0, insertAt),
-            ...newLines,
-            ...split.lines.slice(insertAt),
-        ]
-
-        return joinContent(updatedLines, split.trailingNewline, { forceTrailingNewline: true })
+        return null
     }
 
-    const starts = findMatchingStarts(split.lines, oldLines, {
-        startIndex: contextStart,
-        preferEnd: hunk.isEndOfFile,
-    })
-    const startIndex = resolveStartIndex(starts, hunk.sourceStart, file, hunk.header)
+    const exact = runPass((line, pat) => line === pat)
+    if (exact !== null) return exact
 
-    const updatedLines = [
-        ...split.lines.slice(0, startIndex),
-        ...newLines,
-        ...split.lines.slice(startIndex + oldLines.length),
-    ]
+    const trimEnd = runPass((line, pat) => line.trimEnd() === pat.trimEnd())
+    if (trimEnd !== null) return trimEnd
 
-    return joinContent(updatedLines, split.trailingNewline, { forceTrailingNewline: true })
+    const trimBoth = runPass((line, pat) => line.trim() === pat.trim())
+    if (trimBoth !== null) return trimBoth
+
+    return runPass(
+        (line, pat) => normalizeUnicodeForLooseMatch(line) === normalizeUnicodeForLooseMatch(pat),
+    )
+}
+
+function computeReplacements(
+    originalLines: string[],
+    filePath: string,
+    chunks: UpdateFileChunk[],
+): Replacement[] {
+    const replacements: Replacement[] = []
+    let lineIndex = 0
+
+    for (const chunk of chunks) {
+        if (chunk.changeContext) {
+            const ctx = seekSequence(originalLines, [chunk.changeContext], lineIndex, false)
+            if (ctx === null) {
+                throw new Error(`Failed to find context "${chunk.changeContext}" in ${filePath}`)
+            }
+            lineIndex = ctx + 1
+        }
+
+        if (chunk.oldLines.length === 0) {
+            const insertionIdx =
+                originalLines.length > 0 && originalLines[originalLines.length - 1] === ''
+                    ? originalLines.length - 1
+                    : originalLines.length
+            replacements.push({
+                start: insertionIdx,
+                oldLen: 0,
+                newLines: [...chunk.newLines],
+            })
+            continue
+        }
+
+        let pattern = [...chunk.oldLines]
+        let nextLines = [...chunk.newLines]
+
+        let found = seekSequence(originalLines, pattern, lineIndex, chunk.isEndOfFile)
+
+        if (found === null && pattern.length > 0 && pattern[pattern.length - 1] === '') {
+            pattern = pattern.slice(0, -1)
+            if (nextLines.length > 0 && nextLines[nextLines.length - 1] === '') {
+                nextLines = nextLines.slice(0, -1)
+            }
+            found = seekSequence(originalLines, pattern, lineIndex, chunk.isEndOfFile)
+        }
+
+        if (found === null) {
+            throw new Error(
+                `Failed to find expected lines in ${filePath}:\n${chunk.oldLines.join('\n')}`,
+            )
+        }
+
+        replacements.push({
+            start: found,
+            oldLen: pattern.length,
+            newLines: nextLines,
+        })
+        lineIndex = found + pattern.length
+    }
+
+    replacements.sort((a, b) => a.start - b.start)
+    return replacements
+}
+
+function applyReplacements(originalLines: string[], replacements: Replacement[]): string[] {
+    const next = [...originalLines]
+
+    for (const replacement of [...replacements].reverse()) {
+        next.splice(replacement.start, replacement.oldLen, ...replacement.newLines)
+    }
+
+    return next
 }
 
 function ensureWritable(absPath: string) {
@@ -529,80 +466,123 @@ function ensureWritable(absPath: string) {
     }
 }
 
+async function deriveUpdatedContent(filePath: string, chunks: UpdateFileChunk[]): Promise<string> {
+    const originalContent = await readFile(filePath, 'utf8')
+    const originalLines = splitLines(originalContent)
+    const replacements = computeReplacements(originalLines, filePath, chunks)
+    const newLines = applyReplacements(originalLines, replacements)
+
+    if (newLines.length === 0 || newLines[newLines.length - 1] !== '') {
+        newLines.push('')
+    }
+
+    return newLines.join('\n')
+}
+
+function renderSummary(affected: AffectedPaths): string {
+    const lines = ['Success. Updated the following files:']
+    for (const path of affected.added) {
+        lines.push(`A ${path}`)
+    }
+    for (const path of affected.modified) {
+        lines.push(`M ${path}`)
+    }
+    for (const path of affected.deleted) {
+        lines.push(`D ${path}`)
+    }
+    return lines.join('\n')
+}
+
 export const applyPatchTool = defineMcpTool<ApplyPatchInput>({
     name: 'apply_patch',
-    description: `Apply a structured patch.
+    description: `Apply file edits using Codex-style patch format.
 
-Required envelope:
+Patch envelope:
 *** Begin Patch
-...operations...
+... one or more operations ...
 *** End Patch
 
-Supported operations:
+Operations:
 1) Add file
-*** Add File: path/to/file.ts
-+line 1
-+line 2
+*** Add File: path/to/file
++line
 
-2) Update file (with optional move)
-*** Update File: path/to/file.ts
-*** Move to: path/to/new-file.ts
-@@ -3,2 +3,2 @@
--old line
-+new line
+2) Delete file
+*** Delete File: path/to/file
 
-3) Delete file
-*** Delete File: path/to/file.ts
+3) Update file (optional rename)
+*** Update File: path/to/file
+*** Move to: path/to/new-file
+@@ optional context
+-removed
++added
+*** End of File (optional)
 
-Update hunks may use "@@", "@@ <context>", or "@@ -start,count +start,count @@" headers.
-Hunk body lines must start with " ", "+", or "-".`,
+Hunk lines must begin with one of: " ", "+", "-".`,
     inputSchema: APPLY_PATCH_INPUT_SCHEMA,
     supportsParallelToolCalls: false,
     isMutating: true,
     execute: async (input) => {
         try {
-            const operations = parsePatch(input.input)
+            const hunks = parsePatch(input.input)
 
-            for (const op of operations) {
-                if (op.type === 'add') {
-                    const filePath = normalizePath(op.file)
+            if (hunks.length === 0) {
+                throw new Error('No files were modified.')
+            }
+
+            const affected: AffectedPaths = {
+                added: [],
+                modified: [],
+                deleted: [],
+            }
+
+            for (const hunk of hunks) {
+                if (hunk.type === 'add') {
+                    const filePath = normalizePath(hunk.path)
                     ensureWritable(filePath)
+
                     await mkdir(dirname(filePath), { recursive: true })
-                    const content = op.lines.length > 0 ? `${op.lines.join('\n')}\n` : ''
-                    await writeFile(filePath, content, 'utf8')
+                    await writeFile(filePath, hunk.contents, 'utf8')
+                    affected.added.push(filePath)
                     continue
                 }
 
-                if (op.type === 'delete') {
-                    const filePath = normalizePath(op.file)
+                if (hunk.type === 'delete') {
+                    const filePath = normalizePath(hunk.path)
                     ensureWritable(filePath)
+
                     await rm(filePath)
+                    affected.deleted.push(filePath)
                     continue
                 }
 
-                const filePath = normalizePath(op.file)
-                ensureWritable(filePath)
-                let content = await readFile(filePath, 'utf8')
-                for (const hunk of op.hunks) {
-                    content = applyHunkByReplace(content, hunk, filePath)
-                }
+                const sourcePath = normalizePath(hunk.path)
+                ensureWritable(sourcePath)
 
-                if (op.moveTo) {
-                    const targetPath = normalizePath(op.moveTo)
+                const updatedContent = await deriveUpdatedContent(sourcePath, hunk.chunks)
+
+                if (hunk.moveTo) {
+                    const targetPath = normalizePath(hunk.moveTo)
                     ensureWritable(targetPath)
+
                     await mkdir(dirname(targetPath), { recursive: true })
-                    await writeFile(targetPath, content, 'utf8')
-                    if (targetPath !== filePath) {
-                        await rm(filePath)
+                    await writeFile(targetPath, updatedContent, 'utf8')
+
+                    if (targetPath !== sourcePath) {
+                        await rm(sourcePath)
                     }
+
+                    affected.modified.push(targetPath)
                 } else {
-                    await writeFile(filePath, content, 'utf8')
+                    await writeFile(sourcePath, updatedContent, 'utf8')
+                    affected.modified.push(sourcePath)
                 }
             }
 
-            return textResult(`apply_patch succeeded (${operations.length} operations)`)
+            return textResult(renderSummary(affected))
         } catch (err) {
-            return textResult(`apply_patch failed: ${(err as Error).message}`, true)
+            const message = (err as Error).message || String(err)
+            return textResult(`apply_patch failed: ${withHint(message)}`, true)
         }
     },
 })
