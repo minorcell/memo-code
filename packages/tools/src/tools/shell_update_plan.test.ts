@@ -21,6 +21,19 @@ describe('shell wrappers and update_plan', () => {
         assert.ok(text.includes('shell-wrapper-ok'))
     })
 
+    test('shell tool quotes dangerous shell metacharacters in argv', async () => {
+        const literal = '$HOME $(echo hacked);`date`'
+        const result = await shellTool.execute({
+            command: ['printf', '%s', literal],
+        })
+
+        const text = textPayload(result)
+        assert.ok(!result.isError)
+        assert.ok(text.includes(literal))
+        assert.ok(text.includes('$(echo hacked)'))
+        assert.ok(text.includes('`date`'))
+    })
+
     test('shell tool blocks dangerous argv command', async () => {
         const result = await shellTool.execute({
             command: ['mkfs.ext4', '/dev/sda'],

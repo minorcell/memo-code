@@ -16,13 +16,16 @@ const SHELL_INPUT_SCHEMA = z
 
 type ShellInput = z.infer<typeof SHELL_INPUT_SCHEMA>
 
+const SAFE_SHELL_ARG = /^[A-Za-z0-9_./:@%+-]+$/
+
+function shellQuote(part: string) {
+    if (part.length === 0) return "''"
+    if (SAFE_SHELL_ARG.test(part)) return part
+    return `'${part.replace(/'/g, `'\"'\"'`)}'`
+}
+
 function shellJoin(argv: string[]) {
-    return argv
-        .map((part) => {
-            if (/^[A-Za-z0-9_./:@%+-]+$/.test(part)) return part
-            return JSON.stringify(part)
-        })
-        .join(' ')
+    return argv.map((part) => shellQuote(part)).join(' ')
 }
 
 export const shellTool = defineMcpTool<ShellInput>({
