@@ -38,6 +38,10 @@ export type ResolvedToolPermission = {
     approvalMode: 'auto' | 'strict'
 }
 
+function writeStructuredError(payload: Record<string, unknown>) {
+    process.stderr.write(`${JSON.stringify(payload)}\n`)
+}
+
 export function resolveToolPermission(options: AgentSessionOptions): ResolvedToolPermission {
     if (options.toolPermissionMode === 'none') {
         return {
@@ -122,7 +126,12 @@ export async function emitEventToSinks(event: HistoryEvent, sinks: HistorySink[]
         try {
             await sink.append(event)
         } catch (err) {
-            console.error(`Failed to write history event: ${(err as Error).message}`)
+            writeStructuredError({
+                level: 'error',
+                event: 'history_sink_append_failed',
+                sink: sink.constructor?.name || 'anonymous_sink',
+                message: (err as Error).message,
+            })
         }
     }
 }

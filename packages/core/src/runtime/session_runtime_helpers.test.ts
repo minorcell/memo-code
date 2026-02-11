@@ -1,5 +1,10 @@
-import { describe, expect, test } from 'vitest'
-import { accumulateUsage, emptyUsage } from '@memo/core/runtime/session_runtime_helpers'
+import { describe, expect, test, vi } from 'vitest'
+import type { HistorySink } from '@memo/core/types'
+import {
+    accumulateUsage,
+    emitEventToSinks,
+    emptyUsage,
+} from '@memo/core/runtime/session_runtime_helpers'
 
 describe('accumulateUsage', () => {
     test('uses explicit total when provided', () => {
@@ -12,5 +17,44 @@ describe('accumulateUsage', () => {
         const usage = emptyUsage()
         accumulateUsage(usage, { prompt: 2, completion: 3 })
         expect(usage).toEqual({ prompt: 2, completion: 3, total: 5 })
+    })
+})
+
+describe('emitEventToSinks', () => {
+    test('writes structured error payload to stderr when sink append fails', async () => {
+        const writes: string[] = []
+        const writeSpy = vi
+            .spyOn(process.stderr, 'write')
+            .mockImplementation(((chunk: unknown) => {
+                writes.push(String(chunk))
+                return true
+            }) as typeof process.stderr.write)
+
+        const failingSink: HistorySink = {
+            append: async () => {
+                throw new Error('disk full')
+            },
+        }
+
+        try {
+            await emitEventToSinks(
+                {
+                    ts: '2026-01-01T00:00:00.000Z',
+                    sessionId: 's-1',
+                    type: 'assistant',
+                    content: 'hello',
+                },
+                [failingSink],
+            )
+        } finally {
+            writeSpy.mockRestore()
+        }
+
+        expect(writes.length).toBeGreaterThan(0)
+        const parsed = JSON.parse(writes.join('').trim()) as Record<string, unknown>
+        expect(parsed.level).toBe('error')
+        expect(parsed.event).toBe('history_sink_append_failed')
+        expect(parsed.message).toBe('disk full')
+        expect(parsed.sink).toBe('Object')
     })
 })
