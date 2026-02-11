@@ -21,6 +21,7 @@ import {
     moveCursorVertical,
     type EditorBuffer,
 } from './composer_input'
+import { resolveDeleteKind } from './composer_keys'
 import { PasteBurst, type PasteBurstFlushResult } from './paste_burst'
 import {
     CONTEXT_LIMIT_CHOICES,
@@ -608,14 +609,14 @@ export function Composer({
         const hasSuggestions = mode !== 'none'
         const canNavigate = hasSuggestions && items.length > 0
 
+        const deleteKind = resolveDeleteKind(input, key)
         const hasCtrlOrMeta = Boolean(key.ctrl || key.meta)
         const isPlainInputChar =
             Boolean(input) &&
             !hasCtrlOrMeta &&
             !key.return &&
             !key.tab &&
-            !key.backspace &&
-            !key.delete &&
+            deleteKind === 'none' &&
             !key.escape &&
             !key.upArrow &&
             !key.downArrow &&
@@ -868,11 +869,12 @@ export function Composer({
             return
         }
 
-        if (key.backspace || key.delete) {
+        if (deleteKind !== 'none') {
             const current = editorRef.current
-            const next = key.backspace
-                ? backspaceAtCursor(current.value, current.cursor)
-                : deleteAtCursor(current.value, current.cursor)
+            const next =
+                deleteKind === 'backspace'
+                    ? backspaceAtCursor(current.value, current.cursor)
+                    : deleteAtCursor(current.value, current.cursor)
             preferredColumnRef.current = null
             commitEditor(next, true)
             return
