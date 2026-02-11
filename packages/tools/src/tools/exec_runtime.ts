@@ -193,6 +193,14 @@ class UnifiedExecManager {
         }
     }
 
+    private activeSessionCount() {
+        let count = 0
+        for (const session of this.sessions.values()) {
+            if (!session.exited) count += 1
+        }
+        return count
+    }
+
     private async terminateForTimeout(session: SessionState) {
         if (session.exited) return
         session.proc.kill('SIGTERM')
@@ -207,6 +215,11 @@ class UnifiedExecManager {
         const cmd = request.cmd.trim()
         if (!cmd) {
             throw new Error('cmd must not be empty')
+        }
+
+        this.cleanupSessions()
+        if (this.activeSessionCount() >= MAX_SESSIONS) {
+            throw new Error(`too many active sessions (max ${MAX_SESSIONS})`)
         }
 
         const blocked = guardDangerousCommand({

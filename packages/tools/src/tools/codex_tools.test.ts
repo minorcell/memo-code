@@ -154,6 +154,20 @@ describe('codex shell family', () => {
         assert.ok(nextChunk.length > 0, `expected unread tail, got: ${nextText}`)
         assert.ok(nextChunk.includes('X'))
     })
+
+    test('exec_command rejects when active session cap is exceeded', async () => {
+        const results = []
+        for (let i = 0; i < 70; i += 1) {
+            results.push(await execCommandTool.execute({ cmd: 'sleep 2', yield_time_ms: 0 }))
+        }
+        const overflow = results.find(
+            (result) => result.isError && textPayload(result).includes('too many active sessions'),
+        )
+        assert.ok(overflow, 'expected active-session cap error')
+
+        // Allow spawned sessions to exit before subsequent tests.
+        await new Promise((resolve) => setTimeout(resolve, 2200))
+    })
 })
 
 describe('codex file/search family', () => {
