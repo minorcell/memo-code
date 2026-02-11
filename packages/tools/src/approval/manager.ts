@@ -13,9 +13,10 @@ import { generateFingerprint } from './fingerprint'
 import { ALWAYS_AUTO_APPROVE_TOOLS } from './constants'
 
 interface ApprovalCache {
-    session: Set<ApprovalKey>
-    once: Set<ApprovalKey>
-    denied: Set<ApprovalKey>
+    sessionTools: Set<string>
+    onceTools: Set<string>
+    deniedTools: Set<string>
+    toolByFingerprint: Map<ApprovalKey, string>
 }
 
 function buildApprovalReason(toolName: string): string {
@@ -41,9 +42,10 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
     const classifier = createToolClassifier({ customLevels: toolRiskLevels })
 
     const cache: ApprovalCache = {
-        session: new Set(),
-        once: new Set(),
-        denied: new Set(),
+        sessionTools: new Set(),
+        onceTools: new Set(),
+        deniedTools: new Set(),
+        toolByFingerprint: new Map(),
     }
 
     return {
@@ -67,12 +69,13 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
             }
 
             const fingerprint = generateFingerprint(toolName, params)
+            cache.toolByFingerprint.set(fingerprint, toolName)
 
-            if (cache.session.has(fingerprint) || cache.once.has(fingerprint)) {
+            if (cache.sessionTools.has(toolName) || cache.onceTools.has(toolName)) {
                 return { needApproval: false, decision: 'auto-execute' }
             }
 
-            if (cache.denied.has(fingerprint)) {
+            if (cache.deniedTools.has(toolName)) {
                 return {
                     needApproval: true,
                     fingerprint,
@@ -94,35 +97,41 @@ export function createApprovalManager(config?: ApprovalManagerConfig): ApprovalM
         },
 
         recordDecision(fingerprint: ApprovalKey, decision: ApprovalDecision): void {
-            cache.session.delete(fingerprint)
-            cache.once.delete(fingerprint)
-            cache.denied.delete(fingerprint)
+            const toolName = cache.toolByFingerprint.get(fingerprint)
+            if (!toolName) return
+
+            cache.sessionTools.delete(toolName)
+            cache.onceTools.delete(toolName)
+            cache.deniedTools.delete(toolName)
 
             switch (decision) {
                 case 'session':
-                    cache.session.add(fingerprint)
+                    cache.sessionTools.add(toolName)
                     break
                 case 'once':
-                    cache.once.add(fingerprint)
+                    cache.onceTools.add(toolName)
                     break
                 case 'deny':
-                    cache.denied.add(fingerprint)
+                    cache.deniedTools.add(toolName)
                     break
             }
         },
 
         isGranted(fingerprint: ApprovalKey): boolean {
-            return cache.session.has(fingerprint) || cache.once.has(fingerprint)
+            const toolName = cache.toolByFingerprint.get(fingerprint)
+            if (!toolName) return false
+            return cache.sessionTools.has(toolName) || cache.onceTools.has(toolName)
         },
 
         clearOnceApprovals(): void {
-            cache.once.clear()
+            cache.onceTools.clear()
         },
 
         dispose(): void {
-            cache.session.clear()
-            cache.once.clear()
-            cache.denied.clear()
+            cache.sessionTools.clear()
+            cache.onceTools.clear()
+            cache.deniedTools.clear()
+            cache.toolByFingerprint.clear()
         },
     }
 }
