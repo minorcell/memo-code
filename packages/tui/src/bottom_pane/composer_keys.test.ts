@@ -7,8 +7,13 @@ describe('composer_keys', () => {
         assert.strictEqual(resolveDeleteKind('', { backspace: true, delete: true }), 'backspace')
     })
 
-    test('maps delete flag to forward delete when no backspace signals', () => {
-        assert.strictEqual(resolveDeleteKind('', { delete: true }), 'delete')
+    test('treats delete flag as backspace by default (ink compatibility)', () => {
+        assert.strictEqual(resolveDeleteKind('', { delete: true }), 'backspace')
+    })
+
+    test('supports forward delete via modified delete key', () => {
+        assert.strictEqual(resolveDeleteKind('', { delete: true, ctrl: true }), 'delete')
+        assert.strictEqual(resolveDeleteKind('', { delete: true, meta: true }), 'delete')
     })
 
     test('treats DEL control char as backspace', () => {
