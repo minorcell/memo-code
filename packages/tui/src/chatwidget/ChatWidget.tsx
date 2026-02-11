@@ -19,10 +19,21 @@ type ChatWidgetProps = {
     historicalTurns: TurnView[]
 }
 
-type StaticItem =
-    | { type: 'header'; data: HeaderInfo }
-    | { type: 'system'; data: SystemMessage }
-    | { type: 'turn'; data: TurnView }
+type HeaderStaticItem = { type: 'header'; data: HeaderInfo }
+type HistoryStaticItem = SystemMessage | TurnView
+type StaticItem = HeaderStaticItem | HistoryStaticItem
+
+function itemSequence(item: HistoryStaticItem): number {
+    return item.sequence ?? 0
+}
+
+function isHeaderItem(item: StaticItem): item is HeaderStaticItem {
+    return (item as HeaderStaticItem).type === 'header'
+}
+
+function isSystemItem(item: HistoryStaticItem): item is SystemMessage {
+    return (item as SystemMessage).id !== undefined
+}
 
 export const ChatWidget = memo(function ChatWidget({
     header,
@@ -39,33 +50,27 @@ export const ChatWidget = memo(function ChatWidget({
     const completedTurns = lastTurnComplete ? allTurns : allTurns.slice(0, -1)
     const inProgressTurn = lastTurnComplete ? undefined : lastTurn
 
-    const staticItems: StaticItem[] = [{ type: 'header', data: header }]
+    const headerItem = useMemo<HeaderStaticItem>(() => ({ type: 'header', data: header }), [header])
 
-    const sorted = [
-        ...systemMessages.map((message) => ({
-            type: 'system' as const,
-            sequence: message.sequence,
-            data: message,
-        })),
-        ...completedTurns.map((turn) => ({
-            type: 'turn' as const,
-            sequence: turn.sequence ?? 0,
-            data: turn,
-        })),
-    ].sort((a, b) => a.sequence - b.sequence)
+    const historyItems = useMemo<HistoryStaticItem[]>(() => {
+        const items: HistoryStaticItem[] = [...systemMessages, ...completedTurns]
+        items.sort((a, b) => itemSequence(a) - itemSequence(b))
+        return items
+    }, [completedTurns, systemMessages])
 
-    for (const item of sorted) {
-        staticItems.push(item)
-    }
+    const staticItems = useMemo<StaticItem[]>(
+        () => [headerItem, ...historyItems],
+        [headerItem, historyItems],
+    )
 
     return (
         <Box flexDirection="column">
             <Static items={staticItems}>
                 {(item) => {
-                    if (item.type === 'header') {
+                    if (isHeaderItem(item)) {
                         return (
                             <Box
-                                key="header"
+                                key={`header-${item.data.sessionId}`}
                                 borderStyle="round"
                                 borderColor="blue"
                                 paddingX={1}
@@ -84,14 +89,14 @@ export const ChatWidget = memo(function ChatWidget({
                         )
                     }
 
-                    if (item.type === 'system') {
-                        return <SystemCell key={item.data.id} message={item.data} />
+                    if (isSystemItem(item)) {
+                        return <SystemCell key={item.id} message={item} />
                     }
 
                     return (
                         <TurnCell
-                            key={`turn-${item.data.index}`}
-                            turn={item.data}
+                            key={`turn-${item.sequence ?? item.index}`}
+                            turn={item}
                             cwd={header.cwd}
                         />
                     )

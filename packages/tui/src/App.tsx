@@ -740,6 +740,24 @@ Keep the result concise and actionable.`
 
     const tokenLine = formatTokenUsage(timeline.turns[timeline.turns.length - 1]?.tokenUsage)
     const contextPercent = calculateContextPercent(currentContextTokens, contextLimit)
+    const chatHeader = useMemo(
+        () => ({
+            providerName: currentProvider,
+            model: currentModel,
+            cwd,
+            sessionId: sessionOptionsState.sessionId ?? 'unknown',
+            mcpNames: activeMcpServerNames,
+            version: localPackageInfo?.version ?? 'unknown',
+        }),
+        [
+            activeMcpServerNames,
+            currentModel,
+            currentProvider,
+            cwd,
+            localPackageInfo?.version,
+            sessionOptionsState.sessionId,
+        ],
+    )
 
     if (exitMessage) {
         return (
@@ -775,14 +793,7 @@ Keep the result concise and actionable.`
     return (
         <Box flexDirection="column">
             <ChatWidget
-                header={{
-                    providerName: currentProvider,
-                    model: currentModel,
-                    cwd,
-                    sessionId: sessionOptionsState.sessionId ?? 'unknown',
-                    mcpNames: activeMcpServerNames,
-                    version: localPackageInfo?.version ?? 'unknown',
-                }}
+                header={chatHeader}
                 systemMessages={timeline.systemMessages}
                 turns={timeline.turns}
                 historicalTurns={timeline.historicalTurns}
