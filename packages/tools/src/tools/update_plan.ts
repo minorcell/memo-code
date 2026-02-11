@@ -32,6 +32,13 @@ export const updatePlanTool = defineMcpTool<UpdatePlanInput>({
             return textResult('At most one step can be in_progress at a time', true)
         }
 
+        if (plan.length < 4) {
+            const step = plan[0]?.step ?? ''
+            return textResult(
+                `<system_hint tool="update_plan" reason="simple_task">Task "${step}" is simple (${plan.length} step${plan.length > 1 ? 's' : ''}) - execute directly without update_plan.</system_hint>`,
+            )
+        }
+
         currentPlan = plan
 
         return textResult(

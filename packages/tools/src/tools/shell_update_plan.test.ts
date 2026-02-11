@@ -63,9 +63,35 @@ describe('shell wrappers and update_plan', () => {
         assert.ok(textPayload(result).includes('session_id 999999 not found'))
     })
 
-    test('update_plan accepts one in_progress item', async () => {
+    test('update_plan rejects 1-step task', async () => {
         const result = await updatePlanTool.execute({
-            explanation: 'working plan',
+            explanation: 'simple task',
+            plan: [{ step: 'read_file package.json', status: 'pending' }],
+        })
+
+        const text = textPayload(result)
+        assert.ok(text.startsWith('<system_hint '))
+        assert.ok(text.includes('tool="update_plan"'))
+        assert.ok(text.includes('reason="simple_task"'))
+        assert.ok(text.includes('1 step'))
+    })
+
+    test('update_plan rejects 2-step task', async () => {
+        const result = await updatePlanTool.execute({
+            explanation: '2-step task',
+            plan: [
+                { step: 'step one', status: 'pending' },
+                { step: 'step two', status: 'pending' },
+            ],
+        })
+
+        const text = textPayload(result)
+        assert.ok(text.includes('2 steps'))
+    })
+
+    test('update_plan rejects 3-step task', async () => {
+        const result = await updatePlanTool.execute({
+            explanation: '3-step task',
             plan: [
                 { step: 'step one', status: 'completed' },
                 { step: 'step two', status: 'in_progress' },
@@ -73,9 +99,36 @@ describe('shell wrappers and update_plan', () => {
             ],
         })
 
+        const text = textPayload(result)
+        assert.ok(text.includes('3 steps'))
+    })
+
+    test('update_plan accepts 4-step task', async () => {
+        const result = await updatePlanTool.execute({
+            explanation: 'complex task',
+            plan: [
+                { step: 'step one', status: 'pending' },
+                { step: 'step two', status: 'pending' },
+                { step: 'step three', status: 'pending' },
+                { step: 'step four', status: 'pending' },
+            ],
+        })
+
         assert.ok(!result.isError)
         const parsed = JSON.parse(textPayload(result))
         assert.strictEqual(parsed.message, 'Plan updated')
-        assert.strictEqual(parsed.plan[1].status, 'in_progress')
+    })
+
+    test('update_plan rejects too many in_progress', async () => {
+        const result = await updatePlanTool.execute({
+            explanation: 'invalid plan',
+            plan: [
+                { step: 'step one', status: 'in_progress' },
+                { step: 'step two', status: 'in_progress' },
+            ],
+        })
+
+        assert.ok(result.isError)
+        assert.ok(textPayload(result).includes('At most one step can be in_progress'))
     })
 })
