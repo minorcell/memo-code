@@ -45,7 +45,7 @@ export function isWritePathAllowed(absPath: string) {
 export function writePathDenyReason(absPath: string) {
     if (isWritePathAllowed(absPath)) return null
     const roots = getWritableRoots()
-    return `sandbox 拒绝写入: ${absPath} 不在允许目录内 (${roots.join(', ')})`
+    return `sandbox write denied: ${absPath} is not within allowed directories (${roots.join(', ')})`
 }
 
 export const DEFAULT_IGNORE_PATTERNS = [

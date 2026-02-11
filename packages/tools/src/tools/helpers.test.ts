@@ -2,7 +2,7 @@ import assert from 'node:assert'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, test } from 'vitest'
-import { normalizePath, isWritePathAllowed } from '@memo/tools/tools/helpers'
+import { normalizePath, isWritePathAllowed, writePathDenyReason } from '@memo/tools/tools/helpers'
 
 describe('helpers.normalizePath', () => {
     test('normalizes relative paths to absolute', () => {
@@ -33,6 +33,9 @@ describe('helpers.sandbox', () => {
         try {
             const outside = normalizePath('/etc/passwd')
             assert.strictEqual(isWritePathAllowed(outside), false)
+            const reason = writePathDenyReason(outside) ?? ''
+            assert.ok(reason.includes('sandbox write denied'))
+            assert.ok(reason.includes('is not within allowed directories'))
         } finally {
             if (prev === undefined) delete process.env.MEMO_SANDBOX_WRITABLE_ROOTS
             else process.env.MEMO_SANDBOX_WRITABLE_ROOTS = prev

@@ -181,7 +181,7 @@ describe('apply_patch tool (direct replace)', () => {
 
         assertPatchError(result)
         const text = textPayload(result)
-        assert.ok(text.includes('sandbox') || text.includes('不在允许目录'))
+        assert.ok(text.includes('sandbox write denied'))
         await rm(outside, { force: true })
     })
 })
