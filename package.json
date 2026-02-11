@@ -1,6 +1,6 @@
 {
     "name": "@memo-code/memo",
-    "version": "0.6.55",
+    "version": "0.7.0",
     "private": false,
     "type": "module",
     "description": "A lightweight coding agent that runs in your terminal",
