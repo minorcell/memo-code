@@ -10,6 +10,21 @@ function repeat(str: string, count: number): string {
     return str.repeat(Math.max(0, count))
 }
 
+function formatThinkDisplayLines(content: string): string[] {
+    const lines = content.split('\n')
+    if (lines.length === 0) return ['Think:']
+
+    let firstIndex = lines.findIndex((line) => line.trim().length > 0)
+    if (firstIndex < 0) firstIndex = 0
+
+    return lines.map((line, index) => {
+        if (index === firstIndex) {
+            return `Think: ${line}`
+        }
+        return line
+    })
+}
+
 function CodeBlock({ language, content }: { language?: string; content: string }) {
     const langLabel = language ? `[${language}] ` : ''
     const lines = content.split('\n')
@@ -100,9 +115,9 @@ function renderBlock(node: MarkdownBlock, key: string) {
         case 'think': {
             return (
                 <Box key={key} flexDirection="column" marginY={1}>
-                    {node.content.split('\n').map((line, index) => (
+                    {formatThinkDisplayLines(node.content).map((line, index) => (
                         <Text key={index} color="gray" dimColor>
-                            │ Think: {line}
+                            {line}
                         </Text>
                     ))}
                 </Box>
@@ -162,4 +177,8 @@ export function MarkdownRenderer({ content }: { content: string }) {
             {nodes.map((node, index) => renderBlock(node, `${node.type}-${index}`))}
         </Box>
     )
+}
+
+export const MARKDOWN_RENDERER_TEST_EXPORTS = {
+    formatThinkDisplayLines,
 }
