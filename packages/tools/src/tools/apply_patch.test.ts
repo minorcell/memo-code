@@ -28,10 +28,6 @@ function textPayload(result: { content?: Array<{ type: string; text?: string }> 
     return first?.text ?? ''
 }
 
-async function runPatch(input: string) {
-    return applyPatchTool.execute({ input })
-}
-
 function assertPatchOk(result: {
     isError?: boolean
     content?: Array<{ type: string; text?: string }>
@@ -65,254 +61,127 @@ afterAll(async () => {
     await rm(tempDir, { recursive: true, force: true })
 })
 
-describe('apply_patch tool (codex-aligned)', () => {
-    test('rejects malformed patch header', async () => {
-        const result = await runPatch('*** Bad Patch\n')
-        assertPatchError(result, 'first line of the patch must be')
-    })
+describe('apply_patch tool (direct replace)', () => {
+    test('replace first match by default', async () => {
+        const target = join(tempDir, 'single.txt')
+        await writeFile(target, 'foo bar foo', 'utf8')
 
-    test('rejects missing end marker', async () => {
-        const target = join(tempDir, 'missing-end.txt')
-        const patch = `*** Begin Patch\n*** Add File: ${target}\n+x`
-        const result = await runPatch(patch)
-        assertPatchError(result, 'last line of the patch must be')
-    })
-
-    test('rejects unknown hunk header with line number', async () => {
-        const patch = `*** Begin Patch\n*** Unknown Op: x\n*** End Patch\n`
-        const result = await runPatch(patch)
-        assertPatchError(result, 'line 2')
-        assertPatchError(result, 'not a valid hunk header')
-    })
-
-    test('returns error when patch contains no operations', async () => {
-        const result = await runPatch('*** Begin Patch\n*** End Patch\n')
-        assertPatchError(result, 'No files were modified')
-    })
-
-    test('adds file with + lines', async () => {
-        const target = join(tempDir, 'add.txt')
-        const patch = `*** Begin Patch\n*** Add File: ${target}\n+alpha\n+beta\n*** End Patch\n`
-        const result = await runPatch(patch)
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            old_string: 'foo',
+            new_string: 'baz',
+        })
 
         assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'alpha\nbeta\n')
+        assert.strictEqual(await readText(target), 'baz bar foo')
+        assert.ok(textPayload(result).includes('Replacements: 1'))
     })
 
-    test('supports empty add file body', async () => {
-        const target = join(tempDir, 'empty-add.txt')
-        const patch = `*** Begin Patch\n*** Add File: ${target}\n*** End Patch\n`
-        const result = await runPatch(patch)
+    test('replace all matches when replace_all is true', async () => {
+        const target = join(tempDir, 'replace-all.txt')
+        await writeFile(target, 'x y x y', 'utf8')
+
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            old_string: 'y',
+            new_string: 'z',
+            replace_all: true,
+        })
 
         assertPatchOk(result)
-        assert.strictEqual(await readText(target), '')
+        assert.strictEqual(await readText(target), 'x z x z')
+        assert.ok(textPayload(result).includes('Replacements: 2'))
     })
 
-    test('deletes a file', async () => {
-        const target = join(tempDir, 'delete-me.txt')
-        await writeFile(target, 'hello\n', 'utf8')
+    test('supports batch edits in one call', async () => {
+        const target = join(tempDir, 'batch.txt')
+        await writeFile(target, 'alpha beta gamma beta', 'utf8')
 
-        const patch = `*** Begin Patch\n*** Delete File: ${target}\n*** End Patch\n`
-        const result = await runPatch(patch)
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            edits: [
+                { old_string: 'alpha', new_string: 'A' },
+                { old_string: 'beta', new_string: 'B', replace_all: true },
+                { old_string: 'gamma', new_string: 'G' },
+            ],
+        })
 
         assertPatchOk(result)
-        assert.strictEqual(await readText(target), '')
+        assert.strictEqual(await readText(target), 'A B G B')
+        assert.ok(textPayload(result).includes('Edits: 3'))
+        assert.ok(textPayload(result).includes('Replacements: 4'))
     })
 
-    test('returns error when deleting directory path', async () => {
-        const dirPath = join(tempDir, 'delete-dir')
-        await mkdir(dirPath, { recursive: true })
+    test('fails batch edits atomically when one edit is missing', async () => {
+        const target = join(tempDir, 'batch-atomic.txt')
+        await writeFile(target, 'foo bar baz', 'utf8')
 
-        const patch = `*** Begin Patch\n*** Delete File: ${dirPath}\n*** End Patch\n`
-        const result = await runPatch(patch)
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            edits: [
+                { old_string: 'foo', new_string: 'FOO' },
+                { old_string: 'not-found', new_string: 'X' },
+            ],
+        })
 
-        assertPatchError(result)
+        assertPatchError(result, 'target text not found at edit 2')
+        assert.strictEqual(await readText(target), 'foo bar baz')
     })
 
-    test('updates file with exact match', async () => {
-        const target = join(tempDir, 'update-exact.txt')
-        await writeFile(target, 'before\nhello\nafter\n', 'utf8')
+    test('returns error when target text is missing', async () => {
+        const target = join(tempDir, 'missing-target.txt')
+        await writeFile(target, 'hello world', 'utf8')
 
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n before\n-hello\n+world\n*** End Patch\n`
-        const result = await runPatch(patch)
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            old_string: 'xxx',
+            new_string: 'yyy',
+        })
+
+        assertPatchError(result, 'target text not found')
+        assert.strictEqual(await readText(target), 'hello world')
+    })
+
+    test('returns no changes when replacement results in identical content', async () => {
+        const target = join(tempDir, 'no-change.txt')
+        await writeFile(target, 'same', 'utf8')
+
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            old_string: 'same',
+            new_string: 'same',
+        })
 
         assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'before\nworld\nafter\n')
+        assert.strictEqual(textPayload(result), 'No changes made.')
+        assert.strictEqual(await readText(target), 'same')
     })
 
-    test('matches old lines with trailing whitespace differences', async () => {
-        const target = join(tempDir, 'rstrip-match.txt')
-        await writeFile(target, 'value   \n', 'utf8')
+    test('returns error when file does not exist', async () => {
+        const target = join(tempDir, 'missing.txt')
 
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n-value\n+trimmed\n*** End Patch\n`
-        const result = await runPatch(patch)
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            old_string: 'a',
+            new_string: 'b',
+        })
 
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'trimmed\n')
-    })
-
-    test('matches old lines with leading and trailing whitespace differences', async () => {
-        const target = join(tempDir, 'trim-match.txt')
-        await writeFile(target, '    value   \n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n-value\n+normalized\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'normalized\n')
-    })
-
-    test('matches old lines with normalized unicode punctuation', async () => {
-        const target = join(tempDir, 'unicode-normalized.txt')
-        await writeFile(target, 'import asyncio  # local import – avoids top‑level dep\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n-import asyncio  # local import - avoids top-level dep\n+import asyncio  # changed\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'import asyncio  # changed\n')
-    })
-
-    test('first update chunk may omit @@ context marker', async () => {
-        const target = join(tempDir, 'missing-context-first.txt')
-        await writeFile(target, 'alpha\nbeta\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n-alpha\n+alpha2\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'alpha2\nbeta\n')
-    })
-
-    test('non-first update chunk requires @@ marker', async () => {
-        const target = join(tempDir, 'missing-context-later.txt')
-        await writeFile(target, 'a\nb\nc\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n a\n-b\n+b2\nnot-a-hunk-header\n-c\n+c2\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchError(result, 'expected update hunk to start with "@@"')
-    })
-
-    test('supports @@ <context> targeting', async () => {
-        const target = join(tempDir, 'context-targeting.txt')
-        await writeFile(target, 'fn a\nvalue=1\nfn b\nvalue=2\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@ fn b\n-value=2\n+value=20\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'fn a\nvalue=1\nfn b\nvalue=20\n')
-    })
-
-    test('fails when context hint cannot be found', async () => {
-        const target = join(tempDir, 'context-miss.txt')
-        await writeFile(target, 'a\nb\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@ missing\n-b\n+c\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchError(result, 'Failed to find context')
-    })
-
-    test('supports move + update in one operation', async () => {
-        const source = join(tempDir, 'source.txt')
-        const target = join(tempDir, 'nested', 'target.txt')
-        await writeFile(source, 'hello old\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${source}\n*** Move to: ${target}\n@@\n-hello old\n+hello new\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(source), '')
-        assert.strictEqual(await readText(target), 'hello new\n')
-    })
-
-    test('supports move to same path', async () => {
-        const target = join(tempDir, 'move-same.txt')
-        await writeFile(target, 'old\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n*** Move to: ${target}\n@@\n-old\n+new\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'new\n')
-    })
-
-    test('keeps source unchanged when move target is denied by sandbox', async () => {
-        const source = join(tempDir, 'move-denied-source.txt')
-        const deniedTarget = '/tmp/memo-tools-move-denied-target.txt'
-        await writeFile(source, 'keep-me\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${source}\n*** Move to: ${deniedTarget}\n@@\n-keep-me\n+changed\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchError(result, 'sandbox')
-        assert.strictEqual(await readText(source), 'keep-me\n')
-    })
-
-    test('supports end-of-file pure addition', async () => {
-        const target = join(tempDir, 'append-only.txt')
-        await writeFile(target, 'line-1\nline-2\n', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n+line-3\n*** End of File\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'line-1\nline-2\nline-3\n')
-    })
-
-    test('supports end-of-file replacement and enforces trailing newline', async () => {
-        const target = join(tempDir, 'append-newline.txt')
-        await writeFile(target, 'no newline at end', 'utf8')
-
-        const patch = `*** Begin Patch\n*** Update File: ${target}\n@@\n-no newline at end\n+first line\n+second line\n*** End of File\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'first line\nsecond line\n')
-    })
-
-    test('supports CRLF patch input', async () => {
-        const target = join(tempDir, 'crlf-patch.txt')
-        await writeFile(target, 'before\n', 'utf8')
-
-        const patch = `*** Begin Patch\r\n*** Update File: ${target}\r\n@@\r\n-before\r\n+after\r\n*** End Patch\r\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'after\n')
-    })
-
-    test('supports heredoc-wrapped input (lenient mode)', async () => {
-        const target = join(tempDir, 'heredoc.txt')
-        await writeFile(target, 'a\n', 'utf8')
-
-        const patch = `<<'EOF'\n*** Begin Patch\n*** Update File: ${target}\n@@\n-a\n+b\n*** End Patch\nEOF\n`
-        const result = await runPatch(patch)
-
-        assertPatchOk(result)
-        assert.strictEqual(await readText(target), 'b\n')
-    })
-
-    test('keeps partial updates when later operation fails', async () => {
-        const created = join(tempDir, 'partial-created.txt')
-        const missing = join(tempDir, 'partial-missing.txt')
-
-        const patch = `*** Begin Patch\n*** Add File: ${created}\n+created\n*** Update File: ${missing}\n@@\n-old\n+new\n*** End Patch\n`
-        const result = await runPatch(patch)
-
-        assertPatchError(result)
-        assert.strictEqual(await readText(created), 'created\n')
+        assertPatchError(result, 'file does not exist')
     })
 
     test('denies writes outside writable roots', async () => {
-        const deniedPath = '/tmp/memo-tools-outside-denied.txt'
-        const patch = `*** Begin Patch\n*** Add File: ${deniedPath}\n+blocked\n*** End Patch\n`
-        const result = await runPatch(patch)
+        const outside = '/tmp/memo-tools-apply-patch-outside.txt'
+        await writeFile(outside, 'hello', 'utf8')
+
+        const result = await applyPatchTool.execute({
+            file_path: outside,
+            old_string: 'hello',
+            new_string: 'world',
+        })
 
         assertPatchError(result)
         const text = textPayload(result)
         assert.ok(text.includes('sandbox') || text.includes('不在允许目录'))
+        await rm(outside, { force: true })
     })
 })

@@ -16,13 +16,17 @@ describe('approval manager', () => {
 
         const first = assertNeedApproval(
             manager.check('apply_patch', {
-                input: '*** Begin Patch\n*** End Patch\n',
+                file_path: '/tmp/a.txt',
+                old_string: 'a',
+                new_string: 'b',
             }),
         )
         manager.recordDecision(first.fingerprint, 'session')
 
         const second = manager.check('apply_patch', {
-            input: '*** Begin Patch\n*** Add File: a.txt\n+hello\n*** End Patch\n',
+            file_path: '/tmp/b.txt',
+            old_string: 'x',
+            new_string: 'y',
         })
         assert.strictEqual(second.needApproval, false)
 
@@ -35,20 +39,26 @@ describe('approval manager', () => {
 
         const first = assertNeedApproval(
             manager.check('apply_patch', {
-                input: '*** Begin Patch\n*** End Patch\n',
+                file_path: '/tmp/a.txt',
+                old_string: 'a',
+                new_string: 'b',
             }),
         )
         manager.recordDecision(first.fingerprint, 'once')
 
         const second = manager.check('apply_patch', {
-            input: '*** Begin Patch\n*** Add File: b.txt\n+hello\n*** End Patch\n',
+            file_path: '/tmp/b.txt',
+            old_string: 'x',
+            new_string: 'y',
         })
         assert.strictEqual(second.needApproval, false)
 
         manager.clearOnceApprovals()
 
         const third = manager.check('apply_patch', {
-            input: '*** Begin Patch\n*** Add File: c.txt\n+hello\n*** End Patch\n',
+            file_path: '/tmp/c.txt',
+            old_string: 'k',
+            new_string: 'v',
         })
         assert.strictEqual(third.needApproval, true)
     })
@@ -58,14 +68,18 @@ describe('approval manager', () => {
 
         const first = assertNeedApproval(
             manager.check('apply_patch', {
-                input: '*** Begin Patch\n*** End Patch\n',
+                file_path: '/tmp/a.txt',
+                old_string: 'a',
+                new_string: 'b',
             }),
         )
         manager.recordDecision(first.fingerprint, 'deny')
 
         const second = assertNeedApproval(
             manager.check('apply_patch', {
-                input: '*** Begin Patch\n*** Add File: d.txt\n+hello\n*** End Patch\n',
+                file_path: '/tmp/d.txt',
+                old_string: 'd',
+                new_string: 'e',
             }),
         )
         assert.strictEqual(second.reason, 'This request was previously denied.')

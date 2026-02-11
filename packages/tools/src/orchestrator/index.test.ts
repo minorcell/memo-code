@@ -52,7 +52,11 @@ describe('tool orchestrator', () => {
                 apply_patch: {
                     name: 'apply_patch',
                     validateInput: (input) => {
-                        const schema = z.object({ input: z.string() })
+                        const schema = z.object({
+                            file_path: z.string(),
+                            old_string: z.string(),
+                            new_string: z.string(),
+                        })
                         const parsed = schema.safeParse(input)
                         return parsed.success
                             ? { ok: true, data: parsed.data }
@@ -66,7 +70,10 @@ describe('tool orchestrator', () => {
         })
 
         const result = await orchestrator.executeAction(
-            { name: 'apply_patch', input: { input: '*** Begin Patch\n*** End Patch\n' } },
+            {
+                name: 'apply_patch',
+                input: { file_path: '/tmp/a.txt', old_string: 'a', new_string: 'b' },
+            },
             { requestApproval: async () => 'once' },
         )
 

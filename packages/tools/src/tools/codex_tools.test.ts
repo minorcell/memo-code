@@ -126,24 +126,27 @@ describe('codex shell family', () => {
 })
 
 describe('codex file/search family', () => {
-    test('apply_patch supports add/update/delete flow', async () => {
+    test('apply_patch supports direct replace flow', async () => {
         const target = join(tempDir, 'patched.txt')
+        await writeFile(target, 'alpha beta alpha', 'utf8')
 
-        const addPatch = `*** Begin Patch\n*** Add File: ${target}\n+hello\n*** End Patch\n`
-        const addRes = await applyPatchTool.execute({ input: addPatch })
-        assert.ok(!addRes.isError)
-        assert.strictEqual(await readText(target), 'hello\n')
+        const singleRes = await applyPatchTool.execute({
+            file_path: target,
+            old_string: 'alpha',
+            new_string: 'A',
+        })
+        assert.ok(!singleRes.isError)
+        assert.strictEqual(await readText(target), 'A beta alpha')
 
-        const updatePatch = `*** Begin Patch\n*** Update File: ${target}\n@@\n-hello\n+world\n*** End Patch\n`
-        const updateRes = await applyPatchTool.execute({ input: updatePatch })
-        assert.ok(!updateRes.isError)
-        assert.strictEqual(await readText(target), 'world\n')
-
-        const deletePatch = `*** Begin Patch\n*** Delete File: ${target}\n*** End Patch\n`
-        const deleteRes = await applyPatchTool.execute({ input: deletePatch })
-        assert.ok(!deleteRes.isError)
-        const content = await readText(target)
-        assert.strictEqual(content, '')
+        const batchRes = await applyPatchTool.execute({
+            file_path: target,
+            edits: [
+                { old_string: 'beta', new_string: 'B' },
+                { old_string: 'alpha', new_string: 'A', replace_all: true },
+            ],
+        })
+        assert.ok(!batchRes.isError)
+        assert.strictEqual(await readText(target), 'A B A')
     })
 
     test('read_file requires absolute path', async () => {

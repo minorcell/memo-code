@@ -336,7 +336,7 @@ Common tools include:
 
 - **exec_command / write_stdin**: Run and continue interactive shell sessions
 - **shell / shell_command**: Shell execution compatibility variants
-- **apply_patch**: Structured file edits via patch grammar
+- **apply_patch**: Direct string-replacement edits on a target file
 - **read_file / list_dir / grep_files**: Local file reading, directory listing, and content-based file search
 - **list_mcp_resources / list_mcp_resource_templates / read_mcp_resource**: MCP resource context access
 - **update_plan**: Structured progress plan updates

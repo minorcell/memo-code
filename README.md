@@ -119,7 +119,7 @@ memo mcp remove remote
 
 - `exec_command` / `write_stdin`: execute shell commands (default shell family)
 - `shell` / `shell_command`: compatibility shell variants (feature/env controlled)
-- `apply_patch`: structured file edits
+- `apply_patch`: direct string-replacement edits (single or batch)
 - `read_file` / `list_dir` / `grep_files`: file read and retrieval
 - `list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource`: MCP resource access
 - `update_plan`: structured task plan updates
