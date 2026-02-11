@@ -102,12 +102,14 @@ function truncateByTokens(text: string, maxOutputTokens?: number) {
         return {
             output: text,
             originalTokenCount,
+            deliveredChars: text.length,
         }
     }
 
     return {
         output: text.slice(0, maxChars),
         originalTokenCount,
+        deliveredChars: maxChars,
     }
 }
 
@@ -277,8 +279,8 @@ class UnifiedExecManager {
 
     private buildResponseText(session: SessionState, maxOutputTokens?: number): string {
         const delta = session.output.slice(session.readOffset)
-        session.readOffset = session.output.length
         const truncated = truncateByTokens(delta, maxOutputTokens)
+        session.readOffset += truncated.deliveredChars
 
         const payload: SessionResponse = {
             sessionId: session.id,
