@@ -5,21 +5,38 @@ import type { HistoryEvent, HistorySink, Role } from '@memo/core/types'
 
 /** JSONL history writer: one event per line. */
 export class JsonlHistorySink implements HistorySink {
-    private ready = false
+    private ensureDirPromise: Promise<void> | null = null
+    private writeQueue: Promise<void> = Promise.resolve()
+    private closed = false
 
     constructor(private filePath: string) {}
 
-    async append(event: HistoryEvent) {
-        if (!this.ready) {
-            await mkdir(dirname(this.filePath), { recursive: true })
-            this.ready = true
+    private ensureDirectory() {
+        if (!this.ensureDirPromise) {
+            this.ensureDirPromise = mkdir(dirname(this.filePath), { recursive: true }).then(() => {})
         }
-        await appendFile(this.filePath, `${JSON.stringify(event)}\n`, 'utf8')
+        return this.ensureDirPromise
+    }
+
+    async append(event: HistoryEvent) {
+        if (this.closed) {
+            throw new Error('History sink is closed')
+        }
+        this.writeQueue = this.writeQueue.then(async () => {
+            await this.ensureDirectory()
+            await appendFile(this.filePath, `${JSON.stringify(event)}\n`, 'utf8')
+        })
+        return this.writeQueue
     }
 
     async flush() {
-        // appendFile already ensures persistence, here only for interface compatibility
-        return Promise.resolve()
+        await this.writeQueue
+    }
+
+    async close() {
+        if (this.closed) return
+        this.closed = true
+        await this.flush()
     }
 }
 

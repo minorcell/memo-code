@@ -79,6 +79,49 @@ describe('JsonlHistorySink', () => {
         await expect(sink.flush()).resolves.toBeUndefined()
     })
 
+    test('serializes concurrent append calls without losing lines', async () => {
+        const sink = new JsonlHistorySink(filePath)
+        const events = Array.from({ length: 20 }, (_, idx) =>
+            createHistoryEvent({
+                sessionId: 'concurrent',
+                type: 'action',
+                step: idx,
+                content: `event-${idx}`,
+            }),
+        )
+
+        await Promise.all(events.map((event) => sink.append(event)))
+        await sink.flush()
+
+        const lines = (await readFile(filePath, 'utf8'))
+            .trim()
+            .split('\n')
+            .filter(Boolean)
+        expect(lines).toHaveLength(20)
+        const parsed = lines.map((line) => JSON.parse(line) as { content?: string })
+        expect(parsed[0]?.content).toBe('event-0')
+        expect(parsed[19]?.content).toBe('event-19')
+    })
+
+    test('close flushes pending writes and rejects future appends', async () => {
+        const sink = new JsonlHistorySink(filePath)
+        const first = sink.append(createHistoryEvent({ sessionId: 's-close', type: 'turn_start' }))
+        const second = sink.append(
+            createHistoryEvent({ sessionId: 's-close', type: 'assistant', content: 'done' }),
+        )
+        await sink.close()
+        await Promise.all([first, second])
+
+        const lines = (await readFile(filePath, 'utf8'))
+            .trim()
+            .split('\n')
+            .filter(Boolean)
+        expect(lines).toHaveLength(2)
+        await expect(
+            sink.append(createHistoryEvent({ sessionId: 's-close', type: 'final' })),
+        ).rejects.toThrow('History sink is closed')
+    })
+
     test('handles special characters in content', async () => {
         const sink = new JsonlHistorySink(filePath)
         const event = createHistoryEvent({
