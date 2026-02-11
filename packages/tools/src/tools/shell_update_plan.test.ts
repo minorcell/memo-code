@@ -45,6 +45,20 @@ describe('shell wrappers and update_plan', () => {
         assert.ok(text.includes('reason="dangerous_command"'))
     })
 
+    test('shell tool enforces timeout_ms as execution deadline', async () => {
+        const startedAt = Date.now()
+        const result = await shellTool.execute({
+            command: ['sleep', '2'],
+            timeout_ms: 100,
+        })
+
+        const elapsedMs = Date.now() - startedAt
+        const text = textPayload(result)
+        assert.strictEqual(result.isError, true)
+        assert.ok(text.includes('timed out'))
+        assert.ok(elapsedMs < 1_500)
+    })
+
     test('shell_command executes script command form', async () => {
         const result = await shellCommandTool.execute({
             command: 'echo shell-command-ok',
@@ -68,6 +82,21 @@ describe('shell wrappers and update_plan', () => {
         assert.ok(text.startsWith('<system_hint '))
         assert.ok(text.includes('tool="shell_command"'))
         assert.ok(text.includes('reason="dangerous_command"'))
+    })
+
+    test('shell_command enforces timeout_ms as execution deadline', async () => {
+        const startedAt = Date.now()
+        const result = await shellCommandTool.execute({
+            command: 'sleep 2; echo too-late',
+            login: false,
+            timeout_ms: 100,
+        })
+
+        const elapsedMs = Date.now() - startedAt
+        const text = textPayload(result)
+        assert.strictEqual(result.isError, true)
+        assert.ok(text.includes('timed out'))
+        assert.ok(elapsedMs < 1_500)
     })
 
     test('write_stdin fails for unknown session id', async () => {

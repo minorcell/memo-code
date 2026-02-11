@@ -41,6 +41,7 @@ export const shellTool = defineMcpTool<ShellInput>({
                 workdir,
                 login: false,
                 yield_time_ms: timeout_ms,
+                execution_timeout_ms: timeout_ms,
                 source_tool: 'shell',
             })
             return textResult(content)
