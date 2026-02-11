@@ -1,6 +1,6 @@
 import { normalize, resolve, dirname, join, relative, isAbsolute } from 'node:path'
 import { homedir } from 'node:os'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, statSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import ignore, { type Ignore } from 'ignore'
 
@@ -9,6 +9,15 @@ import ignore, { type Ignore } from 'ignore'
  */
 export function normalizePath(rawPath: string) {
     return normalize(resolve(rawPath))
+}
+
+function canonicalizePath(absPath: string) {
+    const normalized = normalizePath(absPath)
+    try {
+        return normalizePath(realpathSync(normalized))
+    } catch {
+        return normalized
+    }
 }
 
 function isSubPath(targetPath: string, rootPath: string) {
@@ -23,14 +32,14 @@ function parseWritableRootsFromEnv() {
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean)
-        .map((item) => normalizePath(item))
+        .map((item) => canonicalizePath(item))
 }
 
 export function getWritableRoots() {
     const roots = new Set<string>()
-    roots.add(normalizePath(process.cwd()))
+    roots.add(canonicalizePath(process.cwd()))
     const memoHome = process.env.MEMO_HOME?.trim() || join(homedir(), '.memo')
-    roots.add(normalizePath(memoHome))
+    roots.add(canonicalizePath(memoHome))
     for (const item of parseWritableRootsFromEnv()) {
         roots.add(item)
     }
@@ -38,8 +47,9 @@ export function getWritableRoots() {
 }
 
 export function isWritePathAllowed(absPath: string) {
+    const canonicalTarget = canonicalizePath(absPath)
     const roots = getWritableRoots()
-    return roots.some((root) => isSubPath(absPath, root))
+    return roots.some((root) => isSubPath(canonicalTarget, root))
 }
 
 export function writePathDenyReason(absPath: string) {

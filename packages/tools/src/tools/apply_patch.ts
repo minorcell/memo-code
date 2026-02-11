@@ -1,4 +1,4 @@
-import { access, readFile, writeFile } from 'node:fs/promises'
+import { access, readFile, realpath, writeFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { textResult } from '@memo/tools/tools/mcp'
 import { normalizePath, writePathDenyReason } from '@memo/tools/tools/helpers'
@@ -102,13 +102,14 @@ export const applyPatchTool = defineMcpTool<ApplyPatchInput>({
     supportsParallelToolCalls: false,
     isMutating: true,
     execute: async (input) => {
-        const filePath = normalizePath(input.file_path)
+        const userPath = normalizePath(input.file_path)
 
         try {
-            ensureWritable(filePath)
-            await access(filePath)
+            await access(userPath)
+            const targetPath = normalizePath(await realpath(userPath))
+            ensureWritable(targetPath)
 
-            const original = await readFile(filePath, 'utf8')
+            const original = await readFile(targetPath, 'utf8')
             const operations = toOperations(input)
 
             let working = original
@@ -146,14 +147,14 @@ export const applyPatchTool = defineMcpTool<ApplyPatchInput>({
                 return textResult('No changes made.')
             }
 
-            await writeFile(filePath, working, 'utf8')
+            await writeFile(targetPath, working, 'utf8')
             return textResult(
-                `Success. Updated file: ${filePath}\nEdits: ${operations.length}\nReplacements: ${replacementCount}`,
+                `Success. Updated file: ${targetPath}\nEdits: ${operations.length}\nReplacements: ${replacementCount}`,
             )
         } catch (err) {
             const code = (err as NodeJS.ErrnoException).code
             if (code === 'ENOENT') {
-                return textResult(`apply_patch failed: file does not exist: ${filePath}`, true)
+                return textResult(`apply_patch failed: file does not exist: ${userPath}`, true)
             }
             return textResult(`apply_patch failed: ${(err as Error).message}`, true)
         }
