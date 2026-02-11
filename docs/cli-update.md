@@ -15,7 +15,7 @@ The update covered:
 - This page is retained as migration history.
 - For current architecture and behavior, use:
     - `docs/core.md`
-    - `web/content/docs/README.md`
+    - `site/content/docs/README.md`
     - `README.md`
 
 ## Historical Summary

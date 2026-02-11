@@ -222,7 +222,7 @@ memo-cli/
 
 ## Related Docs
 
-- [User Guide](./web/content/docs/README.md) - User-facing docs by module
+- [User Guide](./site/content/docs/README.md) - User-facing docs by module
 - [Core Architecture](./docs/core.md) - Core implementation details
 - [TUI Rewrite Design](./docs/tui-rewrite-design.md) - Codex-aligned TUI architecture and migration notes
 - [CLI Adaptation History](./docs/cli-update.md) - Historical migration notes (Tool Use API)

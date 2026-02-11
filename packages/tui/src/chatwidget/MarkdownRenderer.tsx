@@ -6,6 +6,8 @@ import {
     type MarkdownBlock,
 } from './markdown_parser'
 
+const HORIZONTAL_RULE_TEXT = '———'
+
 function repeat(str: string, count: number): string {
     return str.repeat(Math.max(0, count))
 }
@@ -25,32 +27,17 @@ function formatThinkDisplayLines(content: string): string[] {
     })
 }
 
-function CodeBlock({ language, content }: { language?: string; content: string }) {
-    const langLabel = language ? `[${language}] ` : ''
-    const lines = content.split('\n')
-    const maxWidth = Math.max(...lines.map((line) => line.length), 40)
-    const border = '─'.repeat(Math.min(maxWidth, 60))
+function formatCodeBlockLines(content: string): string[] {
+    return content.split('\n')
+}
 
+function CodeBlock({ content }: { content: string }) {
+    const lines = formatCodeBlockLines(content)
     return (
         <Box flexDirection="column" marginY={1}>
-            <Box>
-                <Text color="yellow" dimColor>
-                    {langLabel}┌{border}┐
-                </Text>
-            </Box>
             {lines.map((line, index) => (
-                <Box key={index}>
-                    <Text color="yellow" dimColor>
-                        │
-                    </Text>
-                    <Text color="gray"> {line}</Text>
-                </Box>
+                <Text key={index}>{line}</Text>
             ))}
-            <Box>
-                <Text color="yellow" dimColor>
-                    {langLabel}└{border}┘
-                </Text>
-            </Box>
         </Box>
     )
 }
@@ -62,11 +49,7 @@ function InlineSegment({ node }: { node: InlineNode }) {
         case 'italic':
             return <Text italic>{node.content}</Text>
         case 'inlineCode':
-            return (
-                <Text color="green" backgroundColor="#1a1a2e">
-                    {node.content}
-                </Text>
-            )
+            return <Text color="cyan">{node.content}</Text>
         case 'link':
             return (
                 <>
@@ -108,7 +91,9 @@ function renderBlock(node: MarkdownBlock, key: string) {
         case 'hr': {
             return (
                 <Box key={key} marginY={1}>
-                    <Text color="gray">─────────────────────────────────</Text>
+                    <Text color="gray" dimColor>
+                        {HORIZONTAL_RULE_TEXT}
+                    </Text>
                 </Box>
             )
         }
@@ -136,16 +121,14 @@ function renderBlock(node: MarkdownBlock, key: string) {
             return <InlineLine key={key} content={node.content} />
         }
         case 'code': {
-            return <CodeBlock key={key} language={node.language} content={node.content} />
+            return <CodeBlock key={key} content={node.content} />
         }
         case 'blockquote': {
             return (
                 <Box key={key} flexDirection="column">
                     {node.content.split('\n').map((line, index) => (
                         <Box key={index}>
-                            <Text color="gray" dimColor>
-                                │
-                            </Text>
+                            <Text color="gray" dimColor>{`> `}</Text>
                             <InlineLine content={line} />
                         </Box>
                     ))}
@@ -180,5 +163,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
 }
 
 export const MARKDOWN_RENDERER_TEST_EXPORTS = {
+    HORIZONTAL_RULE_TEXT,
+    formatCodeBlockLines,
     formatThinkDisplayLines,
 }

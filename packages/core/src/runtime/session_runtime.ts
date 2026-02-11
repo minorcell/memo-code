@@ -328,10 +328,16 @@ export class AgentSessionImpl implements AgentSession {
                 let usageFromLLM: Partial<TokenUsage> | undefined
                 let stopReason: string | undefined
                 let reasoningContent: string | undefined
+                let receivedAssistantChunk = false
                 try {
                     const llmResult = await this.deps.callLLM(
                         this.history,
-                        (chunk) => this.deps.onAssistantStep?.(chunk, step),
+                        (chunk) => {
+                            if (chunk) {
+                                receivedAssistantChunk = true
+                            }
+                            this.deps.onAssistantStep?.(chunk, step)
+                        },
                         { signal: abortController.signal },
                     )
                     const normalized = normalizeLLMResponse(llmResult)
@@ -387,7 +393,9 @@ export class AgentSessionImpl implements AgentSession {
                     break
                 }
 
-                this.deps.onAssistantStep?.(assistantText, step)
+                if (!receivedAssistantChunk && assistantText) {
+                    this.deps.onAssistantStep?.(assistantText, step)
+                }
 
                 const textToolCall =
                     toolUseBlocks.length === 0 && assistantText

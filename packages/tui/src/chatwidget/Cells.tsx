@@ -98,7 +98,7 @@ function StepCell({ step, cwd }: { step: StepView; cwd: string }) {
 export function TurnCell({ turn, cwd }: { turn: TurnView; cwd: string }) {
     return (
         <Box flexDirection="column">
-            <Box>
+            <Box marginY={0.5}>
                 <Text color="gray">› </Text>
                 <Text>{turn.userInput}</Text>
             </Box>

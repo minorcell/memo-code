@@ -1,9 +1,11 @@
-name: Deploy Web to GitHub Pages
+name: Deploy Site to GitHub Pages
 
 on:
     push:
         branches: [main]
         paths:
+            - "site/**"
+            - ".github/workflows/deploy-web-pages.yml"
             - 'web/**'
             - '.github/workflows/deploy-web-pages.yml'
     workflow_dispatch:
@@ -35,17 +37,17 @@ jobs:
               with:
                   node-version: '20'
                   cache: 'pnpm'
-                  cache-dependency-path: web/pnpm-lock.yaml
+                  cache-dependency-path: site/pnpm-lock.yaml
 
             - name: Configure GitHub Pages
               uses: actions/configure-pages@v5
 
             - name: Install dependencies
-              working-directory: web
+              working-directory: site
               run: pnpm install --frozen-lockfile
 
             - name: Build static site
-              working-directory: web
+              working-directory: site
               env:
                   GITHUB_ACTIONS: 'true'
                   GITHUB_REPOSITORY: ${{ github.repository }}
@@ -55,7 +57,7 @@ jobs:
             - name: Upload Pages artifact
               uses: actions/upload-pages-artifact@v3
               with:
-                  path: web/out
+                  path: site/out
 
     deploy:
         name: Deploy to GitHub Pages

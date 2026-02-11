@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Text, useInput } from 'ink'
+import { Box, Text, useInput, useStdout } from 'ink'
 import type { MCPServerConfig, ProviderConfig } from '@memo/core'
 import { resolveSlashCommand, SLASH_SPECS } from '../slash/registry'
 import type { SlashContext } from '../slash/types'
@@ -12,7 +12,7 @@ import {
     deleteToLineEnd,
     deleteToLineStart,
     deleteWordBackwardAtCursor,
-    getCursorLayout,
+    getWrappedCursorLayout,
     insertAtCursor,
     moveCursorLeft,
     moveCursorRight,
@@ -359,6 +359,7 @@ export function Composer({
     onSetToolPermission,
     onSystemMessage,
 }: ComposerProps) {
+    const { stdout } = useStdout()
     const [editor, setEditor] = useState<EditorBuffer>({ value: '', cursor: 0 })
     const editorRef = useRef<EditorBuffer>(editor)
     const preferredColumnRef = useRef<number | null>(null)
@@ -952,16 +953,22 @@ export function Composer({
         }
     })
 
-    const layout = getCursorLayout(editor.value, editor.cursor)
-    const lines = layout.lines
+    const terminalWidth = stdout?.columns ?? process.stdout?.columns ?? 80
+    // Reserve prompt prefix width (2) and one cell for the synthetic cursor block.
+    const composerContentWidth = Math.max(1, terminalWidth - 3)
+    const wrappedLayout = getWrappedCursorLayout(editor.value, editor.cursor, composerContentWidth)
+    const lines = wrappedLayout.lines
 
     return (
         <Box flexDirection="column" gap={1}>
             <Box flexDirection="column" paddingY={1}>
                 {lines.map((line, index) => {
-                    const isCursorRow = !disabled && index === layout.row
-                    const before = isCursorRow ? line.slice(0, layout.column) : line
-                    const after = isCursorRow ? line.slice(layout.column) : ''
+                    const lineText = line.text
+                    const isCursorRow = !disabled && index === wrappedLayout.row
+                    const before = isCursorRow
+                        ? lineText.slice(0, wrappedLayout.cursorInRow)
+                        : lineText
+                    const after = isCursorRow ? lineText.slice(wrappedLayout.cursorInRow) : ''
 
                     return (
                         <Box key={`line-${index}`}>

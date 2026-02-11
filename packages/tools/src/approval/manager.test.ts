@@ -2,9 +2,7 @@ import assert from 'node:assert'
 import { describe, test } from 'vitest'
 import { createApprovalManager } from './manager'
 
-function assertNeedApproval(
-    result: ReturnType<ReturnType<typeof createApprovalManager>['check']>,
-) {
+function assertNeedApproval(result: ReturnType<ReturnType<typeof createApprovalManager>['check']>) {
     assert.strictEqual(result.needApproval, true)
     if (!result.needApproval) {
         throw new Error('Expected approval to be required')
@@ -72,9 +70,7 @@ describe('approval manager', () => {
         )
         assert.strictEqual(second.reason, 'This request was previously denied.')
 
-        const third = assertNeedApproval(
-            manager.check('exec_command', { cmd: 'echo hi' }),
-        )
+        const third = assertNeedApproval(manager.check('exec_command', { cmd: 'echo hi' }))
         assert.strictEqual(third.reason, 'Tool "exec_command" requires approval.')
     })
 })

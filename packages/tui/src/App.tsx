@@ -82,6 +82,16 @@ function normalizeMcpSelection(availableNames: string[], selectedNames: string[]
     return selectedNames.filter((name) => available.has(name))
 }
 
+function clearTerminalScreen() {
+    try {
+        if (process.stdout?.isTTY) {
+            process.stdout.write('\x1Bc')
+        }
+    } catch {
+        // Best-effort terminal clear.
+    }
+}
+
 export function App({
     sessionOptions,
     providerName,
@@ -257,26 +267,39 @@ export function App({
         ;(async () => {
             if (setupPending || mcpSelectionPending) return
 
-            const previous = sessionRef.current
-            if (previous) {
-                await previous.close()
-            }
+            try {
+                const previous = sessionRef.current
+                if (previous) {
+                    await previous.close()
+                }
 
-            const created = await createAgentSession(deps, sessionOptionsState)
-            if (cancelled) {
-                await created.close()
-                return
-            }
+                const created = await createAgentSession(deps, sessionOptionsState)
+                if (cancelled) {
+                    await created.close()
+                    return
+                }
 
-            sessionRef.current = created
-            setSession(created)
-            setSessionLogPath(created.historyFilePath ?? null)
+                sessionRef.current = created
+                setSession(created)
+                setSessionLogPath(created.historyFilePath ?? null)
+            } catch (err) {
+                if (cancelled) return
+                sessionRef.current = null
+                setSession(null)
+                setSessionLogPath(null)
+                setBusy(false)
+                appendSystemMessage(
+                    'Session',
+                    `Failed to create session: ${(err as Error).message}`,
+                    'error',
+                )
+            }
         })()
 
         return () => {
             cancelled = true
         }
-    }, [deps, mcpSelectionPending, sessionOptionsState, setupPending])
+    }, [appendSystemMessage, deps, mcpSelectionPending, sessionOptionsState, setupPending])
 
     useEffect(() => {
         let cancelled = false
@@ -303,20 +326,57 @@ export function App({
     }, [])
 
     const handleExit = useCallback(async () => {
+        const resolver = approvalResolverRef.current
+        if (resolver) {
+            resolver('deny')
+            approvalResolverRef.current = null
+        }
+        if (pendingApproval) {
+            setPendingApproval(null)
+        }
         if (sessionRef.current) {
             await sessionRef.current.close()
         }
         setExitMessage('Bye!')
         setTimeout(() => exit(), 250)
-    }, [exit])
+    }, [exit, pendingApproval])
 
     const handleClear = useCallback(() => {
+        if (busy) {
+            appendSystemMessage('Clear', 'Cancel current run before clearing timeline.', 'warning')
+            return
+        }
+        if (pendingApproval) {
+            appendSystemMessage(
+                'Clear',
+                'Resolve current approval request before clearing timeline.',
+                'warning',
+            )
+            return
+        }
         dispatch({ type: 'clear_current_timeline' })
         setPendingHistoryMessages(null)
         setCurrentContextTokens(0)
-    }, [dispatch])
+        clearTerminalScreen()
+    }, [appendSystemMessage, busy, dispatch, pendingApproval])
 
     const handleNewSession = useCallback(() => {
+        if (busy) {
+            appendSystemMessage(
+                'New Session',
+                'Cancel current run before starting a new session.',
+                'warning',
+            )
+            return
+        }
+        if (pendingApproval) {
+            appendSystemMessage(
+                'New Session',
+                'Resolve current approval request before starting a new session.',
+                'warning',
+            )
+            return
+        }
         dispatch({ type: 'reset_all' })
         setPendingHistoryMessages(null)
         setCurrentContextTokens(0)
@@ -326,7 +386,7 @@ export function App({
             sessionId: randomUUID(),
         }))
         appendSystemMessage('New Session', 'Started a fresh session.')
-    }, [appendSystemMessage, dispatch])
+    }, [appendSystemMessage, busy, dispatch, pendingApproval])
 
     const persistCurrentProvider = useCallback(
         async (name: string) => {
@@ -412,6 +472,22 @@ export function App({
 
     const handleSetContextLimit = useCallback(
         (limit: number) => {
+            if (busy) {
+                appendSystemMessage(
+                    'Context',
+                    'Cancel current run before changing context window.',
+                    'warning',
+                )
+                return
+            }
+            if (pendingApproval) {
+                appendSystemMessage(
+                    'Context',
+                    'Resolve current approval request before changing context window.',
+                    'warning',
+                )
+                return
+            }
             setContextLimit(limit)
             setCurrentContextTokens(0)
             setSessionOptionsState((prev) => ({
@@ -422,7 +498,7 @@ export function App({
             appendSystemMessage('Context', `Context window set to ${Math.floor(limit / 1000)}k.`)
             void persistContextLimit(limit)
         },
-        [appendSystemMessage, persistContextLimit],
+        [appendSystemMessage, busy, pendingApproval, persistContextLimit],
     )
 
     const toolPermissionLabel = useCallback((mode: ToolPermissionMode): string => {
@@ -507,6 +583,22 @@ export function App({
 
     const handleHistorySelect = useCallback(
         async (entry: SessionHistoryEntry) => {
+            if (busy) {
+                appendSystemMessage(
+                    'History',
+                    'Cancel current run before loading session history.',
+                    'warning',
+                )
+                return
+            }
+            if (pendingApproval) {
+                appendSystemMessage(
+                    'History',
+                    'Resolve current approval request before loading session history.',
+                    'warning',
+                )
+                return
+            }
             try {
                 const raw = await readFile(entry.sessionFile, 'utf8')
                 const parsed = parseHistoryLog(raw)
@@ -532,7 +624,7 @@ export function App({
                 )
             }
         },
-        [appendSystemMessage, dispatch],
+        [appendSystemMessage, busy, dispatch, pendingApproval],
     )
 
     const handleCancelRun = useCallback(() => {
@@ -567,10 +659,15 @@ Keep the result concise and actionable.`
         try {
             nextUserInputOverrideRef.current = initCommand
             await session.runTurn(prompt)
-        } catch {
+        } catch (err) {
             setBusy(false)
+            appendSystemMessage(
+                'Init',
+                `Failed to run init task: ${(err as Error).message}`,
+                'error',
+            )
         }
-    }, [busy, session])
+    }, [appendSystemMessage, busy, session])
 
     const handleSubmit = useCallback(
         async (value: string) => {
@@ -593,11 +690,12 @@ Keep the result concise and actionable.`
             setBusy(true)
             try {
                 await session.runTurn(trimmed)
-            } catch {
+            } catch (err) {
                 setBusy(false)
+                appendSystemMessage('Run', `Turn failed: ${(err as Error).message}`, 'error')
             }
         },
-        [busy, handleExit, runInitCommand, session],
+        [appendSystemMessage, busy, handleExit, runInitCommand, session],
     )
 
     const handleSetupComplete = useCallback(async () => {
@@ -728,7 +826,12 @@ Keep the result concise and actionable.`
                 <ApprovalOverlay request={pendingApproval} onDecision={handleApprovalDecision} />
             ) : null}
 
-            <Footer busy={busy} contextPercent={contextPercent} tokenLine={tokenLine} />
+            <Footer
+                busy={busy}
+                pendingApproval={Boolean(pendingApproval)}
+                contextPercent={contextPercent}
+                tokenLine={tokenLine}
+            />
         </Box>
     )
 }
