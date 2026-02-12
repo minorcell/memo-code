@@ -99,60 +99,46 @@ async function buildHistoryEntryFromFile(
     }
 }
 
-async function collectDatePartitionedSessionCandidates(
-    sessionsDir: string,
-): Promise<SessionFileCandidate[]> {
-    const listDirectory = async (dirPath: string) => {
+async function collectSessionCandidates(sessionsDir: string): Promise<SessionFileCandidate[]> {
+    const candidates: SessionFileCandidate[] = []
+
+    const walk = async (dirPath: string): Promise<void> => {
+        let entries: import('node:fs').Dirent[]
         try {
-            return await readdir(dirPath, { withFileTypes: true })
+            entries = await readdir(dirPath, { withFileTypes: true })
         } catch {
-            return [] as import('node:fs').Dirent[]
+            return
         }
-    }
 
-    const yearDirs = (await listDirectory(sessionsDir)).filter(
-        (entry) => entry.isDirectory() && /^\d{4}$/.test(entry.name),
-    )
+        await Promise.all(
+            entries.map(async (entry) => {
+                const fullPath = join(dirPath, entry.name)
 
-    const filePaths: string[] = []
-
-    for (const yearDir of yearDirs) {
-        const yearPath = join(sessionsDir, yearDir.name)
-        const monthDirs = (await listDirectory(yearPath)).filter(
-            (entry) => entry.isDirectory() && /^\d{2}$/.test(entry.name),
-        )
-
-        for (const monthDir of monthDirs) {
-            const monthPath = join(yearPath, monthDir.name)
-            const dayDirs = (await listDirectory(monthPath)).filter(
-                (entry) => entry.isDirectory() && /^\d{2}$/.test(entry.name),
-            )
-
-            for (const dayDir of dayDirs) {
-                const dayPath = join(monthPath, dayDir.name)
-                const files = (await listDirectory(dayPath)).filter(
-                    (entry) => entry.isFile() && entry.name.endsWith('.jsonl'),
-                )
-
-                for (const file of files) {
-                    filePaths.push(join(dayPath, file.name))
+                if (entry.isSymbolicLink()) {
+                    return
                 }
-            }
-        }
+
+                if (entry.isDirectory()) {
+                    await walk(fullPath)
+                    return
+                }
+
+                if (!entry.isFile() || !entry.name.endsWith('.jsonl')) {
+                    return
+                }
+
+                try {
+                    const fileStat = await stat(fullPath)
+                    candidates.push({ path: fullPath, mtimeMs: fileStat.mtimeMs })
+                } catch {
+                    // Ignore transient stat/read errors.
+                }
+            }),
+        )
     }
 
-    const candidates = await Promise.all(
-        filePaths.map(async (filePath) => {
-            try {
-                const fileStat = await stat(filePath)
-                return { path: filePath, mtimeMs: fileStat.mtimeMs }
-            } catch {
-                return null
-            }
-        }),
-    )
-
-    return candidates.filter((item): item is SessionFileCandidate => Boolean(item))
+    await walk(sessionsDir)
+    return candidates
 }
 
 export async function loadSessionHistoryEntries(options: {
@@ -164,7 +150,7 @@ export async function loadSessionHistoryEntries(options: {
 }): Promise<SessionHistoryEntry[]> {
     const normalizedActive = options.activeSessionFile ? resolve(options.activeSessionFile) : null
 
-    const candidates = await collectDatePartitionedSessionCandidates(options.sessionsDir)
+    const candidates = await collectSessionCandidates(options.sessionsDir)
     const filteredCandidates = candidates
         .filter((candidate) => !normalizedActive || resolve(candidate.path) !== normalizedActive)
         .filter(

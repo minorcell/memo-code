@@ -18,9 +18,8 @@ async function writeSessionFile(
     fileName: string,
     lines: string[],
 ): Promise<string> {
-    const dayDir = join(sessionsDir, '2026', '02', '10')
-    await mkdir(dayDir, { recursive: true })
-    const filePath = join(dayDir, fileName)
+    await mkdir(sessionsDir, { recursive: true })
+    const filePath = join(sessionsDir, fileName)
     await writeFile(filePath, `${lines.join('\n')}\n`, 'utf8')
     return filePath
 }
