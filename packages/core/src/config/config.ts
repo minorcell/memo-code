@@ -1,9 +1,9 @@
 /** @file Configuration management: read/write ~/.memo/config.toml and path construction utilities. */
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, parse as parsePath, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { parse } from 'toml'
+import { parse as parseToml } from 'toml'
 import type { AgentSessionOptions } from '@memo/core/types'
 
 export type ProviderConfig = {
@@ -184,7 +184,7 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
     try {
         await access(configPath)
         const text = await readFile(configPath, 'utf-8')
-        const parsed = parse(text) as ParsedMemoConfig
+        const parsed = parseToml(text) as ParsedMemoConfig
         const providers = normalizeProviders(parsed.providers)
         const maxPromptTokens =
             typeof parsed.max_prompt_tokens === 'number' &&
@@ -220,7 +220,28 @@ export function selectProvider(config: MemoConfig, preferred?: string): Provider
 
 export function getSessionsDir(loaded: LoadedConfig, options: AgentSessionOptions) {
     const base = options.historyDir ?? join(loaded.home, DEFAULT_SESSIONS_DIR)
-    return expandHome(base)
+    const absoluteBase = expandHome(base)
+    const projectPath = resolve(process.cwd())
+    const root = parsePath(projectPath).root
+    const relative = projectPath.slice(root.length)
+    const segments = relative.split(/[\\/]+/).filter(Boolean)
+
+    if (process.platform === 'win32') {
+        const drive = /^([A-Za-z]):/.exec(root)?.[1]
+        if (drive) {
+            segments.unshift(drive.toUpperCase())
+        }
+    }
+
+    if (segments.length === 0) {
+        return join(absoluteBase, '-root')
+    }
+
+    const encodedProjectPath = `-${segments
+        .map((segment) => segment.replace(/[^A-Za-z0-9._-]/g, '_'))
+        .join('-')}`
+
+    return join(absoluteBase, encodedProjectPath)
 }
 
 export function buildSessionPath(baseDir: string, sessionId: string) {
@@ -231,8 +252,10 @@ export function buildSessionPath(baseDir: string, sessionId: string) {
     const HH = String(now.getHours()).padStart(2, '0')
     const MM = String(now.getMinutes()).padStart(2, '0')
     const SS = String(now.getSeconds()).padStart(2, '0')
-    const fileName = `rollout-${yyyy}-${mm}-${dd}T${HH}-${MM}-${SS}-${sessionId}.jsonl`
-    return join(baseDir, yyyy, mm, dd, fileName)
+    const date = `${yyyy}-${mm}-${dd}T${HH}-${MM}-${SS}`
+    const safeId = sessionId.replace(/[^A-Za-z0-9._-]/g, '_')
+    const fileName = `${date}-${safeId}.jsonl`
+    return join(baseDir, fileName)
 }
 
 /** 提供一个新的 sessionId，便于外部复用。 */

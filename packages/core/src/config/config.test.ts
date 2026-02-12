@@ -7,6 +7,7 @@ import { beforeAll, afterAll, describe, test, expect } from 'vitest'
 import { readFile, writeFile } from 'node:fs/promises'
 import {
     buildSessionPath,
+    getSessionsDir,
     loadMemoConfig,
     writeMemoConfig,
     type MCPServerConfig,
@@ -45,7 +46,7 @@ afterAll(async () => {
 })
 
 describe('buildSessionPath', () => {
-    test('uses date-partitioned directories with rollout filename', async () => {
+    test('uses date-uuid filename under project-specific sessions directory', async () => {
         const projectDir = join(tempBase, 'My Project:Demo with spaces')
         await mkdir(projectDir, { recursive: true })
         process.chdir(projectDir)
@@ -53,30 +54,55 @@ describe('buildSessionPath', () => {
         const path = buildSessionPath('/history-base', 'session123')
         const segments = path.split(/[/\\]/).filter(Boolean)
         const filename = segments[segments.length - 1] ?? ''
-        const day = segments[segments.length - 2] ?? ''
-        const month = segments[segments.length - 3] ?? ''
-        const year = segments[segments.length - 4] ?? ''
 
         assert.ok(path.startsWith('/history-base'), 'should prefix base dir')
-        assert.ok(/^\d{4}$/.test(year), 'year directory should be numeric')
-        assert.ok(/^\d{2}$/.test(month), 'month directory should be numeric')
-        assert.ok(/^\d{2}$/.test(day), 'day directory should be numeric')
         assert.ok(
-            /^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-session123\.jsonl$/.test(filename),
-            'filename should include rollout timestamp and session id',
+            /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-session123\.jsonl$/.test(filename),
+            'filename should be datetime-sessionId.jsonl',
         )
     })
 
-    test('does not encode cwd in generated path', async () => {
+    test('encodes cwd into one flat project directory name', async () => {
         const longSegment = 'x'.repeat(150)
         const longDir = join(tempBase, `workspace-${longSegment}`)
         await mkdir(join(longDir, longSegment), { recursive: true })
         const prev = process.cwd()
         process.chdir(join(longDir, longSegment))
 
-        const path = buildSessionPath('/history-base', 's')
+        const sessionsDir = getSessionsDir(
+            {
+                config: {
+                    current_provider: 'deepseek',
+                    providers: [
+                        {
+                            name: 'deepseek',
+                            env_api_key: 'DEEPSEEK_API_KEY',
+                            model: 'deepseek-chat',
+                        },
+                    ],
+                    mcp_servers: {},
+                },
+                home: '/tmp/.memo',
+                configPath: '/tmp/.memo/config.toml',
+                needsSetup: false,
+            },
+            {},
+        )
         process.chdir(prev)
-        assert.ok(!path.includes(longSegment), 'path should not contain cwd segments')
+        assert.ok(
+            sessionsDir.startsWith('/tmp/.memo/sessions'),
+            'should stay under sessions base dir',
+        )
+        const projectDirName = sessionsDir.split('/').at(-1) ?? ''
+        assert.ok(projectDirName.startsWith('-'), 'encoded project directory should start with "-"')
+        assert.ok(
+            projectDirName.includes(longSegment),
+            'sessions dir should include cwd path segments',
+        )
+        assert.ok(
+            !sessionsDir.includes(`/${longSegment}/`),
+            'cwd segments should be flattened into one directory name',
+        )
     })
 })
 
