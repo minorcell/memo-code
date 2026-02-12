@@ -19,6 +19,7 @@ type StartExecRequest = {
     login?: boolean
     tty?: boolean
     yield_time_ms?: number
+    execution_timeout_ms?: number
     max_output_tokens?: number
     source_tool?: string
 }
@@ -102,12 +103,14 @@ function truncateByTokens(text: string, maxOutputTokens?: number) {
         return {
             output: text,
             originalTokenCount,
+            deliveredChars: text.length,
         }
     }
 
     return {
         output: text.slice(0, maxChars),
         originalTokenCount,
+        deliveredChars: maxChars,
     }
 }
 
@@ -153,6 +156,27 @@ async function waitForWindow(session: SessionState, yieldMs: number): Promise<vo
     ])
 }
 
+async function waitForExit(session: SessionState, timeoutMs: number): Promise<void> {
+    if (session.exited || timeoutMs <= 0) return
+    await Promise.race([
+        new Promise<void>((resolve) => {
+            const timer = setTimeout(() => {
+                cleanup()
+                resolve()
+            }, timeoutMs)
+            const onExit = () => {
+                clearTimeout(timer)
+                cleanup()
+                resolve()
+            }
+            const cleanup = () => {
+                session.eventBus.off('exit', onExit)
+            }
+            session.eventBus.on('exit', onExit)
+        }),
+    ])
+}
+
 class UnifiedExecManager {
     private sessions = new Map<number, SessionState>()
     private nextId = 1
@@ -169,10 +193,33 @@ class UnifiedExecManager {
         }
     }
 
+    private activeSessionCount() {
+        let count = 0
+        for (const session of this.sessions.values()) {
+            if (!session.exited) count += 1
+        }
+        return count
+    }
+
+    private async terminateForTimeout(session: SessionState) {
+        if (session.exited) return
+        session.proc.kill('SIGTERM')
+        await waitForExit(session, 200)
+        if (!session.exited) {
+            session.proc.kill('SIGKILL')
+            await waitForExit(session, 200)
+        }
+    }
+
     async start(request: StartExecRequest): Promise<string> {
         const cmd = request.cmd.trim()
         if (!cmd) {
             throw new Error('cmd must not be empty')
+        }
+
+        this.cleanupSessions()
+        if (this.activeSessionCount() >= MAX_SESSIONS) {
+            throw new Error(`too many active sessions (max ${MAX_SESSIONS})`)
         }
 
         const blocked = guardDangerousCommand({
@@ -235,8 +282,25 @@ class UnifiedExecManager {
         this.sessions.set(id, session)
         this.cleanupSessions()
 
+        const executionTimeoutMs =
+            typeof request.execution_timeout_ms === 'number' && request.execution_timeout_ms > 0
+                ? Math.floor(request.execution_timeout_ms)
+                : null
         const yieldMs = clampYield(request.yield_time_ms, DEFAULT_EXEC_YIELD_TIME_MS)
-        await waitForWindow(session, yieldMs)
+        const waitMs =
+            executionTimeoutMs !== null
+                ? Math.min(yieldMs, Math.max(0, executionTimeoutMs))
+                : yieldMs
+        await waitForWindow(session, waitMs)
+
+        if (executionTimeoutMs !== null && !session.exited) {
+            const elapsedMs = Date.now() - startedAtMs
+            if (elapsedMs >= executionTimeoutMs) {
+                await this.terminateForTimeout(session)
+                this.cleanupSessions()
+                throw new Error(`command timed out after ${executionTimeoutMs}ms`)
+            }
+        }
 
         return this.buildResponseText(session, request.max_output_tokens)
     }
@@ -277,8 +341,8 @@ class UnifiedExecManager {
 
     private buildResponseText(session: SessionState, maxOutputTokens?: number): string {
         const delta = session.output.slice(session.readOffset)
-        session.readOffset = session.output.length
         const truncated = truncateByTokens(delta, maxOutputTokens)
+        session.readOffset += truncated.deliveredChars
 
         const payload: SessionResponse = {
             sessionId: session.id,

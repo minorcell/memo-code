@@ -183,4 +183,70 @@ describe('tool orchestrator', () => {
             }
         }
     })
+
+    test('rejects oversized raw string input before json parsing', async () => {
+        let executed = false
+        const orchestrator = createToolOrchestrator({
+            tools: {
+                read_file: {
+                    name: 'read_file',
+                    execute: async () => {
+                        executed = true
+                        return { content: [{ type: 'text', text: 'ok' }] }
+                    },
+                },
+            },
+        })
+
+        const result = await orchestrator.executeAction({
+            name: 'read_file',
+            input: 'x'.repeat(100_001),
+        })
+
+        assert.strictEqual(result.success, false)
+        assert.strictEqual(result.status, 'input_invalid')
+        assert.ok(result.observation.includes('input string too large'))
+        assert.strictEqual(executed, false)
+    })
+
+    test('rejects non-object json input payloads', async () => {
+        const orchestrator = createToolOrchestrator({
+            tools: {
+                read_file: {
+                    name: 'read_file',
+                    execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+                },
+            },
+        })
+
+        const result = await orchestrator.executeAction({
+            name: 'read_file',
+            input: '[]',
+        })
+
+        assert.strictEqual(result.success, false)
+        assert.strictEqual(result.status, 'input_invalid')
+        assert.ok(result.observation.includes('expected object'))
+    })
+
+    test('rejects validateInput success payload when shape is not object', async () => {
+        const orchestrator = createToolOrchestrator({
+            tools: {
+                read_file: {
+                    name: 'read_file',
+                    validateInput: () => ({ ok: true, data: 'not-object' }),
+                    execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+                },
+            },
+        })
+
+        const result = await orchestrator.executeAction({
+            name: 'read_file',
+            input: { file_path: '/tmp/a' },
+        })
+
+        assert.strictEqual(result.success, false)
+        assert.strictEqual(result.status, 'input_invalid')
+        assert.ok(result.observation.includes('expected object'))
+    })
 })

@@ -13,6 +13,7 @@ import type {
 } from './types'
 
 const DEFAULT_MAX_TOOL_RESULT_CHARS = 12_000
+const MAX_TOOL_INPUT_STRING_CHARS = 100_000
 
 function getMaxToolResultChars() {
     const raw = process.env.MEMO_TOOL_RESULT_MAX_CHARS?.trim()
@@ -76,9 +77,23 @@ function flattenCallToolResult(result: CallToolResult): string {
     return texts.join('\n')
 }
 
-function parseToolInput(tool: OrchestratorTool, rawInput: unknown) {
+type ParseToolInputResult =
+    | { ok: true; data: Record<string, unknown> }
+    | { ok: false; error: string }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseToolInput(tool: OrchestratorTool, rawInput: unknown): ParseToolInputResult {
     let candidate: unknown = rawInput
     if (typeof rawInput === 'string') {
+        if (rawInput.length > MAX_TOOL_INPUT_STRING_CHARS) {
+            return {
+                ok: false as const,
+                error: `${tool.name} invalid input: input string too large (max ${MAX_TOOL_INPUT_STRING_CHARS} chars)`,
+            }
+        }
         const trimmed = rawInput.trim()
         if (trimmed) {
             try {
@@ -91,12 +106,17 @@ function parseToolInput(tool: OrchestratorTool, rawInput: unknown) {
         }
     }
 
-    if (typeof candidate !== 'object' || candidate === null) {
+    if (!isRecord(candidate)) {
         return { ok: false as const, error: `${tool.name} invalid input: expected object` }
     }
 
     if (typeof tool.validateInput === 'function') {
-        return tool.validateInput(candidate)
+        const validated = tool.validateInput(candidate)
+        if (!validated.ok) return validated
+        if (!isRecord(validated.data)) {
+            return { ok: false as const, error: `${tool.name} invalid input: expected object` }
+        }
+        return { ok: true as const, data: validated.data }
     }
 
     return { ok: true as const, data: candidate }

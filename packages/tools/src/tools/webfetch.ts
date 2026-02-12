@@ -13,7 +13,7 @@ type WebFetchInput = z.infer<typeof WEBFETCH_INPUT_SCHEMA>
 const WEBFETCH_TIMEOUT_MS = 10_000
 const MAX_BODY_BYTES = 512_000
 const MAX_BODY_PREVIEW = 4_000
-const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'data:'])
+const ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])
 const HTML_BREAK_TAG =
     /<\/\s*(p|div|section|article|header|footer|aside|main|h[1-6]|li|tr|table|blockquote)\s*>/gi
 const HTML_LINE_BREAK = /<\s*(br|hr)\s*\/?>/gi

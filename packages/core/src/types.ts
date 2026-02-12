@@ -371,4 +371,6 @@ export type HistorySink = {
     append: (event: HistoryEvent) => Promise<void> | void
     /** 可选：flush 持久化。 */
     flush?: () => Promise<void> | void
+    /** 可选：关闭资源并确保落盘。 */
+    close?: () => Promise<void> | void
 }

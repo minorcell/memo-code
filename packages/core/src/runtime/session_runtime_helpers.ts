@@ -38,6 +38,10 @@ export type ResolvedToolPermission = {
     approvalMode: 'auto' | 'strict'
 }
 
+function writeStructuredError(payload: Record<string, unknown>) {
+    process.stderr.write(`${JSON.stringify(payload)}\n`)
+}
+
 export function resolveToolPermission(options: AgentSessionOptions): ResolvedToolPermission {
     if (options.toolPermissionMode === 'none') {
         return {
@@ -122,7 +126,12 @@ export async function emitEventToSinks(event: HistoryEvent, sinks: HistorySink[]
         try {
             await sink.append(event)
         } catch (err) {
-            console.error(`Failed to write history event: ${(err as Error).message}`)
+            writeStructuredError({
+                level: 'error',
+                event: 'history_sink_append_failed',
+                sink: sink.constructor?.name || 'anonymous_sink',
+                message: (err as Error).message,
+            })
         }
     }
 }
@@ -133,14 +142,37 @@ export function isAbortError(err: unknown): err is Error {
 
 // Stable serialization for duplicate action detection (ensures consistent key ordering)
 export function stableStringify(value: unknown): string {
+    return stableStringifyWithSeen(value, new WeakSet<object>(), 0)
+}
+
+const MAX_STABLE_STRINGIFY_DEPTH = 100
+
+function stableStringifyWithSeen(value: unknown, seen: WeakSet<object>, depth: number): string {
+    if (depth > MAX_STABLE_STRINGIFY_DEPTH) {
+        return JSON.stringify('[MaxDepthExceeded]')
+    }
+    if (typeof value === 'bigint') {
+        return JSON.stringify(value.toString())
+    }
     if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
+    if (seen.has(value)) {
+        return JSON.stringify('[Circular]')
+    }
+
+    seen.add(value)
     if (Array.isArray(value)) {
-        return `[${value.map((v) => stableStringify(v)).join(',')}]`
+        const result = `[${value.map((v) => stableStringifyWithSeen(v, seen, depth + 1)).join(',')}]`
+        seen.delete(value)
+        return result
     }
     const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
         a.localeCompare(b),
     )
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`
+    const result = `{${entries
+        .map(([k, v]) => `${JSON.stringify(k)}:${stableStringifyWithSeen(v, seen, depth + 1)}`)
+        .join(',')}}`
+    seen.delete(value)
+    return result
 }
 
 export function buildAssistantToolCalls(

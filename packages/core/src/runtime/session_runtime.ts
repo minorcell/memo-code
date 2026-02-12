@@ -925,12 +925,14 @@ export class AgentSessionImpl implements AgentSession {
                 },
             })
             for (const sink of this.sinks) {
-                if (sink.flush) {
-                    try {
+                try {
+                    if (sink.close) {
+                        await sink.close()
+                    } else if (sink.flush) {
                         await sink.flush()
-                    } catch (err) {
-                        console.error(`History flush failed: ${(err as Error).message}`)
                     }
+                } catch (err) {
+                    console.error(`History flush failed: ${(err as Error).message}`)
                 }
             }
         }

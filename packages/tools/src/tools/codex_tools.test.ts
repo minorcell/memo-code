@@ -37,6 +37,13 @@ function textPayload(result: { content?: Array<{ type: string; text?: string }> 
     return first?.text ?? ''
 }
 
+function outputPayload(text: string) {
+    const marker = 'Output:\n'
+    const index = text.indexOf(marker)
+    if (index < 0) return ''
+    return text.slice(index + marker.length)
+}
+
 beforeAll(async () => {
     tempDir = await makeTempDir('memo-tools-codex')
     prevWritableRoots = process.env.MEMO_SANDBOX_WRITABLE_ROOTS
@@ -122,6 +129,44 @@ describe('codex shell family', () => {
         })
         const resumedText = textPayload(resumed)
         assert.ok(resumedText.includes('still-alive'))
+    })
+
+    test('write_stdin can fetch unread output tail after truncation', async () => {
+        const started = await execCommandTool.execute({
+            cmd: `node -e "process.stdout.write('X'.repeat(5000)); setTimeout(() => {}, 2000)"`,
+            yield_time_ms: 300,
+            max_output_tokens: 10,
+        })
+        const startedText = textPayload(started)
+        const match = startedText.match(/session ID (\d+)/)
+        assert.ok(match, `expected running session id, got: ${startedText}`)
+        const firstChunk = outputPayload(startedText)
+        assert.strictEqual(firstChunk.length, 40)
+
+        const sessionId = Number(match?.[1])
+        const next = await writeStdinTool.execute({
+            session_id: sessionId,
+            yield_time_ms: 100,
+            max_output_tokens: 2000,
+        })
+        const nextText = textPayload(next)
+        const nextChunk = outputPayload(nextText)
+        assert.ok(nextChunk.length > 0, `expected unread tail, got: ${nextText}`)
+        assert.ok(nextChunk.includes('X'))
+    })
+
+    test('exec_command rejects when active session cap is exceeded', async () => {
+        const results = []
+        for (let i = 0; i < 70; i += 1) {
+            results.push(await execCommandTool.execute({ cmd: 'sleep 2', yield_time_ms: 0 }))
+        }
+        const overflow = results.find(
+            (result) => result.isError && textPayload(result).includes('too many active sessions'),
+        )
+        assert.ok(overflow, 'expected active-session cap error')
+
+        // Allow spawned sessions to exit before subsequent tests.
+        await new Promise((resolve) => setTimeout(resolve, 2200))
     })
 })
 

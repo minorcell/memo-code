@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, beforeAll, describe, test } from 'vitest'
@@ -181,7 +181,25 @@ describe('apply_patch tool (direct replace)', () => {
 
         assertPatchError(result)
         const text = textPayload(result)
-        assert.ok(text.includes('sandbox') || text.includes('不在允许目录'))
+        assert.ok(text.includes('sandbox write denied'))
+        await rm(outside, { force: true })
+    })
+
+    test('denies writes when symlink target is outside writable roots', async () => {
+        const outside = '/tmp/memo-tools-apply-patch-symlink-target.txt'
+        const linkPath = join(tempDir, 'symlink-outside.txt')
+        await writeFile(outside, 'secret', 'utf8')
+        await symlink(outside, linkPath)
+
+        const result = await applyPatchTool.execute({
+            file_path: linkPath,
+            old_string: 'secret',
+            new_string: 'patched',
+        })
+
+        assertPatchError(result, 'sandbox write denied')
+        assert.strictEqual(await readText(outside), 'secret')
+        await rm(linkPath, { force: true })
         await rm(outside, { force: true })
     })
 })
