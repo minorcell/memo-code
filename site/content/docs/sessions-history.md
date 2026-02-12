@@ -12,9 +12,9 @@ If `MEMO_HOME` is set:
 
 - `$MEMO_HOME/sessions/`
 
-Date-partitioned structure:
+Project-scoped structure:
 
-- `YYYY/MM/DD/rollout-YYYY-MM-DDTHH-MM-SS-<sessionId>.jsonl`
+- `-<project_abs_path_flattened>/<YYYY-MM-DDTHH-MM-SS>-<sessionId>.jsonl`
 
 ## Event Types in JSONL
 

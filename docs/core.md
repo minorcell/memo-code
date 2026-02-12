@@ -12,7 +12,7 @@ Core should stay UI-agnostic: do not add Ink/UI rendering details into `packages
 ## Directory and Modules
 
 - `config/`: config and paths
-    - `config.ts`: reads/writes `~/.memo/config.toml`, provider selection (`name/env_api_key/model/base_url`), session path generation (`sessions/<YYYY>/<MM>/<DD>/rollout-...jsonl`), and session ID generation.
+    - `config.ts`: reads/writes `~/.memo/config.toml`, provider selection (`name/env_api_key/model/base_url`), session path generation (`sessions/-<project_abs_path_flattened>/<YYYY-MM-DDTHH-MM-SS>-<sessionId>.jsonl`), and session ID generation.
 - `runtime/`: runtime and logging
     - `prompt.md/prompt.ts`: system prompt loading (integrates Claude Code best practices).
     - `history.ts`: JSONL sink and event builders.
@@ -93,7 +93,7 @@ await session.close()
 ## History and Logs (`runtime/history.ts`)
 
 - Events: `session_start/turn_start/assistant/action/observation/final/turn_end/session_end`.
-- Default output path: `~/.memo/sessions/<YYYY>/<MM>/<DD>/rollout-<timestamp>-<id>.jsonl`, with provider/model/tokenizer/token-usage metadata.
+- Default output path: `~/.memo/sessions/-<project_abs_path_flattened>/<YYYY-MM-DDTHH-MM-SS>-<id>.jsonl`, with provider/model/tokenizer/token-usage metadata.
 - For concurrent calls, each tool observation is logged individually, and merged observation is also recorded.
 
 ## LLM Adapter (`runtime/defaults.ts`)
@@ -137,7 +137,7 @@ await client.chat.completions.create({
 
 - `loadMemoConfig`: reads `~/.memo/config.toml`, returns config/path + `needsSetup` flag.
 - `writeMemoConfig`: writes config back.
-- `buildSessionPath`: builds date-partitioned, timestamped JSONL path.
+- `buildSessionPath`: builds project-scoped JSONL path with `datetime-sessionId` filename.
 - `selectProvider`: selects provider by name with fallback.
 
 ## Key Updates (v2 Architecture)

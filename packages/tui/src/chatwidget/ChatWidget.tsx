@@ -96,7 +96,7 @@ export const ChatWidget = memo(function ChatWidget({
                                 paddingX={1}
                                 flexDirection="column"
                             >
-                                <Text bold>Memo CLI</Text>
+                                <Text bold>Memo Code CLI</Text>
                                 <Text color="gray">
                                     {item.data.providerName} / {item.data.model} • v
                                     {item.data.version}
