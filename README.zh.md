@@ -210,7 +210,7 @@ memo-cli/
 
 ## 技术栈
 
-- **Runtime**: Node.js 18+
+- **Runtime**: Node.js 20+
 - **语言**: TypeScript
 - **UI**: React + Ink
 - **Protocol**: MCP (Model Context Protocol)
@@ -220,7 +220,6 @@ memo-cli/
 
 - [用户指南](./site/content/docs/README.md) - 面向使用者的分模块说明
 - [Core 架构](./docs/core.md) - 核心实现详解
-- [TUI 重构设计](./docs/tui-rewrite-design.md) - 对标 Codex 的 TUI 架构与迁移说明
 - [CLI 适配更新](./docs/cli-update.md) - Tool Use API 迁移说明
 - [开发指南](./CONTRIBUTING.md) - 贡献指南
 - [项目约定](./AGENTS.md) - 代码规范和开发流程

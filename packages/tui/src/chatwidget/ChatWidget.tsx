@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef, useEffect } from 'react'
 import { Box, Static, Text } from 'ink'
 import type { SystemMessage, TurnView } from '../types'
 import { SystemCell, TurnCell } from './Cells'
@@ -35,33 +35,53 @@ function isSystemItem(item: HistoryStaticItem): item is SystemMessage {
     return (item as SystemMessage).id !== undefined
 }
 
+// Stable header key helper to minimize Static re-renders
+function useStableHeaderKey(header: HeaderInfo): string {
+    const prevKeyRef = useRef<string>('')
+    return useMemo(() => {
+        const newKey = `${header.sessionId}-${header.providerName}-${header.model}-${header.version}`
+        // Only update if session actually changed
+        if (newKey !== prevKeyRef.current) {
+            prevKeyRef.current = newKey
+        }
+        return prevKeyRef.current
+    }, [header.sessionId, header.providerName, header.model, header.version])
+}
+
 export const ChatWidget = memo(function ChatWidget({
     header,
     systemMessages,
     turns,
     historicalTurns,
 }: ChatWidgetProps) {
-    const allTurns = useMemo(() => [...historicalTurns, ...turns], [historicalTurns, turns])
+    // Use stable keys to minimize re-renders of Static items
+    const stableHeaderKey = useStableHeaderKey(header)
+    const cwdRef = useRef(header.cwd)
+    useEffect(() => {
+        cwdRef.current = header.cwd
+    }, [header.cwd])
 
-    const lastTurn = allTurns.length > 0 ? allTurns[allTurns.length - 1] : undefined
-    const lastTurnComplete =
-        lastTurn && Boolean(lastTurn.finalText || (lastTurn.status && lastTurn.status !== 'ok'))
+    const { completedTurns, inProgressTurn, staticItems } = useMemo(() => {
+        const allTurns = [...historicalTurns, ...turns]
+        const lastTurn = allTurns.length > 0 ? allTurns[allTurns.length - 1] : undefined
+        const lastTurnComplete =
+            lastTurn && Boolean(lastTurn.finalText || (lastTurn.status && lastTurn.status !== 'ok'))
 
-    const completedTurns = lastTurnComplete ? allTurns : allTurns.slice(0, -1)
-    const inProgressTurn = lastTurnComplete ? undefined : lastTurn
+        const completed = lastTurnComplete ? allTurns : allTurns.slice(0, -1)
+        const inProgress = lastTurnComplete ? undefined : lastTurn
 
-    const headerItem = useMemo<HeaderStaticItem>(() => ({ type: 'header', data: header }), [header])
+        const headerItem: HeaderStaticItem = { type: 'header', data: header }
 
-    const historyItems = useMemo<HistoryStaticItem[]>(() => {
-        const items: HistoryStaticItem[] = [...systemMessages, ...completedTurns]
-        items.sort((a, b) => itemSequence(a) - itemSequence(b))
-        return items
-    }, [completedTurns, systemMessages])
+        const historyItems: HistoryStaticItem[] = [...systemMessages, ...completed]
+        historyItems.sort((a, b) => itemSequence(a) - itemSequence(b))
 
-    const staticItems = useMemo<StaticItem[]>(
-        () => [headerItem, ...historyItems],
-        [headerItem, historyItems],
-    )
+        const items: StaticItem[] = [headerItem, ...historyItems]
+
+        return { completedTurns: completed, inProgressTurn: inProgress, staticItems: items }
+    }, [header, historicalTurns, turns, systemMessages])
+
+    // Use a stable cwd for TurnCell to avoid re-renders during streaming
+    const stableCwd = cwdRef.current
 
     return (
         <Box flexDirection="column">
@@ -70,7 +90,7 @@ export const ChatWidget = memo(function ChatWidget({
                     if (isHeaderItem(item)) {
                         return (
                             <Box
-                                key={`header-${item.data.sessionId}`}
+                                key={`header-${stableHeaderKey}`}
                                 borderStyle="round"
                                 borderColor="blue"
                                 paddingX={1}
@@ -97,13 +117,13 @@ export const ChatWidget = memo(function ChatWidget({
                         <TurnCell
                             key={`turn-${item.sequence ?? item.index}`}
                             turn={item}
-                            cwd={header.cwd}
+                            cwd={stableCwd}
                         />
                     )
                 }}
             </Static>
 
-            {inProgressTurn ? <TurnCell turn={inProgressTurn} cwd={header.cwd} /> : null}
+            {inProgressTurn ? <TurnCell turn={inProgressTurn} cwd={stableCwd} /> : null}
         </Box>
     )
 })

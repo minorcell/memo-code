@@ -68,6 +68,10 @@ function createEmptyTurn(index: number, sequence: number): TurnView {
 }
 
 function ensureStep(steps: StepView[], step: number): StepView[] {
+    // Only copy if we actually need to add steps
+    if (steps.length > step) {
+        return steps
+    }
     const next = steps.slice()
     while (next.length <= step) {
         next.push({ index: next.length, assistantText: '' })
@@ -159,9 +163,14 @@ export function chatTimelineReducer(
                 const steps = ensureStep(turnView.steps, action.step)
                 const currentStep = steps[action.step]
                 if (!currentStep) return turnView
+                // Only create new step object if assistantText actually changed
+                const newText = `${currentStep.assistantText}${action.chunk}`
+                if (newText === currentStep.assistantText) {
+                    return turnView
+                }
                 steps[action.step] = {
                     ...currentStep,
-                    assistantText: `${currentStep.assistantText}${action.chunk}`,
+                    assistantText: newText,
                 }
                 return { ...turnView, steps }
             })

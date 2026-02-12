@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useInput, useStdout } from 'ink'
 import type { MCPServerConfig, ProviderConfig } from '@memo/core'
 import { resolveSlashCommand, SLASH_SPECS } from '../slash/registry'
@@ -334,7 +334,7 @@ async function buildSuggestionsForTrigger({
     }
 }
 
-export function Composer({
+export const Composer = memo(function Composer({
     disabled,
     busy,
     history,
@@ -990,4 +990,4 @@ export function Composer({
             ) : null}
         </Box>
     )
-}
+})

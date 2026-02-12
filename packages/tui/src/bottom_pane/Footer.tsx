@@ -1,4 +1,6 @@
+import { memo } from 'react'
 import { Box, Text } from 'ink'
+import { Spinner } from '@inkjs/ui'
 
 type FooterProps = {
     busy: boolean
@@ -7,21 +9,26 @@ type FooterProps = {
     tokenLine?: string
 }
 
-export function Footer({ busy, pendingApproval = false, contextPercent, tokenLine }: FooterProps) {
+export const Footer = memo(function Footer({
+    busy,
+    pendingApproval = false,
+    contextPercent,
+    tokenLine,
+}: FooterProps) {
     const context = `${contextPercent.toFixed(1)}%`
     const helpText = pendingApproval
-        ? 'Approval pending • ↑/↓ select • Enter confirm • Esc deny'
-        : busy
-          ? 'Working...  Esc Esc to interrupt'
-          : 'Enter send • Shift+Enter newline • /help'
+        ? 'Approval pending • Enter confirm • Esc deny'
+        : 'Enter send • Shift+Enter newline • /help'
 
     return (
         <Box justifyContent="space-between">
-            <Text color="gray">{helpText}</Text>
+            <Box>
+                {busy ? <Spinner label="Working..." /> : <Text color="gray">{helpText}</Text>}
+            </Box>
             <Text color="gray">
                 {tokenLine ? `${tokenLine} • ` : ''}
                 context: {context}
             </Text>
         </Box>
     )
-}
+})

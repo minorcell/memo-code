@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ink Terminal App Dev"
+  short_description: "Build and maintain production Ink terminal apps"
+  default_prompt: "Design or implement an Ink-based terminal app with strong architecture, UX patterns, testing, and ecosystem choices."

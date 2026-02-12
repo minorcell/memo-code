@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Box, Text } from 'ink'
 import {
     TOOL_STATUS,
@@ -39,7 +40,7 @@ function mainParam(input: unknown, cwd: string): string | null {
     return truncate(safeStringify(record), 70)
 }
 
-export function SystemCell({ message }: { message: SystemMessage }) {
+export const SystemCell = memo(function SystemCell({ message }: { message: SystemMessage }) {
     const color = message.tone === 'error' ? 'red' : message.tone === 'warning' ? 'yellow' : 'cyan'
 
     return (
@@ -48,9 +49,9 @@ export function SystemCell({ message }: { message: SystemMessage }) {
             <Text color="gray">{message.content}</Text>
         </Box>
     )
-}
+})
 
-function StepCell({ step, cwd }: { step: StepView; cwd: string }) {
+const StepCell = memo(function StepCell({ step, cwd }: { step: StepView; cwd: string }) {
     const isParallel = Boolean(step.parallelActions && step.parallelActions.length > 1)
     const singleActionParam = !isParallel && step.action ? mainParam(step.action.input, cwd) : null
 
@@ -93,9 +94,9 @@ function StepCell({ step, cwd }: { step: StepView; cwd: string }) {
             ) : null}
         </Box>
     )
-}
+})
 
-export function TurnCell({ turn, cwd }: { turn: TurnView; cwd: string }) {
+export const TurnCell = memo(function TurnCell({ turn, cwd }: { turn: TurnView; cwd: string }) {
     return (
         <Box flexDirection="column">
             <Box marginY={0.5}>
@@ -120,4 +121,4 @@ export function TurnCell({ turn, cwd }: { turn: TurnView; cwd: string }) {
             {turn.errorMessage ? <Text color="red">{turn.errorMessage}</Text> : null}
         </Box>
     )
-}
+})
