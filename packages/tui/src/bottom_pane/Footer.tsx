@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Box, Text } from 'ink'
 
 type FooterProps = {
@@ -7,7 +8,12 @@ type FooterProps = {
     tokenLine?: string
 }
 
-export function Footer({ busy, pendingApproval = false, contextPercent, tokenLine }: FooterProps) {
+export const Footer = memo(function Footer({
+    busy,
+    pendingApproval = false,
+    contextPercent,
+    tokenLine,
+}: FooterProps) {
     const context = `${contextPercent.toFixed(1)}%`
     const helpText = pendingApproval
         ? 'Approval pending • ↑/↓ select • Enter confirm • Esc deny'
@@ -24,4 +30,4 @@ export function Footer({ busy, pendingApproval = false, contextPercent, tokenLin
             </Text>
         </Box>
     )
-}
+})

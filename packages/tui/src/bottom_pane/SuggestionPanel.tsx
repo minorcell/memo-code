@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Box, Text } from 'ink'
 
 export type SuggestionKind = 'file' | 'history' | 'slash' | 'model' | 'context' | 'tools'
@@ -18,7 +19,11 @@ type SuggestionPanelProps = {
 const ACTIVE_BG = '#3a3a3a'
 const INACTIVE_BG = '#262626'
 
-export function SuggestionPanel({ items, activeIndex, loading }: SuggestionPanelProps) {
+export const SuggestionPanel = memo(function SuggestionPanel({
+    items,
+    activeIndex,
+    loading,
+}: SuggestionPanelProps) {
     if (loading) {
         return (
             <Box paddingX={1} {...({ backgroundColor: INACTIVE_BG } as any)}>
@@ -55,4 +60,4 @@ export function SuggestionPanel({ items, activeIndex, loading }: SuggestionPanel
             })}
         </Box>
     )
-}
+})

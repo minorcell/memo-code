@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink'
-import { useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { writeMemoConfig, type MemoConfig } from '@memo/core'
 
 type SetupWizardProps = {
@@ -47,7 +47,11 @@ const STEPS: SetupStep[] = [
     },
 ]
 
-export function SetupWizard({ configPath, onComplete, onExit }: SetupWizardProps) {
+export const SetupWizard = memo(function SetupWizard({
+    configPath,
+    onComplete,
+    onExit,
+}: SetupWizardProps) {
     const [stepIndex, setStepIndex] = useState(0)
     const [draft, setDraft] = useState('')
     const [values, setValues] = useState<Partial<SetupValues>>({})
@@ -152,4 +156,4 @@ export function SetupWizard({ configPath, onComplete, onExit }: SetupWizardProps
             ) : null}
         </Box>
     )
-}
+})

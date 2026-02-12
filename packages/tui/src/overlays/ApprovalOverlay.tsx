@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
 import type { ApprovalDecision, ApprovalRequest } from '@memo/tools/approval'
 
@@ -29,7 +29,10 @@ function shortParam(params: unknown): string {
     return `${key}=${raw?.slice(0, 60) ?? ''}${raw && raw.length > 60 ? '...' : ''}`
 }
 
-export function ApprovalOverlay({ request, onDecision }: ApprovalOverlayProps) {
+export const ApprovalOverlay = memo(function ApprovalOverlay({
+    request,
+    onDecision,
+}: ApprovalOverlayProps) {
     const [selected, setSelected] = useState(0)
     const options = DEFAULT_OPTIONS
 
@@ -79,4 +82,4 @@ export function ApprovalOverlay({ request, onDecision }: ApprovalOverlayProps) {
             </Box>
         </Box>
     )
-}
+})

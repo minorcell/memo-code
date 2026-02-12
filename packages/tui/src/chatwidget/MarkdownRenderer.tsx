@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import { Box, Text } from 'ink'
 import {
     parseInlineNodes,
@@ -152,15 +153,15 @@ function renderBlock(node: MarkdownBlock, key: string) {
     }
 }
 
-export function MarkdownRenderer({ content }: { content: string }) {
-    const nodes = parseMarkdownContent(content)
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content }: { content: string }) {
+    const nodes = useMemo(() => parseMarkdownContent(content), [content])
 
     return (
         <Box flexDirection="column">
             {nodes.map((node, index) => renderBlock(node, `${node.type}-${index}`))}
         </Box>
     )
-}
+})
 
 export const MARKDOWN_RENDERER_TEST_EXPORTS = {
     HORIZONTAL_RULE_TEXT,

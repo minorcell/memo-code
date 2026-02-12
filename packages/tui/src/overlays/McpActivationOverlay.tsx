@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
 
 type McpActivationOverlayProps = {
@@ -13,7 +13,7 @@ function normalizeSelected(serverNames: string[], selected: string[]) {
     return selected.filter((name) => allowed.has(name))
 }
 
-export function McpActivationOverlay({
+export const McpActivationOverlay = memo(function McpActivationOverlay({
     serverNames,
     defaultSelected,
     onConfirm,
@@ -116,4 +116,4 @@ export function McpActivationOverlay({
             </Box>
         </Box>
     )
-}
+})
