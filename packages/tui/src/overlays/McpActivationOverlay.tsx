@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import { MultiSelect, type Option } from '@inkjs/ui'
 
 type McpActivationOverlayProps = {
     serverNames: string[]
@@ -26,10 +27,6 @@ export const McpActivationOverlay = memo(function McpActivationOverlay({
     }, [defaultSelected, serverNames])
 
     const [selectedNames, setSelectedNames] = useState<string[]>(initialSelection)
-    const [cursor, setCursor] = useState(0)
-    const [persistSelection, setPersistSelection] = useState(true)
-
-    const selectedSet = useMemo(() => new Set(selectedNames), [selectedNames])
     const allSelected = selectedNames.length === serverNames.length
 
     useInput((input, key) => {
@@ -38,53 +35,8 @@ export const McpActivationOverlay = memo(function McpActivationOverlay({
             return
         }
 
-        if (key.upArrow) {
-            setCursor((prev) => (prev <= 0 ? serverNames.length - 1 : prev - 1))
-            return
-        }
-
-        if (key.downArrow) {
-            setCursor((prev) => (prev + 1) % serverNames.length)
-            return
-        }
-
-        if (key.return) {
-            onConfirm(selectedNames, persistSelection)
-            return
-        }
-
-        if (input === ' ') {
-            const target = serverNames[cursor]
-            if (!target) return
-            setSelectedNames((prev) => {
-                const next = new Set(prev)
-                if (next.has(target)) {
-                    next.delete(target)
-                } else {
-                    next.add(target)
-                }
-                return serverNames.filter((name) => next.has(name))
-            })
-            return
-        }
-
-        if (input.toLowerCase() === 'a') {
-            setSelectedNames([...serverNames])
-            return
-        }
-
-        if (input.toLowerCase() === 'n') {
-            setSelectedNames([])
-            return
-        }
-
-        if (input.toLowerCase() === 'p') {
-            setPersistSelection((prev) => !prev)
-            return
-        }
-
         if (key.escape) {
-            onConfirm(selectedNames, persistSelection)
+            onConfirm(selectedNames, false)
         }
     })
 
@@ -95,24 +47,21 @@ export const McpActivationOverlay = memo(function McpActivationOverlay({
             </Text>
             <Text color="gray">Select servers to load for this run.</Text>
             <Box marginTop={1} flexDirection="column">
-                {serverNames.map((name, index) => {
-                    const checked = selectedSet.has(name)
-                    return (
-                        <Text key={name} color={index === cursor ? 'green' : 'gray'}>
-                            {index === cursor ? '> ' : '  '}[{checked ? 'x' : ' '}] {name}
-                        </Text>
-                    )
-                })}
+                <MultiSelect
+                    options={serverNames.map((name): Option => ({ label: name, value: name }))}
+                    defaultValue={initialSelection}
+                    onChange={setSelectedNames}
+                    onSubmit={(value) => {
+                        onConfirm(value, true)
+                    }}
+                />
             </Box>
             <Box marginTop={1} flexDirection="column">
                 <Text color="gray">
                     Selected: {selectedNames.length}/{serverNames.length}
                     {allSelected ? ' (all)' : ''}
                 </Text>
-                <Text color="gray">Persist as default: {persistSelection ? 'yes' : 'no'}</Text>
-                <Text color="gray">
-                    Controls: ↑/↓ move, Space toggle, A all, N none, P persist, Enter confirm
-                </Text>
+                <Text color="gray">Controls: ↑/↓ move, Space toggle, Enter confirm</Text>
             </Box>
         </Box>
     )

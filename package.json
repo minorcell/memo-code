@@ -14,7 +14,7 @@
         "LICENSE"
     ],
     "engines": {
-        "node": ">=18.0.0"
+        "node": ">=20.0.0"
     },
     "scripts": {
         "start": "tsx packages/tui/src/cli.tsx",
@@ -37,7 +37,7 @@
     },
     "devDependencies": {
         "@types/node": "^22.10.2",
-        "@types/react": "^18.2.79",
+        "@types/react": "^19.2.14",
         "prettier": "^3.3.3",
         "tsup": "^8.3.5",
         "tsx": "^4.19.2",
@@ -47,13 +47,14 @@
     },
     "dependencies": {
         "@dqbd/tiktoken": "^1.0.22",
+        "@inkjs/ui": "^2.0.0",
         "@modelcontextprotocol/sdk": "^1.24.3",
         "fast-glob": "^3.3.3",
-        "ink": "^5.0.0",
+        "ink": "^6.7.0",
         "marked": "^17.0.1",
         "openai": "^6.10.0",
-        "react": "^18.2.0",
-        "react-reconciler": "^0.29.0",
+        "react": "^19.2.4",
+        "react-reconciler": "^0.33.0",
         "string-width": "^7.2.0",
         "toml": "^3.0.0",
         "zod": "^4.3.6",

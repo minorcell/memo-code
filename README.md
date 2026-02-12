@@ -214,7 +214,7 @@ memo-cli/
 
 ## Tech Stack
 
-- **Runtime**: Node.js 18+
+- **Runtime**: Node.js 20+
 - **Language**: TypeScript
 - **UI**: React + Ink
 - **Protocol**: MCP (Model Context Protocol)
@@ -224,7 +224,6 @@ memo-cli/
 
 - [User Guide](./site/content/docs/README.md) - User-facing docs by module
 - [Core Architecture](./docs/core.md) - Core implementation details
-- [TUI Rewrite Design](./docs/tui-rewrite-design.md) - Codex-aligned TUI architecture and migration notes
 - [CLI Adaptation History](./docs/cli-update.md) - Historical migration notes (Tool Use API)
 - [Contributing](./CONTRIBUTING.md) - Contribution guide
 - [Project Guidelines](./AGENTS.md) - Coding conventions and development process

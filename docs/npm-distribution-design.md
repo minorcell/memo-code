@@ -6,7 +6,7 @@
 
 - **Cross-platform compatibility**: support macOS, Linux, and Windows without per-platform recompilation
 - **Zero runtime dependency setup for users**: package all dependencies into one deliverable file
-- **Standard Node.js runtime**: require only Node.js >=18 (no Bun-specific runtime dependency)
+- **Standard Node.js runtime**: require only Node.js >=20 (no Bun-specific runtime dependency)
 - **Small package size**: published package under 100KB for fast install
 
 ### 1.2 Comparison with Binary Distribution
@@ -17,7 +17,7 @@
 | Signing requirements | none                          | macOS/Windows signing required |
 | Package size         | ~38KB                         | ~50-100MB                      |
 | Update workflow      | `npm update`                  | manual download/replace        |
-| Runtime requirement  | Node.js >=18                  | none                           |
+| Runtime requirement  | Node.js >=20                  | none                           |
 | Install speed        | fast                          | slower                         |
 
 ## 2. Architecture
@@ -41,7 +41,7 @@
 └─────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────┐
-│         Node.js Runtime (>=18)          │
+│         Node.js Runtime (>=20)          │
 └─────────────────────────────────────────┘
 ```
 

@@ -1,5 +1,6 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import { Box, Text, useInput } from 'ink'
+import { Select, StatusMessage, type Option as SelectOption } from '@inkjs/ui'
 import type { ApprovalDecision, ApprovalRequest } from '@memo/tools/approval'
 
 type ApprovalOverlayProps = {
@@ -7,12 +8,12 @@ type ApprovalOverlayProps = {
     onDecision: (decision: ApprovalDecision) => void
 }
 
-type Option = {
+type ApprovalOption = {
     label: string
     decision: ApprovalDecision
 }
 
-const DEFAULT_OPTIONS: Option[] = [
+const DEFAULT_OPTIONS: ApprovalOption[] = [
     { label: 'Allow once', decision: 'once' },
     { label: 'Allow for this session', decision: 'session' },
     { label: 'Deny', decision: 'deny' },
@@ -33,28 +34,7 @@ export const ApprovalOverlay = memo(function ApprovalOverlay({
     request,
     onDecision,
 }: ApprovalOverlayProps) {
-    const [selected, setSelected] = useState(0)
-    const options = DEFAULT_OPTIONS
-
     useInput((input, key) => {
-        if (key.upArrow) {
-            setSelected((prev) => (prev <= 0 ? options.length - 1 : prev - 1))
-            return
-        }
-
-        if (key.downArrow) {
-            setSelected((prev) => (prev + 1) % options.length)
-            return
-        }
-
-        if (key.return) {
-            const option = options[selected]
-            if (option) {
-                onDecision(option.decision)
-            }
-            return
-        }
-
         if (key.escape || (key.ctrl && input === 'c')) {
             onDecision('deny')
         }
@@ -71,14 +51,24 @@ export const ApprovalOverlay = memo(function ApprovalOverlay({
                 {request.toolName}
                 {param ? ` (${param})` : ''}
             </Text>
-            <Text color="gray">{request.reason}</Text>
+            <Box marginTop={1}>
+                <StatusMessage variant="warning">{request.reason}</StatusMessage>
+            </Box>
             <Box marginTop={1} flexDirection="column">
-                {options.map((option, index) => (
-                    <Text key={option.decision} color={selected === index ? 'green' : 'gray'}>
-                        {selected === index ? '> ' : '  '}
-                        {option.label}
-                    </Text>
-                ))}
+                <Select
+                    options={DEFAULT_OPTIONS.map(
+                        (option): SelectOption => ({
+                            label: option.label,
+                            value: option.decision,
+                        }),
+                    )}
+                    onChange={(value) => {
+                        onDecision(value as ApprovalDecision)
+                    }}
+                />
+            </Box>
+            <Box marginTop={1}>
+                <Text color="gray">Enter confirm • Esc deny</Text>
             </Box>
         </Box>
     )

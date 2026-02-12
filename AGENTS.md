@@ -6,7 +6,7 @@
 - `packages/core/`: Session state machine, provider/config handling, shared types.
 - `packages/tools/`: Built-in MCP-like tools; tests live next to implementations and use `*.test.ts`.
 - `docs/`: Development docs and design direction; `public/`: static TUI assets.
-- Root scripts are managed by `package.json`; requires Node.js >=18 and pnpm. Install `rg` for faster search. Type/path aliases are in `tsconfig.json`.
+- Root scripts are managed by `package.json`; requires Node.js >=20 and pnpm. Install `rg` for faster search. Type/path aliases are in `tsconfig.json`.
 - Runtime config and logs are stored in `~/.memo/` by default, and can be redirected with `MEMO_HOME`.
 
 ## Build, Test, and Development

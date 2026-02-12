@@ -8,7 +8,7 @@ export default defineConfig({
     },
     outDir: 'dist',
     format: ['esm'],
-    target: 'node18',
+    target: 'node20',
     dts: false,
     clean: true,
     minify: true,
