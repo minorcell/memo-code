@@ -93,10 +93,7 @@ describe('JsonlHistorySink', () => {
         await Promise.all(events.map((event) => sink.append(event)))
         await sink.flush()
 
-        const lines = (await readFile(filePath, 'utf8'))
-            .trim()
-            .split('\n')
-            .filter(Boolean)
+        const lines = (await readFile(filePath, 'utf8')).trim().split('\n').filter(Boolean)
         expect(lines).toHaveLength(20)
         const parsed = lines.map((line) => JSON.parse(line) as { content?: string })
         expect(parsed[0]?.content).toBe('event-0')
@@ -112,10 +109,7 @@ describe('JsonlHistorySink', () => {
         await sink.close()
         await Promise.all([first, second])
 
-        const lines = (await readFile(filePath, 'utf8'))
-            .trim()
-            .split('\n')
-            .filter(Boolean)
+        const lines = (await readFile(filePath, 'utf8')).trim().split('\n').filter(Boolean)
         expect(lines).toHaveLength(2)
         await expect(
             sink.append(createHistoryEvent({ sessionId: 's-close', type: 'final' })),

@@ -24,12 +24,10 @@ describe('accumulateUsage', () => {
 describe('emitEventToSinks', () => {
     test('writes structured error payload to stderr when sink append fails', async () => {
         const writes: string[] = []
-        const writeSpy = vi
-            .spyOn(process.stderr, 'write')
-            .mockImplementation(((chunk: unknown) => {
-                writes.push(String(chunk))
-                return true
-            }) as typeof process.stderr.write)
+        const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+            writes.push(String(chunk))
+            return true
+        }) as typeof process.stderr.write)
 
         const failingSink: HistorySink = {
             append: async () => {
