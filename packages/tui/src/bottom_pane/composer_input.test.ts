@@ -23,6 +23,11 @@ describe('composer_input', () => {
         assert.deepStrictEqual(next, { value: 'hello, brave world', cursor: 12 })
     })
 
+    test('normalizes pasted CRLF and CR line endings', () => {
+        const next = insertAtCursor('', 0, '- a\r\n- b\r- c')
+        assert.deepStrictEqual(next, { value: '- a\n- b\n- c', cursor: 11 })
+    })
+
     test('backspace and delete respect unicode code points', () => {
         const source = 'a🙂b'
         const backspaced = backspaceAtCursor(source, 3)

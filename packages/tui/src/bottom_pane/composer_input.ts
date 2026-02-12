@@ -109,8 +109,14 @@ export function insertAtCursor(value: string, cursor: number, input: string): Ed
         return { value, cursor: safeCursor }
     }
 
-    const nextValue = `${value.slice(0, safeCursor)}${input}${value.slice(safeCursor)}`
-    return { value: nextValue, cursor: safeCursor + input.length }
+    // Normalize pasted line endings to avoid terminal carriage-return artifacts.
+    const normalizedInput = input.replace(/\r\n?/g, '\n')
+    if (!normalizedInput) {
+        return { value, cursor: safeCursor }
+    }
+
+    const nextValue = `${value.slice(0, safeCursor)}${normalizedInput}${value.slice(safeCursor)}`
+    return { value: nextValue, cursor: safeCursor + normalizedInput.length }
 }
 
 export function backspaceAtCursor(value: string, cursor: number): EditorBuffer {
