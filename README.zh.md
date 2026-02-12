@@ -139,15 +139,13 @@ memo mcp remove remote
 
 ## 会话历史
 
-所有会话自动保存到 `~/.memo/sessions/`，按日期分层组织：
+所有会话自动保存到 `~/.memo/sessions/`，按项目绝对路径分层组织：
 
 ```
 ~/.memo/sessions/
-  └── 2026/
-      └── 02/
-          └── 08/
-              ├── rollout-2026-02-08T02-21-18-abc123.jsonl
-              └── rollout-2026-02-08T02-42-09-def456.jsonl
+  └── -Users-mcell-Desktop-workspace-memo-code/
+      ├── 2026-02-08T02-21-18-abc123.jsonl
+      └── 2026-02-08T02-42-09-def456.jsonl
 ```
 
 JSONL 格式便于分析和调试。

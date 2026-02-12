@@ -143,15 +143,13 @@ Memo includes a tool-approval mechanism to reduce risky operations:
 
 ## Session History
 
-All sessions are saved to `~/.memo/sessions/`, grouped by date:
+All sessions are saved to `~/.memo/sessions/`, grouped by project absolute path:
 
 ```text
 ~/.memo/sessions/
-  └── 2026/
-      └── 02/
-          └── 08/
-              ├── rollout-2026-02-08T02-21-18-abc123.jsonl
-              └── rollout-2026-02-08T02-42-09-def456.jsonl
+  └── -Users-mcell-Desktop-workspace-memo-code/
+      ├── 2026-02-08T02-21-18-abc123.jsonl
+      └── 2026-02-08T02-42-09-def456.jsonl
 ```
 
 JSONL format is useful for analysis and debugging.
