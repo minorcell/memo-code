@@ -8,9 +8,7 @@ type DocContentProps = {
 export function DocContent({ page }: DocContentProps) {
     return (
         <article id="doc-article" className="doc-prose">
-            {page.introHtml ? (
-                <div className="doc-intro" dangerouslySetInnerHTML={{ __html: page.introHtml }} />
-            ) : null}
+            {page.introContent ? <div className="doc-intro">{page.introContent}</div> : null}
 
             {page.sections.map((section) => (
                 <section key={section.id} id={section.id} className="doc-section scroll-mt-24">
@@ -23,9 +21,7 @@ export function DocContent({ page }: DocContentProps) {
                             <Link className="h-4 w-4 text-[var(--text-tertiary)] opacity-0 transition-opacity group-hover:opacity-100" />
                         </a>
                     </h2>
-                    {section.html ? (
-                        <div dangerouslySetInnerHTML={{ __html: section.html }} />
-                    ) : null}
+                    {section.content ? <div>{section.content}</div> : null}
                 </section>
             ))}
         </article>

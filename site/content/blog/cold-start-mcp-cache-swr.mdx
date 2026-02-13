@@ -1,0 +1,237 @@
+---
+title: 'Agent 冷启动优化：MCP 缓存的 SWR 统一策略'
+description: 'Agent 每次启动都要等 MCP server 连接？重复请求太多？这篇记录了 memo 如何用 SWR 思想把启动缓存和运行缓存统一成一份数据，把冷启动时间和重复请求一起打下来。'
+date: '2026-02-13'
+order: 3
+---
+
+# Agent 冷启动优化：MCP 缓存的 SWR 统一策略
+
+做 Agent 开发的人大多会遇到两个痛点：
+
+1. **冷启动慢**：会话一启动就要连 MCP server、拉 `listTools`，首屏交互时间直接被网络和 server 状态绑住。
+2. **重复请求多**：`list_mcp_resources`、`read_mcp_resource` 在跨会话和重复调用时，冗余请求很明显。
+
+memo（[https://github.com/minorcell/memo-code](https://github.com/minorcell/memo-code)）的 MCP 能力做了几周后，这俩问题变得很突出。连接池能解决进程内复用，但它覆盖不了"新进程重启"这条路径，也没法把工具发现和资源读取放到同一套缓存策略里。
+
+这篇讲 memo 怎么用 SWR（Stale-While-Revalidate）思想统一这两件事。
+
+## 先想清楚目标
+
+我想要的是三件事：
+
+- **第二次启动尽量快**：先用本地缓存，先可用再说。
+- **缓存只有一份**：启动阶段缓存和运行时缓存放在同一份数据里，别搞两套。
+- **策略可解释**：什么时候用缓存、什么时候刷新、什么时候失效——都要说得清。
+
+## 方案：SWR 分三层
+
+核心思路是 `stale-while-revalidate`，拆成三层看：
+
+<McpCacheSWRDiagram />
+
+### 第一层：启动阶段——Tools Cache
+
+memo 启动时会先读 `~/.memo/cache/mcp.json`（遵循 `MEMO_HOME` 环境变量）：
+
+```typescript
+// packages/tools/src/router/mcp/cache_store.ts
+
+async function ensureLoaded(): Promise<void> {
+    if (!isDiskCacheEnabled()) {
+        this.loaded = true
+        return
+    }
+    // ...
+    const cachePath = getCacheFilePath()
+    const raw = await readFile(cachePath, 'utf8')
+    const parsed = JSON.parse(raw)
+    // ...
+}
+```
+
+如果命中 `toolsByServer`：
+
+- **先注册工具**，马上可用
+- 如果缓存 `ageMs > fresh TTL (10min)`，后台刷新
+
+如果没命中：
+
+- 走同步连接 + `listTools` 拉取，再写回缓存
+
+### 第二层：运行阶段——Resources Cache
+
+`list_mcp_resources`、`list_mcp_resource_templates`、`read_mcp_resource` 全部走统一缓存层（内存 + 磁盘）：
+
+```typescript
+class McpCacheStore {
+    private responseInflight = new Map<string, Promise<unknown>>()
+
+    async getOrFetch<T>(key: string, fetcher: () => Promise<T>, ttlMs: number): Promise<T> {
+        // 1. 查缓存
+        const cached = this.data.responses[key]
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.value as T
+        }
+
+        // 2. in-flight 去重
+        const existing = this.responseInflight.get(key)
+        if (existing) return existing as Promise<T>
+
+        // 3. 发起请求
+        const promise = fetcher()
+        this.responseInflight.set(key, promise)
+
+        try {
+            const result = await promise
+            // 4. 写缓存
+            this.data.responses[key] = {
+                expiresAt: Date.now() + ttlMs,
+                value: result,
+            }
+            this.requestPersist()
+            return result
+        } finally {
+            this.responseInflight.delete(key)
+        }
+    }
+}
+```
+
+缓存支持：
+
+- **TTL 过期**：`list*` 15秒，`read` 60秒
+- **in-flight 去重**：同 key 并发请求复用同一个 Promise，防止请求风暴
+- **部分失败容忍**：全量聚合时允许单 server 失败，返回 errors
+
+### 第三层：单一缓存文件
+
+统一落地到 `~/.memo/cache/mcp.json`，内部拆两块：
+
+```typescript
+type McpCacheFile = {
+    version: number
+    toolsByServer: Record<string, CachedServerToolsEntry>
+    responses: Record<string, CachedResponseEntry>
+}
+```
+
+- `toolsByServer`：给启动阶段用，按 server name 组织
+- `responses`：给运行阶段工具调用用，按请求 key 组织
+
+## 更新与失效策略
+
+### `toolsByServer`
+
+- `fresh TTL`: 10 分钟
+- `max-stale`: 24 小时
+- `configHash`：MCP 配置变更时，相关 server 缓存立即失效
+
+过期后的行为：
+
+- `<= max-stale`：先用缓存，后台刷新
+- `> max-stale`：丢弃缓存，回退同步拉取
+
+```typescript
+function configHash(config: MCPServerConfig): string {
+    return createHash('sha256').update(stableStringify(config)).digest('hex')
+}
+```
+
+### `responses`
+
+- `list*` 默认 TTL：15 秒
+- `read` 默认 TTL：60 秒
+- 同 key 并发请求复用同一个 Promise，防止请求风暴
+
+## 容错与一致性——四个关键设计
+
+### 1. 写盘原子化
+
+避免中间态文件导致缓存损坏：
+
+```typescript
+private async persistToDisk(): Promise<void> {
+    const cachePath = getCacheFilePath()
+    const tempPath = `${cachePath}.tmp`
+    await writeFile(tempPath, JSON.stringify(this.data), 'utf8')
+    await rename(tempPath, cachePath) // rename 是原子操作
+}
+```
+
+### 2. 写盘节流
+
+高频 IO 影响性能，用 debounce 合并写入：
+
+```typescript
+private requestPersist(): void {
+    if (this.persistTimer) return
+    this.persistTimer = setTimeout(() => {
+        this.persistTimer = null
+        this.flushPersistQueue()
+    }, CACHE_PERSIST_DEBOUNCE_MS)
+}
+```
+
+`CACHE_PERSIST_DEBOUNCE_MS` 设为 120ms。
+
+### 3. 部分失败容忍
+
+全量聚合时，单 server 失败不阻塞整体：
+
+```typescript
+async function aggregateResources(): Promise<ResourceResult[]> {
+    const results = await Promise.allSettled(servers.map((s) => s.listResources()))
+    return results.map((r, i) => {
+        if (r.status === 'rejected') {
+            return { server: servers[i], error: r.reason }
+        }
+        return { server: servers[i], data: r.value }
+    })
+}
+```
+
+### 4. 懒连接执行
+
+缓存恢复的工具在首次调用时再连 server，避免"只为注册工具就全连"：
+
+```typescript
+// pool.ts
+async function getToolHandler(toolName: string): Promise<ToolHandler> {
+    // 先查缓存
+    const cached = this.toolCache.get(toolName)
+    if (cached) {
+        // 返回懒连接包装
+        return makeLazyHandler(cached, () => this.connectToServer(cached.server))
+    }
+    // ...
+}
+```
+
+## 关键代码位置
+
+- **统一缓存读写**：`packages/tools/src/router/mcp/cache_store.ts`
+- **启动流程**：`packages/tools/src/router/mcp/index.ts`
+- **连接池管理**：`packages/tools/src/router/mcp/pool.ts`
+- **资源工具切换**：`packages/tools/src/tools/mcp_resources.ts`
+
+## 预期收益
+
+1. **二次启动更快**：工具可以直接从缓存恢复，省去 MCP 握手和 `listTools` 网络开销
+2. **调用更稳**：重复请求减少，MCP server 压力下降
+3. **维护更简单**：启动和运行时缓存共用一套策略，不用维护两套逻辑
+
+## 关联
+
+- 相关 issue：[#155](https://github.com/minorcell/memo-code/issues/155)
+- 这篇可以当"冷启动 + MCP 缓存"后续演进的基线记录
+
+## 扩展思路
+
+如果你在做自己的 Agent，这套方案可以简化迁移：
+
+1. SWR 思想不限于 MCP，内部工具也可以用
+2. 单一缓存文件 + 分区设计，可以扩展到更多场景
+3. 懒连接 + in-flight 去重，是降低服务压力的通用手段
+
+（完）

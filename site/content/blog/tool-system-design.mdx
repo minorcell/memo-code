@@ -1,0 +1,268 @@
+---
+title: 'Agent 工具系统设计：定义、分级与编排的统一方案'
+description: '从 memo 的实践中提炼出工具系统的三层架构：定义层用声明式 DSL，风险层用关键词分级，编排层统一拦截。这套方案可以帮助你在 Agent 项目中建立清晰、可维护的工具治理机制。'
+date: '2026-02-13'
+order: 2
+---
+
+# Agent 工具系统设计：定义、分级与编排的统一方案
+
+我在做 memo（[https://github.com/minorcell/memo-code](https://github.com/minorcell/memo-code)）的时候，工具系统是绕不开的一环。Agent 到底能干什么、风险怎么控制、出问题怎么排查——这些问题随着工具数量增长会指数级变复杂。
+
+这篇想讲的不是"什么是工具"，而是**如何在实际项目中建立一套可维护的工具治理方案**。方案来自 memo 的真实演进，希望能给其他 Agent 开发者一些参考。
+
+## 先拆开看：工具系统的三层职责
+
+memo 的工具系统分成了三层，每层各司其职：
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    编排层 (Orchestrator)             │
+│    入参校验 → 审批拦截 → 结果裁剪 → 错误归类         │
+├─────────────────────────────────────────────────────┤
+│                   风险与审批层 (Approval)           │
+│           风险分级 → 审批策略 → 决策缓存             │
+├─────────────────────────────────────────────────────┤
+│                  工具定义层 (Definition)            │
+│         声明式 DSL → Schema 校验 → 并发能力标记     │
+└─────────────────────────────────────────────────────┘
+```
+
+这种分层的好处是：**每层的关注点单一，变更影响范围可控**。比如要改审批策略，不需要动工具定义；要加新工具，定义 + 编排自动生效。
+
+## 第一层：工具定义——用声明式 DSL 描述能力
+
+工具定义的目标是：**让机器能理解这个工具能做什么、参数是什么、是否有副作用**。
+
+memo 用了一个轻量级的 DSL（`defineMcpTool`），放在 `packages/tools/src/tools/types.ts`：
+
+```typescript
+defineMcpTool({
+    name: 'apply_patch',
+    description: 'Edit a local file by direct string replacement.',
+    inputSchema: zod_schema,
+    isMutating: true,
+    supportsParallelToolCalls: false,
+    execute: async (input) => CallToolResult,
+})
+```
+
+几个关键字段：
+
+- `name`：工具唯一标识，Agent 通过这个名字调用。
+- `description`：给模型看的能力描述，模型靠这个理解什么时候该用这个工具。
+- `inputSchema`：Zod Schema，编排层会自动校验参数合法性。
+- `isMutating`：标记是否有写操作，这是风险分级的重要依据。
+- `supportsParallelToolCalls`：是否允许并发调用，影响调度策略。
+- `execute`：实际执行逻辑，返回标准化结果。
+
+**为什么要用声明式而不是直接写函数？** 因为 Agent 需要"可发现的工具列表"。编排层会遍历所有已注册的工具，生成给模型的 manifest。声明式让这件事变得机械且可靠。
+
+## 第二层：风险分级——用关键词做第一道粗过滤
+
+Agent 调用工具是有风险的。`read_file` 最多读不该读的文件，`exec_command` 可能删库跑路。所以必须先做风险分级。
+
+memo 把风险分成四级（从低到高）：
+
+| 级别       | 含义             | 审批策略          |
+| ---------- | ---------------- | ----------------- |
+| `read`     | 读取操作         | auto 模式自动通过 |
+| `write`    | 写入/修改操作    | 首次审批后可缓存  |
+| `execute`  | 执行命令/子进程  | 每次都需要审批    |
+| `critical` | 高危操作（保留） | 每次都需要审批    |
+
+分级规则放在 `packages/tools/src/approval/classifier.ts`，核心逻辑是关键词匹配：
+
+```typescript
+function matchesAnyKeyword(name: string, keywords: readonly string[]): boolean {
+    return keywords.some((keyword) => name.includes(keyword))
+}
+```
+
+关键词列表：
+
+```typescript
+const EXECUTE_RISK_KEYWORDS = ['shell', 'exec', 'command', 'run', 'spawn'] as const
+const WRITE_RISK_KEYWORDS = ['patch', 'write', 'edit', 'create', 'delete'] as const
+const READ_RISK_KEYWORDS = ['read', 'file', 'list', 'grep', 'fetch', 'get'] as const
+```
+
+**为什么用关键词而不是人工标注？** 因为 memo 接入 MCP 后，外部 server 带来的工具数量是不可预期的。关键词兜底可以保证"至少不会被漏掉"，人工标注是补充而非替代。
+
+分级结果会进入审批流程。`auto` 模式下，`read` 直接过；`write` 首次需要审批，后续可以按 `session` 或 `once` 缓存决策；`execute` 每次都要审批。`strict` 模式则更保守，只要有风险就拦截。
+
+## 第三层：编排器——统一拦截所有工具调用
+
+编排器是整个系统的"门禁"，所有工具调用都必须经过它。memo 的编排器在 `packages/tools/src/orchestrator/index.ts`，职责包括四件事：
+
+### 1. 入参校验
+
+```typescript
+function parseToolInput(tool: OrchestratorTool, rawInput: unknown): ParseToolInputResult {
+    if (typeof rawInput === 'string') {
+        // 支持 JSON 字符串输入
+        const trimmed = rawInput.trim()
+        if (trimmed) {
+            try {
+                candidate = JSON.parse(trimmed)
+            } catch {
+                candidate = trimmed
+            }
+        }
+    }
+    // 调用工具定义的 validateInput
+    if (typeof tool.validateInput === 'function') {
+        const validated = tool.validateInput(candidate)
+        if (!validated.ok) return validated
+    }
+    return { ok: true, data: candidate }
+}
+```
+
+### 2. 审批拦截
+
+```typescript
+async executeAction(action: ToolAction, options?: ToolApprovalHooks): Promise<ToolActionResult> {
+    const check = this.approvalManager.check(action.name, action.input)
+
+    if (check.needApproval) {
+        // 触发审批回调
+        await options?.onApprovalRequest?.(request)
+        const decision = options?.requestApproval
+            ? await options.requestApproval(request)
+            : 'deny'
+        this.approvalManager.recordDecision(check.fingerprint, decision)
+
+        if (decision === 'deny') {
+            return { status: 'approval_denied', rejected: true }
+        }
+    }
+    // ...
+}
+```
+
+### 3. 结果裁剪
+
+工具输出可能很长，Agent 上下文有限。编排器会做默认裁剪：
+
+```typescript
+const DEFAULT_MAX_TOOL_RESULT_CHARS = 12_000
+```
+
+可以通过环境变量 `MEMO_TOOL_RESULT_MAX_CHARS` 调整。超限时会返回提示信息，让模型知道输出被截断了：
+
+```typescript
+function buildOversizeHintXml(toolName: string, actualChars: number, maxChars: number) {
+    return `<system_hint type="tool_output_omitted" tool="${toolName}" reason="too_long" actual_chars="${actualChars}" max_chars="${maxChars}">Tool output too long, automatically omitted.</system_hint>`
+}
+```
+
+### 4. 错误归类
+
+工具执行失败时，编排器会统一归类：
+
+```typescript
+function classifyExecutionError(err: unknown): ToolActionErrorType {
+    const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
+    if (message.includes('sandbox') || message.includes('permission denied')) {
+        return 'sandbox_denied'
+    }
+    return 'execution_failed'
+}
+```
+
+这样 Agent 可以根据错误类型做重试或降级策略，而不是被原始错误信息淹没。
+
+## 审批缓存——避免重复审批同一个操作
+
+审批如果每次都弹窗，用户体验会很差。memo 实现了三级审批缓存：
+
+- `session`：本会话内持续放行（适合"这个会话内信任这个工具"）
+- `once`：仅本次调用放行（适合"这次特殊情况允许，过后不算"）
+- `deny`：拒绝（用户明确说 no，后续不再询问）
+
+缓存 key 用工具名 + 参数指纹生成：
+
+```typescript
+function generateFingerprint(toolName: string, params: unknown): string {
+    return createHash('md5')
+        .update(`${toolName}:${JSON.stringify(params)}`)
+        .digest('hex')
+}
+```
+
+这样同一个工具、相同参数不会重复弹窗。
+
+## memo 内置工具现状
+
+| 工具                 | 功能           | 风险等级 | 并发支持 |
+| -------------------- | -------------- | -------- | -------- |
+| `read_file`          | 读取文件       | read     | ✓        |
+| `apply_patch`        | 编辑文件       | write    | ✗        |
+| `grep_files`         | 搜索内容       | read     | ✓        |
+| `list_dir`           | 列出目录       | read     | ✓        |
+| `exec_command`       | 执行命令       | execute  | ✓        |
+| `write_stdin`        | 写入 stdin     | execute  | ✓        |
+| `webfetch`           | HTTP 请求      | write    | ✓        |
+| `spawn_agent`        | 启动子 agent   | execute  | ✓        |
+| `update_plan`        | 更新任务计划   | read     | ✗        |
+| `get_memory`         | 获取持久化记忆 | read     | ✗        |
+| `list_mcp_resources` | 列出 MCP 资源  | read     | ✓        |
+| `read_mcp_resource`  | 读取 MCP 资源  | read     | ✓        |
+
+## 常见调用示例
+
+### `read_file`
+
+```typescript
+await read_file({ file_path: '/path/to/file.ts' })
+await read_file({ file_path: '/path/to/file.ts', offset: 10, limit: 50 })
+await read_file({
+    file_path: '/path/to/file.ts',
+    mode: 'indentation',
+    indentation: { anchor_line: 50, max_levels: 2 },
+})
+```
+
+### `apply_patch`
+
+```typescript
+await apply_patch({ file_path: '/path/to/file.ts', old_string: 'foo', new_string: 'bar' })
+await apply_patch({
+    file_path: '/path/to/file.ts',
+    edits: [{ old_string: 'foo', new_string: 'bar' }],
+    replace_all: true,
+})
+```
+
+### `exec_command`
+
+```typescript
+await exec_command({ cmd: 'ls -la' })
+await exec_command({ cmd: 'npm test', workdir: '/project/path' })
+await exec_command({ cmd: 'htop', tty: true })
+await exec_command({ cmd: 'docker build .', sandbox_permissions: 'require_escalated' })
+```
+
+## 这套方案可以迁移吗？
+
+可以。memo 的工具系统在设计上追求的是**与框架无关**：
+
+- 定义层只是一组 JSON Schema + 元数据
+- 分级层是可拔插的 classifier
+- 编排层依赖最少，可以复用在任何 Node.js Agent 项目
+
+如果你在做自己的 Agent，建议从这三层开始：
+
+1. 先有声明式定义，让工具可被发现
+2. 再有分级策略，让风险可控
+3. 最后有编排器，统一处理入参、审批、结果
+
+相关代码位置：
+
+- 定义层：`packages/tools/src/tools/types.ts`
+- 分级层：`packages/tools/src/approval/classifier.ts`
+- 审批层：`packages/tools/src/approval/manager.ts`
+- 编排层：`packages/tools/src/orchestrator/index.ts`
+
+（完）
