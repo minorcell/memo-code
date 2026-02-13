@@ -1,5 +1,7 @@
-import { readdir } from 'node:fs/promises'
-import { join, relative, sep } from 'node:path'
+import { existsSync, statSync } from 'node:fs'
+import { readFile, readdir } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import ignore, { type Ignore } from 'ignore'
 import type { FileSuggestion, FileSuggestionRequest } from './types'
 
 const DEFAULT_MAX_DEPTH = 6
@@ -38,7 +40,13 @@ type DirectoryCache = {
     pending?: Promise<IndexedEntry[]>
 }
 
+type GitIgnoreMatcher = {
+    root: string
+    ignores: (absPath: string) => boolean
+}
+
 const directoryCache = new Map<string, DirectoryCache>()
+const gitIgnoreMatcherCache = new Map<string, Promise<GitIgnoreMatcher>>()
 
 export function normalizePath(input: string): string {
     return input.split(sep).join('/')
@@ -48,6 +56,7 @@ type NormalizedOptions = {
     maxDepth: number
     maxEntries: number
     limit: number
+    respectGitIgnore: boolean
     ignoreGlobs: string[]
 }
 
@@ -59,6 +68,7 @@ function normalizeOptions(req: FileSuggestionRequest): NormalizedOptions {
                 ? Math.max(100, req.maxEntries)
                 : DEFAULT_MAX_ENTRIES,
         limit: typeof req.limit === 'number' ? Math.max(1, req.limit) : DEFAULT_LIMIT,
+        respectGitIgnore: req.respectGitIgnore ?? true,
         ignoreGlobs: req.ignoreGlobs?.length ? req.ignoreGlobs : [],
     }
 }
@@ -94,16 +104,92 @@ function shouldIgnorePath(normalizedPath: string, req: NormalizedOptions): boole
     })
 }
 
+function toPosixPath(inputPath: string): string {
+    return inputPath.replace(/\\/g, '/')
+}
+
+function findIgnoreRoot(startPath: string): string {
+    let dir = resolve(startPath)
+    try {
+        if (statSync(dir).isFile()) {
+            dir = dirname(dir)
+        }
+    } catch {
+        dir = process.cwd()
+    }
+    const initial = dir
+
+    while (true) {
+        if (existsSync(join(dir, '.gitignore')) || existsSync(join(dir, '.git'))) {
+            return dir
+        }
+        const parent = dirname(dir)
+        if (parent === dir) return initial
+        dir = parent
+    }
+}
+
+async function loadGitignore(root: string): Promise<string[]> {
+    const gitignorePath = join(root, '.gitignore')
+    if (!existsSync(gitignorePath)) return []
+
+    try {
+        const raw = await readFile(gitignorePath, 'utf8')
+        return raw
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0 && !line.startsWith('#'))
+    } catch {
+        return []
+    }
+}
+
+function createIgMatcher(rules: string[]): Ignore {
+    const ig = ignore()
+    if (rules.length > 0) {
+        ig.add(rules)
+    }
+    return ig
+}
+
+async function buildGitIgnoreMatcher(root: string): Promise<GitIgnoreMatcher> {
+    const ig = createIgMatcher(await loadGitignore(root))
+    return {
+        root,
+        ignores: (absPath: string) => {
+            const rel = relative(root, absPath)
+            if (!rel || rel.startsWith('..')) return false
+            return ig.ignores(toPosixPath(rel))
+        },
+    }
+}
+
+async function getGitIgnoreMatcher(startPath: string): Promise<GitIgnoreMatcher> {
+    const root = findIgnoreRoot(startPath)
+    const cached = gitIgnoreMatcherCache.get(root)
+    if (cached) return cached
+
+    const pending = buildGitIgnoreMatcher(root).catch((err) => {
+        gitIgnoreMatcherCache.delete(root)
+        throw err
+    })
+
+    gitIgnoreMatcherCache.set(root, pending)
+    return pending
+}
+
 function buildSignature(opts: NormalizedOptions): string {
     return JSON.stringify({
         maxDepth: opts.maxDepth,
         maxEntries: opts.maxEntries,
+        respectGitIgnore: opts.respectGitIgnore,
         ignoreGlobs: opts.ignoreGlobs,
     })
 }
 
 async function scanDirectory(cwd: string, opts: NormalizedOptions): Promise<IndexedEntry[]> {
     const entries: IndexedEntry[] = []
+    const gitIgnoreMatcher = opts.respectGitIgnore ? await getGitIgnoreMatcher(cwd) : null
 
     const walk = async (dir: string, depth: number) => {
         if (entries.length >= opts.maxEntries) return
@@ -120,6 +206,10 @@ async function scanDirectory(cwd: string, opts: NormalizedOptions): Promise<Inde
             if (dirent.isSymbolicLink()) continue
 
             const absolute = join(dir, dirent.name)
+            if (gitIgnoreMatcher?.ignores(absolute)) {
+                continue
+            }
+
             const rel = relative(cwd, absolute)
             if (!rel) continue
 
@@ -262,7 +352,9 @@ export async function getFileSuggestions(req: FileSuggestionRequest): Promise<Fi
 export function invalidateFileSuggestionCache(cwd?: string): void {
     if (cwd) {
         directoryCache.delete(cwd)
+        gitIgnoreMatcherCache.delete(findIgnoreRoot(cwd))
         return
     }
     directoryCache.clear()
+    gitIgnoreMatcherCache.clear()
 }
