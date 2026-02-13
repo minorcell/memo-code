@@ -2,18 +2,127 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 import type { McpTool, ToolRegistry, MCPServerConfig } from '../types'
 import { McpClientPool } from './pool'
-import { setActiveMcpPool } from './context'
+import { getGlobalMcpCacheStore, type CachedMcpToolDescriptor } from './cache_store'
+import { setActiveMcpCacheStore, setActiveMcpPool } from './context'
 
 /** MCP tool registry */
 export class McpToolRegistry {
     private pool: McpClientPool
+    private serverToolNames: Map<string, Set<string>> = new Map()
+    private refreshPromises: Map<string, Promise<void>> = new Map()
     private tools: Map<string, McpTool> = new Map()
+    private cacheStore = getGlobalMcpCacheStore()
     private readonly shouldLog: boolean
 
     constructor() {
         this.pool = new McpClientPool()
         setActiveMcpPool(this.pool)
+        setActiveMcpCacheStore(this.cacheStore)
         this.shouldLog = !(process.stdout.isTTY && process.stdin.isTTY)
+    }
+
+    private buildTool(
+        serverName: string,
+        config: MCPServerConfig,
+        descriptor: CachedMcpToolDescriptor,
+    ): McpTool {
+        return {
+            name: `${serverName}_${descriptor.originalName}`,
+            description:
+                descriptor.description || `Tool from ${serverName}: ${descriptor.originalName}`,
+            source: 'mcp',
+            serverName,
+            originalName: descriptor.originalName,
+            inputSchema: (descriptor.inputSchema as any) ?? {},
+            execute: async (input: unknown): Promise<CallToolResult> => {
+                const connection = await this.pool.connect(serverName, config)
+                return connection.client.callTool({
+                    name: descriptor.originalName,
+                    arguments: input as Record<string, unknown>,
+                }) as Promise<CallToolResult>
+            },
+        }
+    }
+
+    private replaceServerTools(serverName: string, nextTools: McpTool[]) {
+        const prev = this.serverToolNames.get(serverName)
+        if (prev) {
+            for (const toolName of prev) {
+                this.tools.delete(toolName)
+            }
+        }
+
+        const next = new Set<string>()
+        for (const tool of nextTools) {
+            this.tools.set(tool.name, tool)
+            next.add(tool.name)
+        }
+        this.serverToolNames.set(serverName, next)
+    }
+
+    private connectionToDescriptors(
+        serverName: string,
+        connection: Awaited<ReturnType<McpClientPool['connect']>>,
+    ): CachedMcpToolDescriptor[] {
+        return connection.tools.map((tool) => ({
+            originalName: tool.originalName,
+            description: tool.description || `Tool from ${serverName}: ${tool.originalName}`,
+            inputSchema: tool.inputSchema,
+        }))
+    }
+
+    private async refreshServer(
+        serverName: string,
+        config: MCPServerConfig,
+        mode: 'sync' | 'background',
+    ): Promise<void> {
+        const existing = this.refreshPromises.get(serverName)
+        if (existing) {
+            if (mode === 'sync') {
+                await existing
+            }
+            return
+        }
+
+        const task = (async () => {
+            try {
+                const connection = await this.pool.connect(serverName, config)
+                const descriptors = this.connectionToDescriptors(serverName, connection)
+                await this.cacheStore.setServerTools(serverName, config, descriptors)
+                const tools = descriptors.map((descriptor) =>
+                    this.buildTool(serverName, config, descriptor),
+                )
+                this.replaceServerTools(serverName, tools)
+                if (this.shouldLog && mode === 'background') {
+                    console.log(
+                        `[MCP] Refreshed '${serverName}' tools in background (${tools.length})`,
+                    )
+                }
+            } catch (err) {
+                if (this.shouldLog) {
+                    console.error(`[MCP] Failed to refresh server '${serverName}':`, err)
+                }
+            }
+        })()
+
+        this.refreshPromises.set(serverName, task)
+        task.finally(() => {
+            this.refreshPromises.delete(serverName)
+        })
+
+        if (mode === 'sync') {
+            await task
+        }
+    }
+
+    private removeToolsForMissingServers(activeServerNames: Set<string>) {
+        for (const [serverName, toolNames] of this.serverToolNames.entries()) {
+            if (activeServerNames.has(serverName)) continue
+            for (const toolName of toolNames) {
+                this.tools.delete(toolName)
+            }
+            this.serverToolNames.delete(serverName)
+        }
     }
 
     /**
@@ -26,48 +135,36 @@ export class McpToolRegistry {
             return 0
         }
 
-        let totalTools = 0
+        const entries = Object.entries(servers)
+        this.pool.setServerConfigs(servers)
+        this.removeToolsForMissingServers(new Set(entries.map(([name]) => name)))
 
-        await Promise.all(
-            Object.entries(servers).map(async ([name, config]) => {
-                try {
-                    const connection = await this.pool.connect(name, config)
+        const syncRefreshTasks: Promise<void>[] = []
 
-                    // Bind execute method for each tool
-                    for (const toolInfo of connection.tools) {
-                        const tool: McpTool = {
-                            ...toolInfo,
-                            execute: async (input: unknown): Promise<CallToolResult> => {
-                                const client = this.pool.get(toolInfo.serverName)?.client
-                                if (!client) {
-                                    throw new Error(
-                                        `MCP client for server '${toolInfo.serverName}' not found`,
-                                    )
-                                }
-                                return client.callTool({
-                                    name: toolInfo.originalName,
-                                    arguments: input as Record<string, unknown>,
-                                }) as Promise<CallToolResult>
-                            },
-                        }
-                        this.tools.set(tool.name, tool)
-                    }
-
-                    totalTools += connection.tools.length
-                    if (this.shouldLog) {
-                        console.log(
-                            `[MCP] Connected to '${name}' with ${connection.tools.length} tools`,
-                        )
-                    }
-                } catch (err) {
-                    if (this.shouldLog) {
-                        console.error(`[MCP] Failed to connect to server '${name}':`, err)
-                    }
+        for (const [serverName, config] of entries) {
+            const cached = await this.cacheStore.getServerTools(serverName, config)
+            if (cached) {
+                const tools = cached.tools.map((descriptor) =>
+                    this.buildTool(serverName, config, descriptor),
+                )
+                this.replaceServerTools(serverName, tools)
+                if (this.shouldLog) {
+                    console.log(
+                        `[MCP] Loaded ${tools.length} cached tools for '${serverName}' (${cached.stale ? 'stale' : 'fresh'})`,
+                    )
                 }
-            }),
-        )
 
-        return totalTools
+                if (cached.stale) {
+                    void this.refreshServer(serverName, config, 'background')
+                }
+                continue
+            }
+
+            syncRefreshTasks.push(this.refreshServer(serverName, config, 'sync'))
+        }
+
+        await Promise.all(syncRefreshTasks)
+        return this.tools.size
     }
 
     /** Get tool */
@@ -103,7 +200,10 @@ export class McpToolRegistry {
     async dispose(): Promise<void> {
         await this.pool.closeAll()
         this.tools.clear()
+        this.serverToolNames.clear()
+        this.refreshPromises.clear()
         setActiveMcpPool(null)
+        setActiveMcpCacheStore(null)
     }
 
     /** Get internal pool (for testing or advanced usage) */

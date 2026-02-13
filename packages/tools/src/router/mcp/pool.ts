@@ -100,6 +100,16 @@ async function connectWithConfig(
 /** MCP Client 连接池 */
 export class McpClientPool {
     private connections: Map<string, McpClientConnection> = new Map()
+    private pendingConnections: Map<string, Promise<McpClientConnection>> = new Map()
+    private serverConfigs: Map<string, MCPServerConfig> = new Map()
+
+    setServerConfigs(servers: Record<string, MCPServerConfig>) {
+        this.serverConfigs = new Map(Object.entries(servers))
+    }
+
+    hasServer(name: string): boolean {
+        return this.connections.has(name) || this.serverConfigs.has(name)
+    }
 
     /**
      * Connect to specified MCP Server
@@ -107,38 +117,70 @@ export class McpClientPool {
      * @param config - server configuration
      * @returns connection info (contains client, transport, and tool list)
      */
-    async connect(name: string, config: MCPServerConfig): Promise<McpClientConnection> {
+    async connect(name: string, config?: MCPServerConfig): Promise<McpClientConnection> {
+        if (config) {
+            this.serverConfigs.set(name, config)
+        }
+
         // If already connected, return directly
         const existing = this.connections.get(name)
         if (existing) {
             return existing
         }
 
-        // Establish new connection
-        const { client, transport } = await connectWithConfig(config)
-
-        // Get tool list
-        const toolsResult = await client.listTools()
-
-        // Build McpTool array (execute not filled yet, handled by Registry)
-        const connection: McpClientConnection = {
-            name,
-            client,
-            transport,
-            tools: (toolsResult.tools || []).map((t) => ({
-                name: `${name}_${t.name}`,
-                description: t.description || `Tool from ${name}: ${t.name}`,
-                source: 'mcp' as const,
-                serverName: name,
-                originalName: t.name,
-                inputSchema: t.inputSchema as any,
-                // execute 会在 registry 中绑定
-                execute: async () => ({ content: [] }),
-            })),
+        const inflight = this.pendingConnections.get(name)
+        if (inflight) {
+            return inflight
         }
 
-        this.connections.set(name, connection)
-        return connection
+        const effectiveConfig = config ?? this.serverConfigs.get(name)
+        if (!effectiveConfig) {
+            throw new Error(`MCP server config not found: ${name}`)
+        }
+
+        const pending = (async () => {
+            // Establish new connection
+            const { client, transport } = await connectWithConfig(effectiveConfig)
+
+            try {
+                // Get tool list
+                const toolsResult = await client.listTools()
+
+                // Build McpTool array (execute not filled yet, handled by Registry)
+                const connection: McpClientConnection = {
+                    name,
+                    client,
+                    transport,
+                    tools: (toolsResult.tools || []).map((t) => ({
+                        name: `${name}_${t.name}`,
+                        description: t.description || `Tool from ${name}: ${t.name}`,
+                        source: 'mcp' as const,
+                        serverName: name,
+                        originalName: t.name,
+                        inputSchema: t.inputSchema as any,
+                        // execute 会在 registry 中绑定
+                        execute: async () => ({ content: [] }),
+                    })),
+                }
+
+                this.connections.set(name, connection)
+                return connection
+            } catch (err) {
+                try {
+                    await client.close()
+                } catch {
+                    // Ignore close errors when bootstrap fails.
+                }
+                throw err
+            }
+        })()
+
+        this.pendingConnections.set(name, pending)
+        try {
+            return await pending
+        } finally {
+            this.pendingConnections.delete(name)
+        }
     }
 
     /** Get connected client */
@@ -149,6 +191,14 @@ export class McpClientPool {
     /** Get all connections */
     getAll(): McpClientConnection[] {
         return Array.from(this.connections.values())
+    }
+
+    getKnownServerNames(): string[] {
+        const names = new Set<string>([
+            ...Array.from(this.serverConfigs.keys()),
+            ...Array.from(this.connections.keys()),
+        ])
+        return Array.from(names.values())
     }
 
     /** Get all tools (across all connections) */
@@ -190,6 +240,7 @@ export class McpClientPool {
 
         await Promise.all(closePromises)
         this.connections.clear()
+        this.pendingConnections.clear()
     }
 
     /** Get connection count */
