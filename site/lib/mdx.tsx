@@ -3,11 +3,13 @@ import { compileMDX } from 'next-mdx-remote/rsc'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { McpCacheSWRDiagram } from '@/content/blog/components/mcp-cache-swr-diagram'
+import { ToolSystemArchitectureDiagram } from '@/content/blog/components/tool-system-architecture-diagram'
 
 type MdxComponentMap = Record<string, ComponentType<unknown>>
 
 const baseMdxComponents: MdxComponentMap = {
     McpCacheSWRDiagram,
+    ToolSystemArchitectureDiagram,
 }
 
 export async function renderMdx(
