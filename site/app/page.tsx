@@ -254,6 +254,12 @@ export default function Home() {
                             >
                                 Documentation
                             </Link>
+                            <Link
+                                href="/blog"
+                                className="transition-colors hover:text-[var(--text-primary)]"
+                            >
+                                Blog
+                            </Link>
                             <a
                                 href="https://github.com/minorcell/memo-cli"
                                 target="_blank"

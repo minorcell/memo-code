@@ -1,15 +1,16 @@
-import { existsSync } from 'node:fs'
+import { readdir } from 'node:fs/promises'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { cache } from 'react'
-import { marked } from 'marked'
+import type { ReactNode } from 'react'
+import { renderMdx } from '@/lib/mdx'
 
 export type DocCategory = 'Getting Started' | 'Core Features' | 'Extensions' | 'Operations'
 
 export type DocSection = {
     id: string
     title: string
-    html: string
+    content: ReactNode | null
 }
 
 export type DocPageSummary = {
@@ -21,86 +22,36 @@ export type DocPageSummary = {
 }
 
 export type DocPage = DocPageSummary & {
-    introHtml: string
+    introContent: ReactNode | null
     sections: DocSection[]
 }
 
 export type DocsHome = {
     title: string
-    html: string
+    content: ReactNode | null
 }
 
-type DocSpec = {
+type DocFrontmatter = {
     slug: string
-    fileName: string
+    title: string
+    description: string
     order: number
     category: DocCategory
 }
 
-// Documentation specification - order matters
-const DOC_SPECS: DocSpec[] = [
-    {
-        slug: 'getting-started',
-        fileName: 'getting-started.md',
-        order: 1,
-        category: 'Getting Started',
-    },
-    {
-        slug: 'cli-tui',
-        fileName: 'cli-tui.md',
-        order: 2,
-        category: 'Getting Started',
-    },
-    {
-        slug: 'configuration',
-        fileName: 'configuration.md',
-        order: 3,
-        category: 'Getting Started',
-    },
-    {
-        slug: 'tools',
-        fileName: 'tools.md',
-        order: 4,
-        category: 'Core Features',
-    },
-    {
-        slug: 'approval-safety',
-        fileName: 'approval-safety.md',
-        order: 5,
-        category: 'Core Features',
-    },
-    {
-        slug: 'subagent',
-        fileName: 'subagent.md',
-        order: 6,
-        category: 'Core Features',
-    },
-    {
-        slug: 'mcp',
-        fileName: 'mcp.md',
-        order: 7,
-        category: 'Extensions',
-    },
-    {
-        slug: 'sessions-history',
-        fileName: 'sessions-history.md',
-        order: 8,
-        category: 'Operations',
-    },
-    {
-        slug: 'troubleshooting',
-        fileName: 'troubleshooting.md',
-        order: 9,
-        category: 'Operations',
-    },
-]
+type ParsedDocFile = {
+    meta: DocFrontmatter
+    body: string
+}
 
-// New location for web documentation
+const DOC_CATEGORIES = ['Getting Started', 'Core Features', 'Extensions', 'Operations'] as const
+const DOC_CATEGORY_SET = new Set<DocCategory>(DOC_CATEGORIES)
 const DOCS_DIR = resolve(process.cwd(), 'content', 'docs')
-const USER_GUIDE_FILE = 'README.md'
+const USER_GUIDE_FILE = 'README.mdx'
+const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---\n?/
 
 function normalizeDocLinks(markdown: string) {
-    return markdown.replace(/\]\((?:\.\/)?([a-z0-9-]+)\.md\)/gi, '](/docs/$1)')
+    return markdown.replace(/\]\((?:\.\/)?([a-z0-9-]+)\.mdx?\)/gi, '](/docs/$1)')
 }
 
 function slugifyHeading(text: string) {
@@ -123,16 +74,94 @@ function stripMarkdown(text: string) {
         .trim()
 }
 
-function toHtml(markdown: string) {
-    return marked.parse(markdown) as string
+function extractMarkdownTitle(markdown: string) {
+    const normalized = markdown.replace(/\r/g, '').trim()
+    const titleLine = normalized.split('\n').find((line) => line.startsWith('# '))
+    return titleLine ? titleLine.slice(2).trim() : 'Documentation'
 }
 
-function splitMarkdownDoc(markdown: string) {
-    const normalized = normalizeDocLinks(markdown).replace(/\r/g, '').trim()
-    const lines = normalized.split('\n')
-    const titleLine = lines.find((line) => line.startsWith('# '))
-    const title = titleLine ? titleLine.slice(2).trim() : 'Untitled'
+function isDocCategory(value: string): value is DocCategory {
+    return DOC_CATEGORY_SET.has(value as DocCategory)
+}
 
+function getSlugFromFileName(fileName: string) {
+    return fileName.replace(/\.(mdx|md)$/i, '')
+}
+
+function parseFrontmatterFields(block: string) {
+    const fieldMap = new Map<string, string>()
+
+    for (const rawLine of block.split('\n')) {
+        const line = rawLine.trim()
+        if (!line || line.startsWith('#')) continue
+
+        const separatorIndex = line.indexOf(':')
+        if (separatorIndex <= 0) continue
+
+        const key = line.slice(0, separatorIndex).trim()
+        const value = line
+            .slice(separatorIndex + 1)
+            .trim()
+            .replace(/^['\"]|['\"]$/g, '')
+        fieldMap.set(key, value)
+    }
+
+    return fieldMap
+}
+
+function parseDocFile(markdown: string, fileName: string): ParsedDocFile {
+    const normalized = markdown.replace(/\r/g, '').trim()
+    const match = normalized.match(FRONTMATTER_REGEX)
+
+    if (!match) {
+        throw new Error(
+            `Missing frontmatter in ${fileName}. Required fields: title, description, order, category.`,
+        )
+    }
+
+    const fieldMap = parseFrontmatterFields(match[1])
+    const title = fieldMap.get('title')
+    const description = fieldMap.get('description')
+    const orderRaw = fieldMap.get('order')
+    const order = Number.parseInt(orderRaw ?? '', 10)
+    const categoryRaw = fieldMap.get('category')
+    const slugRaw = fieldMap.get('slug')
+
+    if (!title || !description || Number.isNaN(order) || !categoryRaw) {
+        throw new Error(
+            `Invalid frontmatter in ${fileName}. Expected title, description, order(number), category.`,
+        )
+    }
+
+    if (!isDocCategory(categoryRaw)) {
+        throw new Error(
+            `Invalid doc category in ${fileName}: ${categoryRaw}. Allowed values: ${DOC_CATEGORIES.join(', ')}`,
+        )
+    }
+
+    const slug = slugRaw?.trim() || getSlugFromFileName(fileName)
+    const body = normalized.slice(match[0].length).trim()
+
+    return {
+        meta: {
+            slug,
+            title,
+            description,
+            order,
+            category: categoryRaw,
+        },
+        body,
+    }
+}
+
+type SplitDocResult = {
+    summary: string
+    introMarkdown: string
+    sections: Array<{ id: string; title: string; markdown: string }>
+}
+
+function splitMarkdownDoc(markdown: string): SplitDocResult {
+    const normalized = normalizeDocLinks(markdown).replace(/\r/g, '').trim()
     const body = normalized.replace(/^#\s+.+\n*/, '').trim()
     const sectionMatches = [...body.matchAll(/^##\s+(.+)$/gm)]
 
@@ -143,11 +172,11 @@ function splitMarkdownDoc(markdown: string) {
                 .map((line) => line.trim())
                 .find((line) => line.length > 0) ?? '',
         )
+
         return {
-            title,
             summary: summaryLine,
             introMarkdown: body,
-            sections: [] as Array<{ id: string; title: string; markdown: string }>,
+            sections: [],
         }
     }
 
@@ -162,6 +191,7 @@ function splitMarkdownDoc(markdown: string) {
                 ? (sectionMatches[index + 1].index ?? body.length)
                 : body.length
         const sectionMarkdown = body.slice(contentStart, contentEnd).trim()
+
         return {
             id: slugifyHeading(sectionTitle),
             title: sectionTitle,
@@ -183,47 +213,71 @@ function splitMarkdownDoc(markdown: string) {
     )
 
     return {
-        title,
         summary: summaryLine,
         introMarkdown,
         sections,
     }
 }
 
+const listDocFiles = cache(async () => {
+    const entries = await readdir(DOCS_DIR, { withFileTypes: true })
+    return entries
+        .filter(
+            (entry) =>
+                entry.isFile() &&
+                /\.(mdx|md)$/i.test(entry.name) &&
+                entry.name.toLowerCase() !== USER_GUIDE_FILE.toLowerCase(),
+        )
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b))
+})
+
 const loadMarkdownFile = cache(async (fileName: string) => {
     const fullPath = resolve(DOCS_DIR, fileName)
     return readFile(fullPath, 'utf8')
 })
 
-const loadDocBySpec = cache(async (spec: DocSpec): Promise<DocPage> => {
-    const markdown = await loadMarkdownFile(spec.fileName)
-    const parsed = splitMarkdownDoc(markdown)
-    const summary = parsed.summary || `Read ${parsed.title}`
+const loadDocByFileName = cache(async (fileName: string): Promise<DocPage> => {
+    const markdown = await loadMarkdownFile(fileName)
+    const parsedFile = parseDocFile(markdown, fileName)
+    const parsedBody = splitMarkdownDoc(parsedFile.body)
+    const summary =
+        parsedFile.meta.description || parsedBody.summary || `Read ${parsedFile.meta.title}`
+
+    const [introContent, sectionContents] = await Promise.all([
+        parsedBody.introMarkdown ? renderMdx(parsedBody.introMarkdown) : Promise.resolve(null),
+        Promise.all(
+            parsedBody.sections.map((section) =>
+                section.markdown ? renderMdx(section.markdown) : Promise.resolve(null),
+            ),
+        ),
+    ])
 
     return {
-        slug: spec.slug,
-        title: parsed.title,
+        slug: parsedFile.meta.slug,
+        title: parsedFile.meta.title,
         summary,
-        order: spec.order,
-        category: spec.category,
-        introHtml: parsed.introMarkdown ? toHtml(parsed.introMarkdown) : '',
-        sections: parsed.sections.map((section) => ({
+        order: parsedFile.meta.order,
+        category: parsedFile.meta.category,
+        introContent,
+        sections: parsedBody.sections.map((section, index) => ({
             id: section.id,
             title: section.title,
-            html: section.markdown ? toHtml(section.markdown) : '',
+            content: sectionContents[index] ?? null,
         })),
     }
 })
 
 export const listDocPages = cache(async () => {
-    const docs = await Promise.all(DOC_SPECS.map((spec) => loadDocBySpec(spec)))
-    return docs.sort((a, b) => a.order - b.order)
+    const fileNames = await listDocFiles()
+    const docs = await Promise.all(fileNames.map((fileName) => loadDocByFileName(fileName)))
+
+    return docs.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
 })
 
 export const getDocPage = cache(async (slug: string) => {
-    const spec = DOC_SPECS.find((item) => item.slug === slug)
-    if (!spec) return undefined
-    return loadDocBySpec(spec)
+    const pages = await listDocPages()
+    return pages.find((page) => page.slug === slug)
 })
 
 export async function getDocNeighbors(slug: string) {
@@ -232,6 +286,7 @@ export async function getDocNeighbors(slug: string) {
     if (index === -1) {
         return { previous: undefined, next: undefined }
     }
+
     return {
         previous: index > 0 ? pages[index - 1] : undefined,
         next: index < pages.length - 1 ? pages[index + 1] : undefined,
@@ -241,17 +296,18 @@ export async function getDocNeighbors(slug: string) {
 export const getDocsHome = cache(async (): Promise<DocsHome> => {
     const markdown = await loadMarkdownFile(USER_GUIDE_FILE)
     const parsed = splitMarkdownDoc(markdown)
+    const title = extractMarkdownTitle(markdown)
 
     const mergedMarkdown = [
         parsed.introMarkdown,
-        ...parsed.sections.map((s) => `## ${s.title}\n${s.markdown}`),
+        ...parsed.sections.map((section) => `## ${section.title}\n${section.markdown}`),
     ]
         .filter(Boolean)
         .join('\n\n')
         .trim()
 
     return {
-        title: parsed.title,
-        html: toHtml(mergedMarkdown),
+        title,
+        content: mergedMarkdown ? await renderMdx(mergedMarkdown) : null,
     }
 })

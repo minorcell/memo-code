@@ -22,7 +22,11 @@ export const Footer = memo(function Footer({
     return (
         <Box justifyContent="space-between">
             <Box>
-                {busy ? <Text color="yellow">Working...</Text> : <Text color="gray">{helpText}</Text>}
+                {busy ? (
+                    <Text color="yellow">Working...</Text>
+                ) : (
+                    <Text color="gray">{helpText}</Text>
+                )}
             </Box>
             <Text color="gray">
                 {tokenLine ? `${tokenLine} • ` : ''}
