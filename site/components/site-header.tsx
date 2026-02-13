@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Github, Package, Menu, X, BookOpen } from 'lucide-react'
+import { Github, Package, Menu, X, BookOpen, NotebookPen } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 
@@ -9,7 +9,10 @@ const GITHUB_URL = 'https://github.com/minorcell/memo-code'
 const NPM_URL = 'https://www.npmjs.com/package/@memo-code/memo'
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
-const navItems = [{ href: '/docs', label: 'Docs', icon: BookOpen }]
+const navItems = [
+    { href: '/docs', label: 'Docs', icon: BookOpen },
+    { href: '/blog', label: 'Blog', icon: NotebookPen },
+]
 
 export function SiteHeader() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
