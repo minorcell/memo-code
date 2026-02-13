@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { Box, Text } from 'ink'
-import { Spinner } from '@inkjs/ui'
 
 type FooterProps = {
     busy: boolean
@@ -23,7 +22,7 @@ export const Footer = memo(function Footer({
     return (
         <Box justifyContent="space-between">
             <Box>
-                {busy ? <Spinner label="Working..." /> : <Text color="gray">{helpText}</Text>}
+                {busy ? <Text color="yellow">Working...</Text> : <Text color="gray">{helpText}</Text>}
             </Box>
             <Text color="gray">
                 {tokenLine ? `${tokenLine} • ` : ''}
