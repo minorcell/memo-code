@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { afterEach, describe, test, vi } from 'vitest'
-import { setActiveMcpPool } from '@memo/tools/router/mcp/context'
+import { setActiveMcpCacheStore, setActiveMcpPool } from '@memo/tools/router/mcp/context'
 import {
     __resetMcpResourceCacheForTests,
     listMcpResourceTemplatesTool,
@@ -18,6 +18,7 @@ function textPayload(result: { content?: Array<{ type: string; text?: string }> 
 
 afterEach(() => {
     setActiveMcpPool(null)
+    setActiveMcpCacheStore(null)
     __resetMcpResourceCacheForTests()
     vi.useRealTimers()
 })
@@ -128,7 +129,9 @@ describe('mcp resource tools', () => {
 
         const first = listMcpResourcesTool.execute({ server: 'alpha' })
         const second = listMcpResourcesTool.execute({ server: 'alpha' })
-        await Promise.resolve()
+        for (let i = 0; i < 5 && callCount === 0; i += 1) {
+            await Promise.resolve()
+        }
 
         assert.strictEqual(callCount, 1)
         resolveList?.({ resources: [{ uri: 'memo://a', name: 'A' }] })
@@ -290,11 +293,13 @@ describe('mcp resource tools', () => {
         const originalMemoHome = process.env.MEMO_HOME
         const originalVitest = process.env.VITEST
         const originalNodeEnv = process.env.NODE_ENV
+        const originalForceDiskCache = process.env.MEMO_FORCE_MCP_DISK_CACHE
 
         const memoHome = await mkdtemp(join(tmpdir(), 'memo-mcp-cache-'))
         process.env.MEMO_HOME = memoHome
         delete process.env.VITEST
         process.env.NODE_ENV = 'development'
+        process.env.MEMO_FORCE_MCP_DISK_CACHE = '1'
 
         try {
             let callCount = 0
@@ -322,11 +327,11 @@ describe('mcp resource tools', () => {
             const persistedPath = join(memoHome, 'cache', 'mcp.json')
             const raw = await readFile(persistedPath, 'utf8')
             const parsed = JSON.parse(raw) as {
-                entries?: Record<string, unknown>
+                responses?: Record<string, unknown>
             }
-            assert.ok(parsed.entries)
+            assert.ok(parsed.responses)
             assert.ok(
-                Object.keys(parsed.entries ?? {}).some((k) => k.startsWith('list_resources:')),
+                Object.keys(parsed.responses ?? {}).some((k) => k.startsWith('list_resources:')),
             )
 
             __resetMcpResourceCacheForTests()
@@ -349,6 +354,12 @@ describe('mcp resource tools', () => {
                 delete process.env.NODE_ENV
             } else {
                 process.env.NODE_ENV = originalNodeEnv
+            }
+
+            if (originalForceDiskCache === undefined) {
+                delete process.env.MEMO_FORCE_MCP_DISK_CACHE
+            } else {
+                process.env.MEMO_FORCE_MCP_DISK_CACHE = originalForceDiskCache
             }
 
             __resetMcpResourceCacheForTests()

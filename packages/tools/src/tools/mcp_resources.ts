@@ -1,10 +1,11 @@
 import { z } from 'zod'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
-import { getActiveMcpPool } from '@memo/tools/router/mcp/context'
+import {
+    getGlobalMcpCacheStore,
+    resetGlobalMcpCacheStoreForTests,
+} from '@memo/tools/router/mcp/cache_store'
+import { getActiveMcpCacheStore, getActiveMcpPool } from '@memo/tools/router/mcp/context'
 
 const LIST_MCP_RESOURCES_INPUT_SCHEMA = z
     .object({
@@ -30,35 +31,28 @@ const READ_MCP_RESOURCE_INPUT_SCHEMA = z
 type ListResourcesInput = z.infer<typeof LIST_MCP_RESOURCES_INPUT_SCHEMA>
 type ListResourceTemplatesInput = z.infer<typeof LIST_MCP_RESOURCE_TEMPLATES_INPUT_SCHEMA>
 type ReadResourceInput = z.infer<typeof READ_MCP_RESOURCE_INPUT_SCHEMA>
-type CacheEntry = {
-    expiresAt: number
-    value: unknown
-}
-type SerializedCacheFile = {
-    version: 1
-    entries: Record<string, CacheEntry>
+
+type PoolLike = {
+    get?: (name: string) => any
+    getAll?: () => any[]
+    connect?: (name: string) => Promise<any>
+    hasServer?: (name: string) => boolean
+    getKnownServerNames?: () => string[]
 }
 
 const LIST_CACHE_TTL_MS = 15_000
 const READ_CACHE_TTL_MS = 60_000
-const CACHE_FILE_NAME = 'mcp.json'
-const CACHE_SCHEMA_VERSION = 1
-const CACHE_PERSIST_DEBOUNCE_MS = 120
-
-const responseCache = new Map<string, CacheEntry>()
-const inflightRequests = new Map<string, Promise<unknown>>()
-let cacheLoaded = false
-let loadCachePromise: Promise<void> | null = null
-let persistTimer: ReturnType<typeof setTimeout> | null = null
-let persistRunning = false
-let persistRequested = false
 
 function getPoolOrThrow() {
     const pool = getActiveMcpPool()
     if (!pool) {
         throw new Error('MCP pool is not initialized')
     }
-    return pool
+    return pool as PoolLike
+}
+
+function getCacheStore() {
+    return getActiveMcpCacheStore() ?? getGlobalMcpCacheStore()
 }
 
 function getErrorMessage(err: unknown): string {
@@ -66,170 +60,6 @@ function getErrorMessage(err: unknown): string {
         return err.message
     }
     return String(err)
-}
-
-function isDiskCacheEnabled() {
-    return process.env.VITEST !== '1' && process.env.NODE_ENV !== 'test'
-}
-
-function expandHomePath(value: string): string {
-    if (value === '~') return homedir()
-    if (value.startsWith('~/')) {
-        return join(homedir(), value.slice(2))
-    }
-    return value
-}
-
-function resolveMemoHomeDir(): string {
-    const configured = process.env.MEMO_HOME?.trim()
-    if (configured) {
-        return expandHomePath(configured)
-    }
-    return join(homedir(), '.memo')
-}
-
-function getCacheFilePath(): string {
-    return join(resolveMemoHomeDir(), 'cache', CACHE_FILE_NAME)
-}
-
-function pruneExpiredEntries() {
-    const now = Date.now()
-    for (const [key, entry] of responseCache.entries()) {
-        if (entry.expiresAt <= now) {
-            responseCache.delete(key)
-        }
-    }
-}
-
-async function ensureDiskCacheLoaded(): Promise<void> {
-    if (!isDiskCacheEnabled()) return
-    if (cacheLoaded) return
-    if (loadCachePromise) {
-        await loadCachePromise
-        return
-    }
-
-    loadCachePromise = (async () => {
-        const cacheFilePath = getCacheFilePath()
-        try {
-            const raw = await readFile(cacheFilePath, 'utf8')
-            const parsed = JSON.parse(raw) as SerializedCacheFile
-            if (parsed.version !== CACHE_SCHEMA_VERSION || !parsed.entries) {
-                return
-            }
-
-            for (const [key, value] of Object.entries(parsed.entries)) {
-                if (
-                    value &&
-                    typeof value === 'object' &&
-                    typeof value.expiresAt === 'number' &&
-                    'value' in value
-                ) {
-                    responseCache.set(key, {
-                        expiresAt: value.expiresAt,
-                        value: value.value,
-                    })
-                }
-            }
-            pruneExpiredEntries()
-        } catch {
-            // Ignore missing/invalid cache file.
-        } finally {
-            cacheLoaded = true
-        }
-    })()
-
-    await loadCachePromise
-}
-
-function getCached<T>(cacheKey: string): T | undefined {
-    const entry = responseCache.get(cacheKey)
-    if (!entry) return undefined
-    if (entry.expiresAt <= Date.now()) {
-        responseCache.delete(cacheKey)
-        return undefined
-    }
-    return entry.value as T
-}
-
-async function persistCacheToDisk(): Promise<void> {
-    if (!isDiskCacheEnabled()) return
-    pruneExpiredEntries()
-    const cacheFilePath = getCacheFilePath()
-    const payload: SerializedCacheFile = {
-        version: CACHE_SCHEMA_VERSION,
-        entries: Object.fromEntries(responseCache.entries()),
-    }
-
-    const cacheDir = dirname(cacheFilePath)
-    const tempPath = `${cacheFilePath}.tmp`
-    await mkdir(cacheDir, { recursive: true })
-    await writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf8')
-    await rename(tempPath, cacheFilePath)
-}
-
-async function flushPersistQueue(): Promise<void> {
-    if (!persistRequested || persistRunning) {
-        return
-    }
-
-    persistRequested = false
-    persistRunning = true
-    try {
-        await persistCacheToDisk()
-    } catch {
-        // Ignore cache persistence errors.
-    } finally {
-        persistRunning = false
-        if (persistRequested) {
-            void flushPersistQueue()
-        }
-    }
-}
-
-function schedulePersistCache() {
-    if (!isDiskCacheEnabled()) return
-    persistRequested = true
-    if (persistTimer) return
-    persistTimer = setTimeout(() => {
-        persistTimer = null
-        void flushPersistQueue()
-    }, CACHE_PERSIST_DEBOUNCE_MS)
-    persistTimer.unref?.()
-}
-
-async function withCachedValue<T>(
-    cacheKey: string,
-    ttlMs: number,
-    loadValue: () => Promise<T>,
-): Promise<T> {
-    await ensureDiskCacheLoaded()
-    const cached = getCached<T>(cacheKey)
-    if (cached !== undefined) {
-        return cached
-    }
-
-    const inflight = inflightRequests.get(cacheKey)
-    if (inflight) {
-        return (await inflight) as T
-    }
-
-    const pending = (async () => {
-        const value = await loadValue()
-        responseCache.set(cacheKey, {
-            value,
-            expiresAt: Date.now() + ttlMs,
-        })
-        schedulePersistCache()
-        return value
-    })()
-
-    inflightRequests.set(cacheKey, pending as Promise<unknown>)
-    try {
-        return await pending
-    } finally {
-        inflightRequests.delete(cacheKey)
-    }
 }
 
 function listResourcesCacheKey(server: string, cursor?: string): string {
@@ -244,17 +74,59 @@ function readResourceCacheKey(server: string, uri: string): string {
     return `read_resource:${server}:${uri}`
 }
 
-export function __resetMcpResourceCacheForTests() {
-    responseCache.clear()
-    inflightRequests.clear()
-    cacheLoaded = false
-    loadCachePromise = null
-    persistRequested = false
-    persistRunning = false
-    if (persistTimer) {
-        clearTimeout(persistTimer)
-        persistTimer = null
+function hasServer(pool: PoolLike, serverName: string): boolean {
+    if (typeof pool.hasServer === 'function') {
+        return pool.hasServer(serverName)
     }
+    if (typeof pool.get === 'function') {
+        return Boolean(pool.get(serverName))
+    }
+    return false
+}
+
+async function resolveConnection(pool: PoolLike, serverName: string): Promise<any | undefined> {
+    if (typeof pool.get === 'function') {
+        const existing = pool.get(serverName)
+        if (existing) return existing
+    }
+
+    if (typeof pool.connect === 'function') {
+        return pool.connect(serverName)
+    }
+
+    return undefined
+}
+
+async function getSortedConnections(pool: PoolLike): Promise<Array<{ name: string; client: any }>> {
+    if (typeof pool.getKnownServerNames === 'function' && typeof pool.connect === 'function') {
+        const names = pool.getKnownServerNames().sort((a, b) => a.localeCompare(b))
+        const settled = await Promise.allSettled(names.map((name) => pool.connect!(name)))
+        const connections: Array<{ name: string; client: any }> = []
+        settled.forEach((item, index) => {
+            if (item.status === 'fulfilled') {
+                connections.push(item.value)
+                return
+            }
+
+            const fallbackName = names[index]
+            if (fallbackName) {
+                connections.push({ name: fallbackName, client: null, __error: item.reason } as any)
+            }
+        })
+        return connections.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    const connections = (typeof pool.getAll === 'function' ? pool.getAll() : []) as Array<{
+        name: string
+        client: any
+    }>
+    return connections.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function __resetMcpResourceCacheForTests() {
+    const active = getActiveMcpCacheStore()
+    active?.resetForTests()
+    resetGlobalMcpCacheStoreForTests()
 }
 
 export const listMcpResourcesTool = defineMcpTool<ListResourcesInput>({
@@ -267,14 +139,20 @@ export const listMcpResourcesTool = defineMcpTool<ListResourcesInput>({
     execute: async ({ server, cursor }) => {
         try {
             const pool = getPoolOrThrow()
+            const cacheStore = getCacheStore()
             const serverName = server?.trim()
+
             if (serverName) {
-                const connection = pool.get(serverName)
+                if (!hasServer(pool, serverName)) {
+                    return textResult(`MCP server not found: ${server}`, true)
+                }
+
+                const connection = await resolveConnection(pool, serverName)
                 if (!connection) {
                     return textResult(`MCP server not found: ${server}`, true)
                 }
 
-                const payload = await withCachedValue(
+                const payload = await cacheStore.withResponseCache(
                     listResourcesCacheKey(connection.name, cursor),
                     LIST_CACHE_TTL_MS,
                     async () => {
@@ -295,28 +173,33 @@ export const listMcpResourcesTool = defineMcpTool<ListResourcesInput>({
                 return textResult('cursor is only supported when server is specified', true)
             }
 
-            const connections = pool.getAll().sort((a, b) => a.name.localeCompare(b.name))
-            const payload = await withCachedValue(
-                listResourcesCacheKey(
-                    `all:${connections.map((connection) => connection.name).join(',')}`,
-                ),
+            const connections = await getSortedConnections(pool)
+            const allKey = `all:${connections.map((connection) => connection.name).join(',')}`
+            const payload = await cacheStore.withResponseCache(
+                listResourcesCacheKey(allKey),
                 LIST_CACHE_TTL_MS,
                 async () => {
                     const settled = await Promise.allSettled(
-                        connections.map(async (connection) => ({
-                            server: connection.name,
-                            result: await connection.client.listResources(),
-                        })),
+                        connections.map(async (connection) => {
+                            if (!connection.client) {
+                                throw new Error(`MCP server '${connection.name}' is not connected`)
+                            }
+
+                            return {
+                                server: connection.name,
+                                result: await connection.client.listResources(),
+                            }
+                        }),
                     )
 
                     const resources: Array<Record<string, unknown>> = []
                     const errors: Array<{ server: string; error: string }> = []
 
                     settled.forEach((item, index) => {
-                        const serverName = connections[index]?.name ?? 'unknown'
+                        const fallbackServer = connections[index]?.name ?? 'unknown'
                         if (item.status === 'rejected') {
                             errors.push({
-                                server: serverName,
+                                server: fallbackServer,
                                 error: getErrorMessage(item.reason),
                             })
                             return
@@ -351,14 +234,20 @@ export const listMcpResourceTemplatesTool = defineMcpTool<ListResourceTemplatesI
     execute: async ({ server, cursor }) => {
         try {
             const pool = getPoolOrThrow()
+            const cacheStore = getCacheStore()
             const serverName = server?.trim()
+
             if (serverName) {
-                const connection = pool.get(serverName)
+                if (!hasServer(pool, serverName)) {
+                    return textResult(`MCP server not found: ${server}`, true)
+                }
+
+                const connection = await resolveConnection(pool, serverName)
                 if (!connection) {
                     return textResult(`MCP server not found: ${server}`, true)
                 }
 
-                const payload = await withCachedValue(
+                const payload = await cacheStore.withResponseCache(
                     listResourceTemplatesCacheKey(connection.name, cursor),
                     LIST_CACHE_TTL_MS,
                     async () => {
@@ -379,28 +268,33 @@ export const listMcpResourceTemplatesTool = defineMcpTool<ListResourceTemplatesI
                 return textResult('cursor is only supported when server is specified', true)
             }
 
-            const connections = pool.getAll().sort((a, b) => a.name.localeCompare(b.name))
-            const payload = await withCachedValue(
-                listResourceTemplatesCacheKey(
-                    `all:${connections.map((connection) => connection.name).join(',')}`,
-                ),
+            const connections = await getSortedConnections(pool)
+            const allKey = `all:${connections.map((connection) => connection.name).join(',')}`
+            const payload = await cacheStore.withResponseCache(
+                listResourceTemplatesCacheKey(allKey),
                 LIST_CACHE_TTL_MS,
                 async () => {
                     const settled = await Promise.allSettled(
-                        connections.map(async (connection) => ({
-                            server: connection.name,
-                            result: await connection.client.listResourceTemplates(),
-                        })),
+                        connections.map(async (connection) => {
+                            if (!connection.client) {
+                                throw new Error(`MCP server '${connection.name}' is not connected`)
+                            }
+
+                            return {
+                                server: connection.name,
+                                result: await connection.client.listResourceTemplates(),
+                            }
+                        }),
                     )
 
                     const resourceTemplates: Array<Record<string, unknown>> = []
                     const errors: Array<{ server: string; error: string }> = []
 
                     settled.forEach((item, index) => {
-                        const serverName = connections[index]?.name ?? 'unknown'
+                        const fallbackServer = connections[index]?.name ?? 'unknown'
                         if (item.status === 'rejected') {
                             errors.push({
-                                server: serverName,
+                                server: fallbackServer,
                                 error: getErrorMessage(item.reason),
                             })
                             return
@@ -435,13 +329,19 @@ export const readMcpResourceTool = defineMcpTool<ReadResourceInput>({
     execute: async ({ server, uri }) => {
         try {
             const pool = getPoolOrThrow()
+            const cacheStore = getCacheStore()
             const serverName = server.trim()
-            const connection = pool.get(serverName)
+
+            if (!hasServer(pool, serverName)) {
+                return textResult(`MCP server not found: ${server}`, true)
+            }
+
+            const connection = await resolveConnection(pool, serverName)
             if (!connection) {
                 return textResult(`MCP server not found: ${server}`, true)
             }
 
-            const payload = await withCachedValue(
+            const payload = await cacheStore.withResponseCache(
                 readResourceCacheKey(serverName, uri),
                 READ_CACHE_TTL_MS,
                 async () => {
