@@ -291,6 +291,7 @@ async function buildSuggestionsForTrigger({
                 cwd,
                 query: trigger.query,
                 limit: 8,
+                respectGitIgnore: true,
             })
             const items: SuggestionRecord[] = matches.map((match) => ({
                 id: match.id,
