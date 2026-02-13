@@ -13,6 +13,7 @@ export const SLASH_SPECS: SlashSpec[] = [
     { name: SLASH_COMMANDS.EXIT, description: 'Exit current session' },
     { name: SLASH_COMMANDS.NEW, description: 'Start a fresh session' },
     { name: SLASH_COMMANDS.RESUME, description: 'List and load session history' },
+    { name: SLASH_COMMANDS.REVIEW, description: 'Review a GitHub pull request and post comments' },
     { name: SLASH_COMMANDS.MODELS, description: 'List or switch configured models' },
     {
         name: SLASH_COMMANDS.CONTEXT,
@@ -85,6 +86,26 @@ function parseContextLimit(input: string | undefined): number | null {
     return base * (match[2] ? 1000 : 1)
 }
 
+function parseReviewPrNumber(input: string | undefined): number | null {
+    if (!input) return null
+    const normalized = input.trim()
+    if (!normalized) return null
+
+    const directMatch = normalized.match(/^#?(\d+)$/)
+    if (directMatch) {
+        const parsed = Number(directMatch[1])
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+    }
+
+    const urlMatch = normalized.match(/\/pull\/(\d+)(?:[/?#].*)?$/i)
+    if (urlMatch) {
+        const parsed = Number(urlMatch[1])
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+    }
+
+    return null
+}
+
 export function resolveSlashCommand(raw: string, context: SlashContext): SlashCommandResult {
     const [commandRaw, ...rest] = raw.trim().slice(1).split(/\s+/)
     const command = (commandRaw ?? '').toLowerCase()
@@ -105,6 +126,22 @@ export function resolveSlashCommand(raw: string, context: SlashContext): SlashCo
                 title: 'Resume',
                 content: 'Type "resume" followed by keywords to load local session history.',
             }
+
+        case SLASH_COMMANDS.REVIEW: {
+            const arg = rest.join(' ').trim()
+            const prNumber = parseReviewPrNumber(arg)
+            if (!prNumber) {
+                return {
+                    kind: 'message',
+                    title: 'Review',
+                    content: `Usage: ${formatSlashCommand(SLASH_COMMANDS.REVIEW)} <prNumber>\nExamples: /review 999, /review #999`,
+                }
+            }
+            return {
+                kind: 'review_pr',
+                prNumber,
+            }
+        }
 
         case SLASH_COMMANDS.MODELS: {
             if (!context.providers.length) {

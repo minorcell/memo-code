@@ -334,6 +334,8 @@ export type AgentSession = {
     runTurn: (input: string) => Promise<TurnResult>
     /** 取消当前运行中的 turn（若支持）。 */
     cancelCurrentTurn?: (reason?: string) => void
+    /** 当前会话可用工具名列表（含 native + MCP）。 */
+    listToolNames?: () => string[]
     /** 结束 Session，释放资源。 */
     close: () => Promise<void>
 }

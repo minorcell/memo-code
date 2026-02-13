@@ -15,6 +15,7 @@ export type SlashCommandResult =
     | { kind: 'exit' }
     | { kind: 'new' }
     | { kind: 'message'; title: string; content: string }
+    | { kind: 'review_pr'; prNumber: number }
     | { kind: 'switch_model'; provider: ProviderConfig }
     | { kind: 'set_context_limit'; limit: number }
     | { kind: 'set_tool_permission'; mode: ToolPermissionMode }

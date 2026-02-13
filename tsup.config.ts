@@ -1,5 +1,5 @@
 import { defineConfig } from 'tsup'
-import { copyFileSync } from 'node:fs'
+import { copyFileSync, cpSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 export default defineConfig({
@@ -12,7 +12,7 @@ export default defineConfig({
     dts: false,
     clean: true,
     minify: true,
-    sourcemap: true,
+    sourcemap: false,
     splitting: false,
     bundle: true,
     external: [],
@@ -25,6 +25,10 @@ export default defineConfig({
     async onSuccess() {
         // Copy prompt.md to dist directory
         copyFileSync(join('packages/core/src/runtime/prompt.md'), join('dist/prompt.md'))
-        console.log('✓ Copied prompt.md to dist/')
+        mkdirSync(join('dist/task-prompts'), { recursive: true })
+        cpSync(join('packages/tui/src/task-prompts'), join('dist/task-prompts'), {
+            recursive: true,
+        })
+        console.log('✓ Copied prompt.md and task prompts to dist/')
     },
 })
