@@ -198,6 +198,7 @@ memo-cli/
 - `/help`：显示帮助与快捷键说明。
 - `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
 - `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
+- `/review <prNumber>`：执行 GitHub PR 审查并直接发布评论（优先使用已激活的 GitHub MCP，失败时回退 `gh` CLI）。
 - `/mcp`：查看当前会话加载的 MCP 服务器配置。
 - `resume` 历史：输入 `resume` 查看并加载本目录的历史会话。
 - 退出与清屏：`exit` / `/exit`，`Ctrl+L` 新会话，`Esc Esc` 取消运行或清空输入。

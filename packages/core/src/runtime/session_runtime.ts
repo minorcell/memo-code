@@ -913,6 +913,10 @@ export class AgentSessionImpl implements AgentSession {
         }
     }
 
+    listToolNames() {
+        return Object.keys(this.deps.tools)
+    }
+
     async close() {
         if (this.closed) return
         this.closed = true

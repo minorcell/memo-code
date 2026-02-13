@@ -10,6 +10,7 @@
     "files": [
         "dist/index.js",
         "dist/prompt.md",
+        "dist/task-prompts/*.md",
         "README.md",
         "LICENSE"
     ],

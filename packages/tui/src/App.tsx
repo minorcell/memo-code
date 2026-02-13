@@ -36,6 +36,8 @@ import {
 } from './utils'
 import { checkForUpdate, findLocalPackageInfoSync } from './version'
 import type { SessionHistoryEntry } from './controllers/session_history'
+import { loadTaskPrompt } from './task_prompt'
+import { resolveReviewBackend } from './review/backend'
 import {
     DEFAULT_CONTEXT_LIMIT,
     formatSlashCommand,
@@ -635,28 +637,11 @@ export function App({
     const runInitCommand = useCallback(async () => {
         if (!session || busy) return
 
-        const prompt = `Please analyze the current project and create an AGENTS.md file at the project root.
-
-The AGENTS.md should include:
-1. Project name and brief description
-2. Directory structure overview
-3. Key technologies and stack
-4. Coding conventions and style guidelines
-5. Build/test/development commands
-6. Any project-specific notes for AI assistants
-
-Steps:
-1. Explore project structure using list_dir and exec_command tools
-2. Read key configuration files
-3. Understand stack and conventions
-4. Create AGENTS.md using apply_patch
-
-Keep the result concise and actionable.`
-
         const initCommand = formatSlashCommand(SLASH_COMMANDS.INIT)
-        setInputHistory((prev) => [...prev, initCommand])
-        setBusy(true)
         try {
+            const prompt = await loadTaskPrompt('init_agents')
+            setInputHistory((prev) => [...prev, initCommand])
+            setBusy(true)
             nextUserInputOverrideRef.current = initCommand
             await session.runTurn(prompt)
         } catch (err) {
@@ -668,6 +653,66 @@ Keep the result concise and actionable.`
             )
         }
     }, [appendSystemMessage, busy, session])
+
+    const runReviewPullRequestCommand = useCallback(
+        async (prNumber: number) => {
+            if (!session || busy) return
+
+            if (toolPermissionMode === TOOL_PERMISSION_MODES.NONE) {
+                appendSystemMessage(
+                    'Review',
+                    'Tool permission mode is "none". Set `/tools once` or `/tools full` before running `/review`.',
+                    'warning',
+                )
+                return
+            }
+
+            const reviewCommand = `${formatSlashCommand(SLASH_COMMANDS.REVIEW)} ${prNumber}`
+            try {
+                const backend = await resolveReviewBackend({
+                    cwd,
+                    mcpServers,
+                    activeMcpServerNames,
+                    availableToolNames: session.listToolNames?.() ?? [],
+                })
+
+                if (backend.kind === 'unavailable') {
+                    appendSystemMessage('Review', backend.reason, 'error')
+                    return
+                }
+
+                const prompt = await loadTaskPrompt('review_pull_request', {
+                    pr_number: String(prNumber),
+                    backend_strategy: backend.strategy,
+                    backend_details: backend.details,
+                    mcp_server_prefix:
+                        backend.kind === 'github_mcp' ? backend.mcpServerPrefix : 'github',
+                })
+
+                setInputHistory((prev) => [...prev, reviewCommand])
+                appendSystemMessage('Review', backend.details)
+                setBusy(true)
+                nextUserInputOverrideRef.current = reviewCommand
+                await session.runTurn(prompt)
+            } catch (err) {
+                setBusy(false)
+                appendSystemMessage(
+                    'Review',
+                    `Failed to run review task for PR #${prNumber}: ${(err as Error).message}`,
+                    'error',
+                )
+            }
+        },
+        [
+            activeMcpServerNames,
+            appendSystemMessage,
+            busy,
+            cwd,
+            mcpServers,
+            session,
+            toolPermissionMode,
+        ],
+    )
 
     const handleSubmit = useCallback(
         async (value: string) => {
@@ -830,6 +875,9 @@ Keep the result concise and actionable.`
                 }}
                 onSetContextLimit={handleSetContextLimit}
                 onSetToolPermission={handleSetToolPermission}
+                onReviewPullRequest={(prNumber) => {
+                    void runReviewPullRequestCommand(prNumber)
+                }}
                 onSystemMessage={appendSystemMessage}
             />
 

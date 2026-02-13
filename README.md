@@ -202,6 +202,7 @@ memo-cli/
 - `/help`: show help and shortcut guide.
 - `/models`: list available Provider/Model entries and switch with Enter; also supports direct selection like `/models deepseek`.
 - `/context`: open 80k/120k/150k/200k options and apply immediately.
+- `/review <prNumber>`: run GitHub PR review and publish review comments (uses active GitHub MCP server first, then falls back to `gh` CLI).
 - `/mcp`: show configured MCP servers in current session.
 - `resume` history: type `resume` to list and load past sessions for current directory.
 - Exit and clear: `exit` / `/exit`, `Ctrl+L` for new session, `Esc Esc` to cancel current run or clear input.

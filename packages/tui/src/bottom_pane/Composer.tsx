@@ -65,6 +65,7 @@ type ComposerProps = {
     onModelSelect: (provider: ProviderConfig) => void
     onSetContextLimit: (limit: number) => void
     onSetToolPermission: (mode: ToolPermissionMode) => void
+    onReviewPullRequest: (prNumber: number) => void
     onSystemMessage: (title: string, content: string) => void
 }
 
@@ -358,6 +359,7 @@ export const Composer = memo(function Composer({
     onModelSelect,
     onSetContextLimit,
     onSetToolPermission,
+    onReviewPullRequest,
     onSystemMessage,
 }: ComposerProps) {
     const { stdout } = useStdout()
@@ -843,20 +845,35 @@ export const Composer = memo(function Composer({
 
             if (trimmed.startsWith('/')) {
                 const result = resolveSlashCommand(trimmed, slashContext)
-                if (result.kind === 'message') {
-                    onSystemMessage(result.title, result.content)
-                } else if (result.kind === 'new') {
-                    onNewSession()
-                } else if (result.kind === 'exit') {
-                    onExit()
-                } else if (result.kind === 'switch_model') {
-                    onModelSelect(result.provider)
-                } else if (result.kind === 'set_context_limit') {
-                    onSetContextLimit(result.limit)
-                } else if (result.kind === 'set_tool_permission') {
-                    onSetToolPermission(result.mode)
-                } else if (result.kind === 'init_agents_md') {
-                    onSubmit(INIT_SLASH_COMMAND)
+                switch (result.kind) {
+                    case 'message':
+                        onSystemMessage(result.title, result.content)
+                        break
+                    case 'new':
+                        onNewSession()
+                        break
+                    case 'exit':
+                        onExit()
+                        break
+                    case 'switch_model':
+                        onModelSelect(result.provider)
+                        break
+                    case 'set_context_limit':
+                        onSetContextLimit(result.limit)
+                        break
+                    case 'set_tool_permission':
+                        onSetToolPermission(result.mode)
+                        break
+                    case 'review_pr':
+                        onReviewPullRequest(result.prNumber)
+                        break
+                    case 'init_agents_md':
+                        onSubmit(INIT_SLASH_COMMAND)
+                        break
+                    default: {
+                        const _exhaustive: never = result
+                        void _exhaustive
+                    }
                 }
                 preferredColumnRef.current = null
                 commitEditor({ value: '', cursor: 0 }, true)

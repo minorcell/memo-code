@@ -8,6 +8,7 @@ export const SLASH_COMMANDS = {
     EXIT: 'exit',
     NEW: 'new',
     RESUME: 'resume',
+    REVIEW: 'review',
     MODELS: 'models',
     CONTEXT: 'context',
     TOOLS: 'tools',

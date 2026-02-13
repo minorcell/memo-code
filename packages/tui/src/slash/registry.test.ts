@@ -38,4 +38,26 @@ describe('slash registry', () => {
             assert.strictEqual(result.mode, 'full')
         }
     })
+
+    test('review command parses PR number', () => {
+        const result = resolveSlashCommand('/review 999', context)
+        assert.strictEqual(result.kind, 'review_pr')
+        if (result.kind === 'review_pr') {
+            assert.strictEqual(result.prNumber, 999)
+        }
+    })
+
+    test('review command parses PR URL', () => {
+        const result = resolveSlashCommand('/review https://github.com/acme/repo/pull/123', context)
+        assert.strictEqual(result.kind, 'review_pr')
+        if (result.kind === 'review_pr') {
+            assert.strictEqual(result.prNumber, 123)
+        }
+    })
+
+    test('review command validates missing argument', () => {
+        const result = resolveSlashCommand('/review', context)
+        assert.strictEqual(result.kind, 'message')
+        assert.strictEqual(result.title, 'Review')
+    })
 })
