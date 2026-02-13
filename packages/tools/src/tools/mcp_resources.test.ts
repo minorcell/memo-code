@@ -1,4 +1,7 @@
 import assert from 'node:assert'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { afterEach, describe, test, vi } from 'vitest'
 import { setActiveMcpPool } from '@memo/tools/router/mcp/context'
 import {
@@ -281,5 +284,75 @@ describe('mcp resource tools', () => {
         const result = await readMcpResourceTool.execute({ server: 'none', uri: 'memo://x' })
         assert.strictEqual(result.isError, true)
         assert.ok(textPayload(result).includes('MCP server not found'))
+    })
+
+    test('persists cache to memo home and warms next process', async () => {
+        const originalMemoHome = process.env.MEMO_HOME
+        const originalVitest = process.env.VITEST
+        const originalNodeEnv = process.env.NODE_ENV
+
+        const memoHome = await mkdtemp(join(tmpdir(), 'memo-mcp-cache-'))
+        process.env.MEMO_HOME = memoHome
+        delete process.env.VITEST
+        process.env.NODE_ENV = 'development'
+
+        try {
+            let callCount = 0
+            const connection = {
+                name: 'alpha',
+                client: {
+                    listResources: async () => {
+                        callCount += 1
+                        return {
+                            resources: [{ uri: 'memo://a', name: 'A' }],
+                        }
+                    },
+                },
+            }
+            const pool = {
+                get: (name: string) => (name === 'alpha' ? connection : undefined),
+                getAll: () => [connection],
+            }
+            setActiveMcpPool(pool as any)
+
+            await listMcpResourcesTool.execute({ server: 'alpha' })
+            assert.strictEqual(callCount, 1)
+
+            await new Promise((resolve) => setTimeout(resolve, 220))
+            const persistedPath = join(memoHome, 'cache', 'mcp.json')
+            const raw = await readFile(persistedPath, 'utf8')
+            const parsed = JSON.parse(raw) as {
+                entries?: Record<string, unknown>
+            }
+            assert.ok(parsed.entries)
+            assert.ok(
+                Object.keys(parsed.entries ?? {}).some((k) => k.startsWith('list_resources:')),
+            )
+
+            __resetMcpResourceCacheForTests()
+            await listMcpResourcesTool.execute({ server: 'alpha' })
+            assert.strictEqual(callCount, 1)
+        } finally {
+            if (originalMemoHome === undefined) {
+                delete process.env.MEMO_HOME
+            } else {
+                process.env.MEMO_HOME = originalMemoHome
+            }
+
+            if (originalVitest === undefined) {
+                delete process.env.VITEST
+            } else {
+                process.env.VITEST = originalVitest
+            }
+
+            if (originalNodeEnv === undefined) {
+                delete process.env.NODE_ENV
+            } else {
+                process.env.NODE_ENV = originalNodeEnv
+            }
+
+            __resetMcpResourceCacheForTests()
+            await rm(memoHome, { recursive: true, force: true })
+        }
     })
 })
