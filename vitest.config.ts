@@ -6,6 +6,20 @@ export default defineConfig({
         globals: true,
         environment: 'node',
         setupFiles: ['./vitest.setup.ts'],
+        coverage: {
+            provider: 'v8',
+            all: false,
+            include: ['packages/*/src/**/*.{ts,tsx}'],
+            exclude: ['**/*.d.ts', '**/*.test.{ts,tsx}'],
+            reporter: ['text', 'lcov'],
+            reportsDirectory: './coverage',
+            thresholds: {
+                statements: 70,
+                branches: 70,
+                functions: 70,
+                lines: 70,
+            },
+        },
     },
     plugins: [tsconfigPaths()],
 })

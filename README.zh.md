@@ -197,6 +197,7 @@ pnpm run build  # 生成 dist/index.js
 
 ```bash
 pnpm test            # 全量测试
+pnpm run test:coverage  # 带覆盖率测试（阈值：>=70%）
 pnpm run test:core   # 测试 core 包
 pnpm run test:tools  # 测试 tools 包
 pnpm run test:tui    # 测试 tui 包
