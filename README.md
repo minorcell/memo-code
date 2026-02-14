@@ -5,18 +5,22 @@
 </div>
 
 <p align="center">
-  <a href="README.zh.md">Chinese Documentation</a>
-</p>
-
-<p align="center">
-  <a href="public/memo-code-cli-show-01.mp4">
-    <img src="https://img.shields.io/badge/📹-Watch%20Demo%20Video-1a1a1a?style=for-the-badge" alt="Demo Video">
+  <a href="https://github.com/minorcell/memo-code/actions/workflows/ci.yml">
+    <img src="https://github.com/minorcell/memo-code/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI">
+  </a>
+  <a href="https://codecov.io/gh/minorcell/memo-code">
+    <img src="https://codecov.io/gh/minorcell/memo-code/graph/badge.svg" alt="Coverage">
+  </a>
+  <a href="https://www.npmjs.com/package/@memo-code/memo">
+    <img src="https://img.shields.io/npm/v/%40memo-code%2Fmemo" alt="npm version">
   </a>
 </p>
 
----
+<p align="center">
+  <a href="README.zh.md">Chinese Documentation</a>
+</p>
 
-<video src="public/memo-code-cli-show-01.mp4" width="100%"></video>
+<img src="public/demo.png" width="100%" alt="Memo Code demo">
 
 Built with Node.js + TypeScript. DeepSeek is the default provider, and OpenAI-compatible APIs are supported.
 
