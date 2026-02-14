@@ -219,6 +219,7 @@ pnpm run build  # generates dist/index.js
 
 ```bash
 pnpm test            # all tests
+pnpm run test:coverage  # all tests with coverage (threshold: >=70%)
 pnpm run test:core   # core package
 pnpm run test:tools  # tools package
 pnpm run test:tui    # tui package
