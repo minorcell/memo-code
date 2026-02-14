@@ -16,7 +16,6 @@ export type ProviderConfig = {
 export type ModelProfileOverride = {
     supports_parallel_tool_calls?: boolean
     supports_reasoning_content?: boolean
-    supports_verbosity?: boolean
     context_window?: number
 }
 
@@ -152,9 +151,6 @@ function normalizeModelProfiles(input: unknown): Record<string, ModelProfileOver
         if (typeof entry.supports_reasoning_content === 'boolean') {
             override.supports_reasoning_content = entry.supports_reasoning_content
         }
-        if (typeof entry.supports_verbosity === 'boolean') {
-            override.supports_verbosity = entry.supports_verbosity
-        }
         if (
             typeof entry.context_window === 'number' &&
             Number.isFinite(entry.context_window) &&
@@ -211,9 +207,6 @@ function serializeConfig(config: MemoConfig) {
                   }
                   if (typeof value.supports_reasoning_content === 'boolean') {
                       lines.push(`supports_reasoning_content = ${value.supports_reasoning_content}`)
-                  }
-                  if (typeof value.supports_verbosity === 'boolean') {
-                      lines.push(`supports_verbosity = ${value.supports_verbosity}`)
                   }
                   if (
                       typeof value.context_window === 'number' &&

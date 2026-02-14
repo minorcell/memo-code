@@ -8,7 +8,6 @@ export type ModelProfile = {
     wireApi: ModelWireApi
     supportsParallelToolCalls: boolean
     supportsReasoningContent: boolean
-    supportsVerbosity: boolean
     contextWindow?: number
     isFallback: boolean
 }
@@ -18,7 +17,6 @@ type ProfileCapabilities = Omit<ModelProfile, 'wireApi' | 'isFallback'>
 const CONSERVATIVE_FALLBACK_PROFILE: ProfileCapabilities = {
     supportsParallelToolCalls: false,
     supportsReasoningContent: false,
-    supportsVerbosity: false,
 }
 
 export type ResolvedModelProfile = {
@@ -62,10 +60,6 @@ function applyOverride(
     }
     if (typeof override.supports_reasoning_content === 'boolean') {
         next.supportsReasoningContent = override.supports_reasoning_content
-        usedOverride = true
-    }
-    if (typeof override.supports_verbosity === 'boolean') {
-        next.supportsVerbosity = override.supports_verbosity
         usedOverride = true
     }
     if (

@@ -87,7 +87,6 @@ Memo uses conservative defaults for model capabilities and gates request options
 [model_profiles.gpt-5]
 supports_parallel_tool_calls = true
 supports_reasoning_content = true
-supports_verbosity = true
 context_window = 272000
 
 # Provider-specific override, key format: "<provider>:<model>"
@@ -101,8 +100,6 @@ supports_parallel_tool_calls = false
     - Controls whether Memo sends `parallel_tool_calls`.
 - `supports_reasoning_content`
     - Controls whether reasoning content is carried in tool-call follow-up rounds.
-- `supports_verbosity`
-    - Controls whether verbosity-related request options are enabled.
 - `context_window`
     - Session prompt/context hard limit used by Memo runtime.
     - Must be a positive number.

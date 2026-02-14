@@ -83,7 +83,6 @@ Optional: override model capability profiles (local capability gating) without c
 [model_profiles.gpt-5]
 supports_parallel_tool_calls = true
 supports_reasoning_content = true
-supports_verbosity = true
 context_window = 272000
 
 [model_profiles."openai:gpt-5"]
