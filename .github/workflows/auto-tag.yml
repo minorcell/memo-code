@@ -1,0 +1,74 @@
+name: Auto Tag on Version Change
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - 'package.json'
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    auto-tag:
+        name: Create tag from package version
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Detect package version change
+              id: version
+              run: |
+                  CURRENT_VERSION=$(node -p "require('./package.json').version")
+                  BEFORE_SHA="${{ github.event.before }}"
+
+                  if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+                      PREVIOUS_VERSION=""
+                  else
+                      PREVIOUS_VERSION=$(git show "$BEFORE_SHA:package.json" 2>/dev/null | node -e "const fs = require('fs'); const input = fs.readFileSync(0, 'utf8'); try { process.stdout.write(String(JSON.parse(input).version ?? '')) } catch { process.stdout.write('') }")
+                  fi
+
+                  if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
+                      VERSION_CHANGED=false
+                  else
+                      VERSION_CHANGED=true
+                  fi
+
+                  echo "current=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+                  echo "previous=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
+                  echo "changed=$VERSION_CHANGED" >> "$GITHUB_OUTPUT"
+
+            - name: Check tag existence
+              if: steps.version.outputs.changed == 'true'
+              id: tag
+              run: |
+                  TAG_NAME="v${{ steps.version.outputs.current }}"
+                  if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+                      TAG_EXISTS=true
+                  elif git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+                      TAG_EXISTS=true
+                  else
+                      TAG_EXISTS=false
+                  fi
+                  echo "name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+                  echo "exists=$TAG_EXISTS" >> "$GITHUB_OUTPUT"
+
+            - name: Create and push tag
+              if: steps.version.outputs.changed == 'true' && steps.tag.outputs.exists != 'true'
+              run: |
+                  TAG_NAME="${{ steps.tag.outputs.name }}"
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git tag "$TAG_NAME" "${GITHUB_SHA}"
+                  git push origin "$TAG_NAME"
+
+            - name: Skip when version is unchanged
+              if: steps.version.outputs.changed != 'true'
+              run: echo "package.json version unchanged; skip tag creation."
+
+            - name: Skip when tag already exists
+              if: steps.version.outputs.changed == 'true' && steps.tag.outputs.exists == 'true'
+              run: echo "Tag ${{ steps.tag.outputs.name }} already exists; skip tag creation."
