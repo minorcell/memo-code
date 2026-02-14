@@ -13,6 +13,13 @@ export type ProviderConfig = {
     base_url?: string
 }
 
+export type ModelProfileOverride = {
+    supports_parallel_tool_calls?: boolean
+    supports_reasoning_content?: boolean
+    supports_verbosity?: boolean
+    context_window?: number
+}
+
 export type MCPServerConfig =
     | {
           /** Default: start local process, connect via stdio. */
@@ -40,6 +47,8 @@ export type MemoConfig = {
     current_provider: string
     /** Persistent prompt token limit (maps to AgentSessionOptions.maxPromptTokens). */
     max_prompt_tokens?: number
+    /** Optional model capability overrides keyed by model slug or provider:model. */
+    model_profiles?: Record<string, ModelProfileOverride>
     /** Map of server name to server configuration */
     mcp_servers?: Record<string, MCPServerConfig>
     /** Persisted default active MCP servers for interactive sessions. */
@@ -51,10 +60,11 @@ type ParsedMemoConfig = Omit<Partial<MemoConfig>, 'providers'> & { providers?: u
 
 const DEFAULT_MEMO_HOME = join(homedir(), '.memo')
 const DEFAULT_SESSIONS_DIR = 'sessions'
+const DEFAULT_CONTEXT_WINDOW = 120000
 
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
-    max_prompt_tokens: 120000,
+    max_prompt_tokens: DEFAULT_CONTEXT_WINDOW,
     providers: [
         {
             name: 'deepseek',
@@ -64,6 +74,44 @@ const DEFAULT_CONFIG: MemoConfig = {
         },
     ],
     mcp_servers: {},
+}
+
+function normalizeModelProfileKey(key: string): string {
+    return key.trim().toLowerCase()
+}
+
+function readContextWindow(override: ModelProfileOverride | undefined): number | undefined {
+    if (
+        typeof override?.context_window === 'number' &&
+        Number.isFinite(override.context_window) &&
+        override.context_window > 0
+    ) {
+        return Math.floor(override.context_window)
+    }
+    return undefined
+}
+
+export function resolveContextWindowForProvider(
+    config: Pick<MemoConfig, 'model_profiles'>,
+    provider: Pick<ProviderConfig, 'name' | 'model'>,
+): number {
+    const modelProfiles = config.model_profiles
+    if (!modelProfiles) return DEFAULT_CONTEXT_WINDOW
+
+    const normalizedProfiles = new Map<string, ModelProfileOverride>()
+    for (const [key, value] of Object.entries(modelProfiles)) {
+        normalizedProfiles.set(normalizeModelProfileKey(key), value)
+    }
+
+    const providerName = normalizeModelProfileKey(provider.name)
+    const modelKey = normalizeModelProfileKey(provider.model)
+    const providerKey = `${providerName}:${modelKey}`
+
+    return (
+        readContextWindow(normalizedProfiles.get(providerKey)) ??
+        readContextWindow(normalizedProfiles.get(modelKey)) ??
+        DEFAULT_CONTEXT_WINDOW
+    )
 }
 
 function formatTomlKey(key: string) {
@@ -87,6 +135,40 @@ function normalizeProviders(input: unknown): ProviderConfig[] {
         }
     }
     return providers
+}
+
+function normalizeModelProfiles(input: unknown): Record<string, ModelProfileOverride> | undefined {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined
+
+    const normalized: Record<string, ModelProfileOverride> = {}
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+        const entry = value as Record<string, unknown>
+        const override: ModelProfileOverride = {}
+
+        if (typeof entry.supports_parallel_tool_calls === 'boolean') {
+            override.supports_parallel_tool_calls = entry.supports_parallel_tool_calls
+        }
+        if (typeof entry.supports_reasoning_content === 'boolean') {
+            override.supports_reasoning_content = entry.supports_reasoning_content
+        }
+        if (typeof entry.supports_verbosity === 'boolean') {
+            override.supports_verbosity = entry.supports_verbosity
+        }
+        if (
+            typeof entry.context_window === 'number' &&
+            Number.isFinite(entry.context_window) &&
+            entry.context_window > 0
+        ) {
+            override.context_window = Math.floor(entry.context_window)
+        }
+
+        if (Object.keys(override).length > 0) {
+            normalized[key] = override
+        }
+    }
+
+    return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
 function expandHome(path: string) {
@@ -115,6 +197,36 @@ function serializeConfig(config: MemoConfig) {
         })
         .filter(Boolean)
         .join('\n\n')
+
+    const modelProfiles = config.model_profiles
+        ? Object.entries(config.model_profiles)
+              .map(([key, value]) => {
+                  const lines: string[] = []
+                  const tableKey = formatTomlKey(key)
+                  lines.push(`[model_profiles.${tableKey}]`)
+                  if (typeof value.supports_parallel_tool_calls === 'boolean') {
+                      lines.push(
+                          `supports_parallel_tool_calls = ${value.supports_parallel_tool_calls}`,
+                      )
+                  }
+                  if (typeof value.supports_reasoning_content === 'boolean') {
+                      lines.push(`supports_reasoning_content = ${value.supports_reasoning_content}`)
+                  }
+                  if (typeof value.supports_verbosity === 'boolean') {
+                      lines.push(`supports_verbosity = ${value.supports_verbosity}`)
+                  }
+                  if (
+                      typeof value.context_window === 'number' &&
+                      Number.isFinite(value.context_window) &&
+                      value.context_window > 0
+                  ) {
+                      lines.push(`context_window = ${Math.floor(value.context_window)}`)
+                  }
+                  return lines.length > 1 ? lines.join('\n') : ''
+              })
+              .filter(Boolean)
+              .join('\n\n')
+        : ''
 
     let mcpSection = ''
     if (config.mcp_servers && Object.keys(config.mcp_servers).length > 0) {
@@ -163,7 +275,7 @@ function serializeConfig(config: MemoConfig) {
     }
     const mainConfig = mainLines.join('\n')
 
-    return [mainConfig, providers, mcpSection].filter(Boolean).join('\n\n')
+    return [mainConfig, providers, modelProfiles, mcpSection].filter(Boolean).join('\n\n')
 }
 
 export async function writeMemoConfig(path: string, config: MemoConfig) {
@@ -197,10 +309,12 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
                   (name): name is string => typeof name === 'string' && name.trim().length > 0,
               )
             : undefined
+        const modelProfiles = normalizeModelProfiles(parsed.model_profiles)
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
             max_prompt_tokens: maxPromptTokens ?? DEFAULT_CONFIG.max_prompt_tokens,
             providers,
+            model_profiles: modelProfiles,
             mcp_servers: parsed.mcp_servers ?? {},
             active_mcp_servers: activeMcpServers,
         }

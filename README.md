@@ -77,6 +77,25 @@ base_url = "https://api.deepseek.com"
 
 You can configure multiple providers and switch with `current_provider`.
 
+Optional: override model capability profiles (local capability gating) without code changes:
+
+```toml
+[model_profiles.gpt-5]
+supports_parallel_tool_calls = true
+supports_reasoning_content = true
+supports_verbosity = true
+context_window = 272000
+
+[model_profiles."openai:gpt-5"]
+supports_parallel_tool_calls = false # provider-specific override
+```
+
+Context window policy:
+
+- priority 1: `model_profiles."provider:model".context_window`
+- priority 2: `model_profiles."<model>".context_window`
+- fallback: `120000`
+
 ### MCP Tool Configuration
 
 Both local and remote MCP servers are supported:
@@ -201,7 +220,6 @@ memo-cli/
 
 - `/help`: show help and shortcut guide.
 - `/models`: list available Provider/Model entries and switch with Enter; also supports direct selection like `/models deepseek`.
-- `/context`: open 80k/120k/150k/200k options and apply immediately.
 - `/review <prNumber>`: run GitHub PR review and publish review comments (uses active GitHub MCP server first, then falls back to `gh` CLI).
 - `/mcp`: show configured MCP servers in current session.
 - `resume` history: type `resume` to list and load past sessions for current directory.

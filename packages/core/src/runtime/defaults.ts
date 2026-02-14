@@ -9,6 +9,7 @@ import {
     selectProvider,
 } from '@memo/core/config/config'
 import { JsonlHistorySink } from '@memo/core/runtime/history'
+import { buildChatCompletionRequest, resolveModelProfile } from '@memo/core/runtime/model_profile'
 import { loadSystemPrompt as defaultLoadPrompt } from '@memo/core/runtime/prompt'
 import { ToolRouter } from '@memo/tools/router'
 import type {
@@ -186,30 +187,22 @@ export async function withDefaultDeps(
                     baseURL: provider.base_url,
                 })
                 const openAIMessages = messages.map(toOpenAIMessage)
-
-                // Build OpenAI format tool definitions
-                const effectiveToolDefinitions = callOptions?.tools ?? toolDefinitions
-                const tools =
-                    effectiveToolDefinitions.length > 0
-                        ? effectiveToolDefinitions.map((tool) => ({
-                              type: 'function' as const,
-                              function: {
-                                  name: tool.name,
-                                  description: tool.description,
-                                  parameters: tool.input_schema,
-                              },
-                          }))
-                        : undefined
-
-                const data = await client.chat.completions.create(
-                    {
-                        model: provider.model,
-                        messages: openAIMessages,
-                        tools,
-                        tool_choice: tools ? 'auto' : undefined,
-                    },
-                    { signal: callOptions?.signal },
+                const { profile: modelProfile } = resolveModelProfile(
+                    provider,
+                    config.model_profiles,
                 )
+
+                const effectiveToolDefinitions = callOptions?.tools ?? toolDefinitions
+                const request = buildChatCompletionRequest({
+                    model: provider.model,
+                    messages: openAIMessages,
+                    toolDefinitions: effectiveToolDefinitions,
+                    profile: modelProfile,
+                })
+
+                const data = await client.chat.completions.create(request, {
+                    signal: callOptions?.signal,
+                })
 
                 const message = data.choices?.[0]?.message
                 const reasoningContent = extractReasoningContent(message)

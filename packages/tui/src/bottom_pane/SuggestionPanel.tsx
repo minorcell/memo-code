@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Box, Text } from 'ink'
 
-export type SuggestionKind = 'file' | 'history' | 'slash' | 'model' | 'context' | 'tools'
+export type SuggestionKind = 'file' | 'history' | 'slash' | 'model' | 'tools'
 
 export type SuggestionItem = {
     id: string

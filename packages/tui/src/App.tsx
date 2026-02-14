@@ -5,6 +5,7 @@ import { Box, Text, useApp } from 'ink'
 import {
     createAgentSession,
     loadMemoConfig,
+    resolveContextWindowForProvider,
     selectProvider,
     writeMemoConfig,
     type AgentSession,
@@ -12,6 +13,7 @@ import {
     type AgentSessionOptions,
     type ChatMessage,
     type MCPServerConfig,
+    type ModelProfileOverride,
     type ProviderConfig,
 } from '@memo/core'
 import type { ApprovalDecision, ApprovalRequest } from '@memo/tools/approval'
@@ -39,7 +41,6 @@ import type { SessionHistoryEntry } from './controllers/session_history'
 import { loadTaskPrompt } from './task_prompt'
 import { resolveReviewBackend } from './review/backend'
 import {
-    DEFAULT_CONTEXT_LIMIT,
     formatSlashCommand,
     PLAIN_EXIT_COMMAND,
     SLASH_COMMANDS,
@@ -56,6 +57,7 @@ export type AppProps = {
     cwd: string
     sessionsDir: string
     providers: ProviderConfig[]
+    modelProfiles?: Record<string, ModelProfileOverride>
     dangerous?: boolean
     needsSetup?: boolean
 }
@@ -103,6 +105,7 @@ export function App({
     cwd,
     sessionsDir,
     providers,
+    modelProfiles,
     dangerous = false,
     needsSetup = false,
 }: AppProps) {
@@ -128,12 +131,20 @@ export function App({
     const [currentProvider, setCurrentProvider] = useState(providerName)
     const [currentModel, setCurrentModel] = useState(model)
     const [providersState, setProvidersState] = useState(providers)
+    const [modelProfilesState, setModelProfilesState] = useState(modelProfiles)
     const [toolPermissionMode, setToolPermissionMode] =
         useState<ToolPermissionMode>(defaultToolPermissionMode)
+
+    const resolveContextLimit = useCallback(
+        (providerConfig: Pick<ProviderConfig, 'name' | 'model'>) =>
+            resolveContextWindowForProvider({ model_profiles: modelProfilesState }, providerConfig),
+        [modelProfilesState],
+    )
 
     const [sessionOptionsState, setSessionOptionsState] = useState<AgentSessionOptions>({
         ...sessionOptions,
         providerName,
+        maxPromptTokens: resolveContextLimit({ name: providerName, model }),
         dangerous: defaultToolPermissionMode === TOOL_PERMISSION_MODES.FULL,
         toolPermissionMode: defaultToolPermissionMode,
     })
@@ -144,7 +155,7 @@ export function App({
     const [pendingHistoryMessages, setPendingHistoryMessages] = useState<ChatMessage[] | null>(null)
 
     const [contextLimit, setContextLimit] = useState<number>(
-        sessionOptions.maxPromptTokens ?? DEFAULT_CONTEXT_LIMIT,
+        resolveContextLimit({ name: providerName, model }),
     )
     const [currentContextTokens, setCurrentContextTokens] = useState(0)
 
@@ -432,12 +443,15 @@ export function App({
             setCurrentContextTokens(0)
             currentTurnRef.current = null
 
+            const nextContextLimit = resolveContextLimit(provider)
             setCurrentProvider(provider.name)
             setCurrentModel(provider.model)
+            setContextLimit(nextContextLimit)
             setSessionOptionsState((prev) => ({
                 ...prev,
                 sessionId: randomUUID(),
                 providerName: provider.name,
+                maxPromptTokens: nextContextLimit,
             }))
 
             await persistCurrentProvider(provider.name)
@@ -450,57 +464,8 @@ export function App({
             currentProvider,
             dispatch,
             persistCurrentProvider,
+            resolveContextLimit,
         ],
-    )
-
-    const persistContextLimit = useCallback(
-        async (limit: number) => {
-            try {
-                const loaded = await loadMemoConfig()
-                await writeMemoConfig(loaded.configPath, {
-                    ...loaded.config,
-                    max_prompt_tokens: limit,
-                })
-            } catch (err) {
-                appendSystemMessage(
-                    'Context',
-                    `Failed to persist context limit: ${(err as Error).message}`,
-                    'warning',
-                )
-            }
-        },
-        [appendSystemMessage],
-    )
-
-    const handleSetContextLimit = useCallback(
-        (limit: number) => {
-            if (busy) {
-                appendSystemMessage(
-                    'Context',
-                    'Cancel current run before changing context window.',
-                    'warning',
-                )
-                return
-            }
-            if (pendingApproval) {
-                appendSystemMessage(
-                    'Context',
-                    'Resolve current approval request before changing context window.',
-                    'warning',
-                )
-                return
-            }
-            setContextLimit(limit)
-            setCurrentContextTokens(0)
-            setSessionOptionsState((prev) => ({
-                ...prev,
-                maxPromptTokens: limit,
-                sessionId: randomUUID(),
-            }))
-            appendSystemMessage('Context', `Context window set to ${Math.floor(limit / 1000)}k.`)
-            void persistContextLimit(limit)
-        },
-        [appendSystemMessage, busy, pendingApproval, persistContextLimit],
     )
 
     const toolPermissionLabel = useCallback((mode: ToolPermissionMode): string => {
@@ -747,13 +712,17 @@ export function App({
         try {
             const loaded = await loadMemoConfig()
             const provider = selectProvider(loaded.config)
+            const nextContextLimit = resolveContextWindowForProvider(loaded.config, provider)
             setProvidersState(loaded.config.providers)
+            setModelProfilesState(loaded.config.model_profiles)
             setCurrentProvider(provider.name)
             setCurrentModel(provider.model)
+            setContextLimit(nextContextLimit)
             setSessionOptionsState((prev) => ({
                 ...prev,
                 sessionId: randomUUID(),
                 providerName: provider.name,
+                maxPromptTokens: nextContextLimit,
             }))
             setSetupPending(false)
             appendSystemMessage('Setup', `Config saved to ${loaded.configPath}`)
@@ -855,7 +824,6 @@ export function App({
                 configPath={configPath}
                 providerName={currentProvider}
                 model={currentModel}
-                contextLimit={contextLimit}
                 toolPermissionMode={toolPermissionMode}
                 mcpServers={mcpServers}
                 onSubmit={(input) => {
@@ -873,7 +841,6 @@ export function App({
                 onModelSelect={(provider) => {
                     void handleModelSelect(provider)
                 }}
-                onSetContextLimit={handleSetContextLimit}
                 onSetToolPermission={handleSetToolPermission}
                 onReviewPullRequest={(prNumber) => {
                     void runReviewPullRequestCommand(prNumber)

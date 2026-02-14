@@ -24,7 +24,6 @@ import {
 import { resolveDeleteKind } from './composer_keys'
 import { PasteBurst, type PasteBurstFlushResult } from './paste_burst'
 import {
-    CONTEXT_LIMIT_CHOICES,
     formatSlashCommand,
     SLASH_COMMANDS,
     TOOL_PERMISSION_MODES,
@@ -33,7 +32,6 @@ import {
 
 const DOUBLE_ESC_WINDOW_MS = 400
 const MODELS_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.MODELS)
-const CONTEXT_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.CONTEXT)
 const TOOLS_SLASH_PREFIX = formatSlashCommand(SLASH_COMMANDS.TOOLS)
 const INIT_SLASH_COMMAND = formatSlashCommand(SLASH_COMMANDS.INIT)
 const TOOL_MODE_OPTIONS: Array<{ mode: ToolPermissionMode; description: string }> = [
@@ -53,7 +51,6 @@ type ComposerProps = {
     configPath: string
     providerName: string
     model: string
-    contextLimit: number
     toolPermissionMode: ToolPermissionMode
     mcpServers: Record<string, MCPServerConfig>
     onSubmit: (value: string) => void
@@ -63,20 +60,18 @@ type ComposerProps = {
     onCancelRun: () => void
     onHistorySelect: (entry: SessionHistoryEntry) => void
     onModelSelect: (provider: ProviderConfig) => void
-    onSetContextLimit: (limit: number) => void
     onSetToolPermission: (mode: ToolPermissionMode) => void
     onReviewPullRequest: (prNumber: number) => void
     onSystemMessage: (title: string, content: string) => void
 }
 
-type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model' | 'context' | 'tools'
+type SuggestionMode = 'none' | 'file' | 'history' | 'slash' | 'model' | 'tools'
 
 type SuggestionMeta =
     | { type: 'file'; isDir?: boolean }
     | { type: 'history'; entry: SessionHistoryEntry }
     | { type: 'slash' }
     | { type: 'model'; provider: ProviderConfig }
-    | { type: 'context'; value: number }
     | { type: 'tools'; mode: ToolPermissionMode }
 
 type SuggestionRecord = SuggestionItem & {
@@ -88,15 +83,8 @@ type FileTrigger = { type: 'file'; query: string; tokenStart: number }
 type HistoryTrigger = { type: 'history'; keyword: string }
 type SlashTrigger = { type: 'slash'; keyword: string }
 type ModelTrigger = { type: 'models'; keyword: string }
-type ContextTrigger = { type: 'context' }
 type ToolsTrigger = { type: 'tools' }
-type Trigger =
-    | FileTrigger
-    | HistoryTrigger
-    | SlashTrigger
-    | ModelTrigger
-    | ContextTrigger
-    | ToolsTrigger
+type Trigger = FileTrigger | HistoryTrigger | SlashTrigger | ModelTrigger | ToolsTrigger
 
 function detectFileTrigger(value: string): FileTrigger | null {
     const atIndex = value.lastIndexOf('@')
@@ -159,14 +147,6 @@ function detectModelsTrigger(value: string): ModelTrigger | null {
     }
 }
 
-function detectContextTrigger(value: string): ContextTrigger | null {
-    const trimmed = value.trimStart()
-    if (!trimmed.startsWith(CONTEXT_SLASH_PREFIX)) return null
-    const rest = trimmed.slice(CONTEXT_SLASH_PREFIX.length)
-    if (rest && !rest.startsWith(' ')) return null
-    return { type: 'context' }
-}
-
 function detectToolsTrigger(value: string): ToolsTrigger | null {
     const trimmed = value.trimStart()
     if (!trimmed.startsWith(TOOLS_SLASH_PREFIX)) return null
@@ -178,7 +158,6 @@ function detectToolsTrigger(value: string): ToolsTrigger | null {
 function detectTrigger(value: string): Trigger | null {
     return (
         detectToolsTrigger(value) ??
-        detectContextTrigger(value) ??
         detectModelsTrigger(value) ??
         detectSlashTrigger(value) ??
         detectFileTrigger(value) ??
@@ -203,7 +182,6 @@ type SuggestionBuildInput = {
     sessionsDir: string
     currentSessionFile?: string
     providers: ProviderConfig[]
-    contextLimit: number
     toolPermissionMode: ToolPermissionMode
 }
 
@@ -233,18 +211,6 @@ function buildModelSuggestions(
         }))
 
     return { mode: 'model', items }
-}
-
-function buildContextSuggestions(contextLimit: number): SuggestionBuildResult {
-    const items: SuggestionRecord[] = CONTEXT_LIMIT_CHOICES.map((choice) => ({
-        id: `${choice}`,
-        title: `${Math.floor(choice / 1000)}k tokens`,
-        subtitle: choice === contextLimit ? 'Current' : undefined,
-        kind: 'context',
-        value: `${CONTEXT_SLASH_PREFIX} ${Math.floor(choice / 1000)}k`,
-        meta: { type: 'context', value: choice },
-    }))
-    return { mode: 'context', items }
 }
 
 function buildToolSuggestions(toolPermissionMode: ToolPermissionMode): SuggestionBuildResult {
@@ -283,7 +249,6 @@ async function buildSuggestionsForTrigger({
     sessionsDir,
     currentSessionFile,
     providers,
-    contextLimit,
     toolPermissionMode,
 }: SuggestionBuildInput): Promise<SuggestionBuildResult> {
     switch (trigger.type) {
@@ -325,9 +290,6 @@ async function buildSuggestionsForTrigger({
         case 'models':
             return buildModelSuggestions(providers, trigger.keyword)
 
-        case 'context':
-            return buildContextSuggestions(contextLimit)
-
         case 'tools':
             return buildToolSuggestions(toolPermissionMode)
 
@@ -347,7 +309,6 @@ export const Composer = memo(function Composer({
     configPath,
     providerName,
     model,
-    contextLimit,
     toolPermissionMode,
     mcpServers,
     onSubmit,
@@ -357,7 +318,6 @@ export const Composer = memo(function Composer({
     onCancelRun,
     onHistorySelect,
     onModelSelect,
-    onSetContextLimit,
     onSetToolPermission,
     onReviewPullRequest,
     onSystemMessage,
@@ -392,10 +352,9 @@ export const Composer = memo(function Composer({
             model,
             mcpServers,
             providers,
-            contextLimit,
             toolPermissionMode,
         }),
-        [configPath, providerName, model, mcpServers, providers, contextLimit, toolPermissionMode],
+        [configPath, providerName, model, mcpServers, providers, toolPermissionMode],
     )
 
     const trigger = useMemo(() => {
@@ -501,7 +460,6 @@ export const Composer = memo(function Composer({
                     sessionsDir,
                     currentSessionFile,
                     providers,
-                    contextLimit,
                     toolPermissionMode,
                 })
                 if (cancelled || requestId !== requestIdRef.current) return
@@ -526,7 +484,6 @@ export const Composer = memo(function Composer({
         sessionsDir,
         currentSessionFile,
         providers,
-        contextLimit,
         toolPermissionMode,
         closeSuggestions,
     ])
@@ -561,12 +518,6 @@ export const Composer = memo(function Composer({
                     closeSuggestions()
                     return
 
-                case 'context':
-                    onSetContextLimit(record.meta.value)
-                    clearComposerValue()
-                    closeSuggestions()
-                    return
-
                 case 'tools':
                     onSetToolPermission(record.meta.mode)
                     clearComposerValue()
@@ -594,7 +545,6 @@ export const Composer = memo(function Composer({
             clearComposerValue,
             onHistorySelect,
             onModelSelect,
-            onSetContextLimit,
             onSetToolPermission,
         ],
     )
@@ -857,9 +807,6 @@ export const Composer = memo(function Composer({
                         break
                     case 'switch_model':
                         onModelSelect(result.provider)
-                        break
-                    case 'set_context_limit':
-                        onSetContextLimit(result.limit)
                         break
                     case 'set_tool_permission':
                         onSetToolPermission(result.mode)
