@@ -1,0 +1,269 @@
+---
+title: 'Memo Code 安全设计：子进程、命令防护与权限审批的统一方案'
+description: '从 memo 的实践中提炼出安全设计的三道防线：子进程管理防止内存泄漏与资源耗尽、命令守卫拦截危险操作、审批系统平衡权限与体验。还有那把「双刃剑」——dangerous 模式。'
+date: '2026-02-14'
+order: 4
+---
+
+做 Agent 这类能「替用户干活」的工具，安全性是躲不掉的坎。
+
+我一开始做 memo（[https://github.com/minorcell/memo-code](https://github.com/minorcell/memo-code)）的时候，安全问题还没想那么多——能跑起来就行。后来工具越加越多，shell 命令也越跑越复杂，就开始踩坑了：
+
+- 子进程忘了关，内存慢慢涨
+- `rm -rf /` 差点真被我跑出来
+- 每次执行都要点批准，用户体验稀碎
+
+这些问题逼着我认真设计了整套安全方案。今天把思路和实现细节都分享出来，希望对你有帮助。
+
+## 先想清楚：安全设计要解决什么问题？
+
+我把它拆成三件事：
+
+1. **资源可控**：子进程不能无限开，不能忘了关
+2. **操作安全**：危险命令要拦截，误操作要有缓冲
+3. **权限平衡**：该拦的拦住，该放的放行，还要给用户留个「后门」
+
+下面逐一展开。
+
+## 第一道防线：子进程管理——防止内存泄漏与资源耗尽
+
+memo 的 shell 执行用的是 Node.js 的 `child_process.spawn`，但光 spawn 是不够的——你还得管得住。
+
+### 统一会话管理器
+
+我写了一个 `UnifiedExecManager`（`packages/tools/src/tools/exec_runtime.ts`），核心思路是**单例 + 会话池**：
+
+```typescript
+class UnifiedExecManager {
+    private sessions = new Map<number, SessionState>()
+    private nextId = 1
+    private MAX_SESSIONS = 64
+}
+```
+
+好处很明显：
+
+- 所有子进程都有唯一 ID
+- 随时可以查询状态、发送信号、获取输出
+- 资源回收有统一入口
+
+### 资源限制：数量 + 内存 + 时间
+
+先看数量限制：
+
+```typescript
+async start(request: StartExecRequest) {
+    this.cleanupSessions()
+    if (this.activeSessionCount() >= MAX_SESSIONS) {
+        throw new Error(`too many active sessions (max ${MAX_SESSIONS})`)
+    }
+    // ...
+}
+```
+
+超过 64 个活跃会话就直接拒绝，防止被LLM恶意耗尽系统资源。
+
+再看输出限制。Agent 交互是基于 token 计费的，子进程输出不能无限制返回：
+
+```typescript
+function truncateByTokens(text: string, maxOutputTokens?: number) {
+    const maxChars = (maxOutputTokens || 2000) * 4
+    if (text.length <= maxChars) {
+        return { output: text, deliveredChars: text.length }
+    }
+    return {
+        output: text.slice(0, maxChars),
+        deliveredChars: maxChars,
+    }
+}
+```
+
+默认最多返回 8000 字符，不够可以调，但不会无限大。
+
+### 超时终止：SIGTERM → SIGKILL
+
+子进程跑飞了是常见问题。memo 的策略是**先礼貌后强硬**：
+
+```typescript
+private async terminateForTimeout(session: SessionState) {
+    if (session.exited) return
+    session.proc.kill('SIGTERM')
+    await waitForExit(session, 200)  // 等 200ms
+    if (!session.exited) {
+        session.proc.kill('SIGKILL')  // 还是没退就直接杀了
+        await waitForExit(session, 200)
+    }
+}
+```
+
+为什么要等一下？因为有些程序接收到 SIGTERM 会做清理工作（比如写入缓存、关闭句柄），直接 SIGKILL 可能导致数据丢失。
+
+### 内存泄漏防护：自动清理已退出的会话
+
+会话不能只增不减。我加了一个自动清理逻辑：
+
+```typescript
+private cleanupSessions() {
+    if (this.sessions.size <= MAX_SESSIONS) return
+    // 优先清理已退出的，按启动时间从早到晚排序
+    const ended = Array.from(this.sessions.values())
+        .filter(session => session.exited)
+        .sort((a, b) => a.startedAtMs - b.startedAtMs)
+
+    for (const session of ended) {
+        if (this.sessions.size <= MAX_SESSIONS) break
+        this.sessions.delete(session.id)
+    }
+}
+```
+
+这样即使跑了几百个命令，内存也不会无限涨。
+
+## 第二道防线：命令守卫——拦截危险操作
+
+子进程管住了还不够，还得管住**跑什么命令**。
+
+我见过太多「rm -rf /」惨案，也见过 `dd if=/dev/zero of=/dev/sda` 这种物理层面不可逆的破坏。memo 的做法是**命令解析 + 黑名单匹配**。
+
+### 命令解析：不只是字符串匹配
+
+直接正则匹配 `rm -rf` 是有漏洞的。比如 `sudo rm -rf /`、包裹在 `bash -c` 里、甚至写成十六进制，都能绕过简单匹配。
+
+memo 的做法是**先把命令拆成「段」**，再逐段解析：
+
+```typescript
+function splitCommandSegments(command: string) {
+    // 按 ; | && || 分割，处理引号和转义
+    // 返回每一段独立的命令
+}
+
+function parseSegment(segment: string) {
+    // 跳过 sudo/env/nohup 等包装
+    // 提取真实的命令名和参数
+}
+```
+
+这样不管外面包了多少层 `sudo env bash -c`，最终都能追溯到真正的命令。
+
+### 危险命令黑名单
+
+目前 memo 拦截这几类（`packages/tools/src/tools/command_guard.ts`）：
+
+| 规则                           | 触发条件                                       | 危险等级 |
+| ------------------------------ | ---------------------------------------------- | -------- |
+| `rm_recursive_critical_target` | `rm -rf` 目标包含 `/`、`~`、`$HOME` 等关键路径 | 极高     |
+| `mkfs_filesystem_create`       | `mkfs`/`mkfs.xxx`                              | 极高     |
+| `dd_write_block_device`        | `dd` 写入 `/dev/` 下的块设备                   | 极高     |
+| `disk_mutation_block_device`   | `fdisk`/`parted`/`shred` 等操作块设备          | 高       |
+| `redirect_block_device`        | 输出重定向到 `/dev/` 块设备                    | 高       |
+
+拦截后返回的是 `<system_hint>` 标记，不是直接报错，方便 Agent 理解为什么被拦：
+
+```xml
+<system_hint type="tool_call_denied"
+    tool="exec_command"
+    reason="dangerous_command"
+    policy="blacklist"
+    rule="rm_recursive_critical_target"
+    command="rm -rf /">
+    Blocked a high-risk shell command to prevent irreversible data loss.
+    Use a safer and scoped alternative.
+</system_hint>
+```
+
+## 第三道防线：审批系统——平衡权限与体验
+
+命令守卫是第一道关卡，但还有很多「不危险但需要知道」的操作，比如写文件、改配置。审批系统的目标就是**分级管理、可追溯、可配置**。
+
+### 风险分级
+
+memo 把工具分成三级（`packages/tools/src/approval/constants.ts`）：
+
+| 级别      | 含义     | 审批策略（auto 模式） |
+| --------- | -------- | --------------------- |
+| `read`    | 只读操作 | 免审批                |
+| `write`   | 文件修改 | 需审批                |
+| `execute` | 执行命令 | 需审批                |
+
+### 审批模式
+
+- **auto 模式**：只读工具免审批，写/执行类工具需要审批
+- **strict 模式**：所有工具都需要审批，一个都跑不掉
+
+```typescript
+check(toolName: string, params: unknown): ApprovalCheckResult {
+    if (ALWAYS_AUTO_APPROVE_TOOLS.has(toolName)) {
+        return { needApproval: false, decision: 'auto-execute' }
+    }
+
+    const riskLevel = classifier.getRiskLevel(toolName)
+    if (!classifier.needsApproval(riskLevel, approvalMode)) {
+        return { needApproval: false, decision: 'auto-execute' }
+    }
+    // 生成指纹，返回需要审批
+}
+```
+
+### 审批记忆：一次批准，记住一整场
+
+如果每次执行都要点批准，用户体验会非常差。memo 用**指纹 + 缓存**解决这个问题：
+
+```typescript
+const fingerprint = generateFingerprint(toolName, params)
+cache.toolByFingerprint.set(fingerprint, toolName)
+
+// 审批后记录
+recordDecision(fingerprint, decision: 'session' | 'once' | 'deny') {
+    switch (decision) {
+        case 'session': cache.sessionTools.add(toolName); break
+        case 'once': cache.onceTools.add(toolName); break
+        case 'deny': cache.deniedTools.add(toolName); break
+    }
+}
+```
+
+- **session**：这场对话内一直有效
+- **once**：用一次就失效
+- **deny**：以后再问直接拦截
+
+## dangerous 模式
+
+审批系统是安全了，但有时候用户就是想要「无限制」——比如在本地开发、或者明确知道自己在干什么。
+
+memo 提供了 `dangerous` 模式：
+
+```typescript
+if (dangerous) {
+    return {
+        isDangerousMode: true,
+        getRiskLevel: () => 'read', // 所有操作都视为最低风险
+        check: () => ({ needApproval: false, decision: 'auto-execute' }),
+        isGranted: () => true,
+    }
+}
+```
+
+开启也很简单，CLI 里加上 `--dangerous` 标记：
+
+```bash
+memo --dangerous
+```
+
+开启后：
+
+- 所有工具都免审批
+
+**这是一把双刃剑。** 我在 CLI 里加了这个选项，但默认是关闭的。开发者如果想用，需要明确加上 `--dangerous` 标记。
+
+## 总结：三层防护 + 一个后门
+
+memo 的安全设计可以总结为：
+
+1. **子进程管理**：数量限制 + 输出截断 + 超时终止 + 自动清理
+2. **命令守卫**：命令解析 + 黑名单拦截 + stdin 检测
+3. **审批系统**：风险分级 + 审批模式 + 记忆缓存
+4. **dangerous 模式**：留一个「我知道我在干什么」的后门
+
+这套方案不完美，还在持续迭代。比如命令守卫目前是硬编码的黑名单，后续可以考虑支持用户自定义规则；审批系统也可以考虑接入外部信任模型。
+
+（完）

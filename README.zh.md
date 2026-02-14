@@ -53,6 +53,8 @@ memo
 
 - 交互式：`memo`（默认 TUI，支持多轮、工具可视化、快捷键）。
 - 非交互纯文本模式（非 TTY）：`echo "你的问题" | memo`（适合脚本）。
+- 单次执行：`memo --once "你的问题"` 或 `memo -once "你的问题"`（执行一轮后退出；在可信仓库建议搭配 `--dangerous`）。
+- 继续最近会话：`memo --prev` 或 `memo -prev`（加载当前目录最近会话上下文）。
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 - 查看版本：`memo --version` 或 `memo -v`。
 - 启动目录约定：若启动根目录存在 `AGENTS.md`，Memo 会自动将其拼接进系统提示词。

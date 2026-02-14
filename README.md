@@ -57,6 +57,8 @@ memo
 
 - Interactive mode: `memo` (default TUI; supports multi-turn chat, tool visualization, shortcuts).
 - Plain mode (non-TTY): `echo "your prompt" | memo` (plain text output; useful for scripts).
+- One-shot mode: `memo --once "your prompt"` or `memo -once "your prompt"` (run one turn and exit; recommended with `--dangerous` in trusted repos).
+- Continue latest local session: `memo --prev` or `memo -prev` (load latest session context for current directory).
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
 - Startup project guidance: if `AGENTS.md` exists in the startup root, Memo appends it to the system prompt automatically.
