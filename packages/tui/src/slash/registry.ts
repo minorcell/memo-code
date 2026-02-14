@@ -1,11 +1,9 @@
 import type { SlashCommandResult, SlashContext, SlashSpec } from './types'
 import {
-    CONTEXT_LIMIT_CHOICES,
     formatSlashCommand,
     SLASH_COMMANDS,
     TOOL_PERMISSION_MODES,
     type ToolPermissionMode,
-    type ContextLimitChoice,
 } from '../constants'
 
 export const SLASH_SPECS: SlashSpec[] = [
@@ -15,10 +13,6 @@ export const SLASH_SPECS: SlashSpec[] = [
     { name: SLASH_COMMANDS.RESUME, description: 'List and load session history' },
     { name: SLASH_COMMANDS.REVIEW, description: 'Review a GitHub pull request and post comments' },
     { name: SLASH_COMMANDS.MODELS, description: 'List or switch configured models' },
-    {
-        name: SLASH_COMMANDS.CONTEXT,
-        description: 'Set context window (80k/120k/150k/200k)',
-    },
     {
         name: SLASH_COMMANDS.TOOLS,
         description: 'Set tool permission mode (none/once/full)',
@@ -74,16 +68,6 @@ export function buildHelpText(): string {
         '  Ctrl+L      Clear screen and start new session',
         '  Esc Esc     Interrupt running turn / clear input',
     ].join('\n')
-}
-
-function parseContextLimit(input: string | undefined): number | null {
-    if (!input) return null
-    const normalized = input.toLowerCase().replace(/,/g, '')
-    const match = normalized.match(/^(\d+)(k)?$/)
-    if (!match) return null
-    const base = Number(match[1])
-    if (!Number.isFinite(base)) return null
-    return base * (match[2] ? 1000 : 1)
 }
 
 function parseReviewPrNumber(input: string | undefined): number | null {
@@ -175,34 +159,6 @@ export function resolveSlashCommand(raw: string, context: SlashContext): SlashCo
                 kind: 'message',
                 title: 'Models',
                 content: `${prefix}${lines.join('\n')}`,
-            }
-        }
-
-        case SLASH_COMMANDS.CONTEXT: {
-            const parsed = parseContextLimit(rest[0])
-            const options = CONTEXT_LIMIT_CHOICES.map(
-                (value) => `${Math.floor(value / 1000)}k`,
-            ).join(', ')
-
-            if (parsed === null) {
-                return {
-                    kind: 'message',
-                    title: 'Context',
-                    content: `Current: ${(context.contextLimit / 1000).toFixed(0)}k\nUsage: ${formatSlashCommand(SLASH_COMMANDS.CONTEXT)} <length>\nChoices: ${options}`,
-                }
-            }
-
-            if (!CONTEXT_LIMIT_CHOICES.includes(parsed as ContextLimitChoice)) {
-                return {
-                    kind: 'message',
-                    title: 'Context',
-                    content: `Unsupported value: ${parsed}. Choose one of ${options}`,
-                }
-            }
-
-            return {
-                kind: 'set_context_limit',
-                limit: parsed,
             }
         }
 

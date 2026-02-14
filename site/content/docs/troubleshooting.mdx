@@ -68,7 +68,7 @@ Fix:
 
 1. use `/new` to reset session context
 2. lower task scope and continue in smaller chunks
-3. adjust `/context` to a larger supported value if needed
+3. set `model_profiles.<model>.context_window` (or `model_profiles."provider:model".context_window`) to a larger value if needed
 
 ## MCP Server Not Available in Session
 

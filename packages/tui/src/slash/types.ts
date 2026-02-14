@@ -7,7 +7,6 @@ export type SlashContext = {
     model: string
     mcpServers: Record<string, MCPServerConfig>
     providers: ProviderConfig[]
-    contextLimit: number
     toolPermissionMode: ToolPermissionMode
 }
 
@@ -17,7 +16,6 @@ export type SlashCommandResult =
     | { kind: 'message'; title: string; content: string }
     | { kind: 'review_pr'; prNumber: number }
     | { kind: 'switch_model'; provider: ProviderConfig }
-    | { kind: 'set_context_limit'; limit: number }
     | { kind: 'set_tool_permission'; mode: ToolPermissionMode }
     | { kind: 'init_agents_md' }
 

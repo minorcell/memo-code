@@ -9,6 +9,7 @@ import {
     buildSessionPath,
     getSessionsDir,
     loadMemoConfig,
+    resolveContextWindowForProvider,
     writeMemoConfig,
     type MCPServerConfig,
 } from '@memo/core/config/config'
@@ -117,6 +118,16 @@ describe('mcp config serialization', () => {
             current_provider: 'deepseek',
             max_prompt_tokens: 120000,
             active_mcp_servers: ['remote'],
+            model_profiles: {
+                'gpt-5': {
+                    supports_parallel_tool_calls: true,
+                    supports_verbosity: true,
+                    context_window: 272000,
+                },
+                'openai:gpt-5': {
+                    context_window: 128000,
+                },
+            },
             providers: [
                 { name: 'deepseek', env_api_key: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
             ],
@@ -139,6 +150,12 @@ describe('mcp config serialization', () => {
         expect(text).toContain('[[providers.deepseek]]')
         expect(text).toContain('max_prompt_tokens = 120000')
         expect(text).toContain('active_mcp_servers = ["remote"]')
+        expect(text).toContain('[model_profiles.gpt-5]')
+        expect(text).toContain('supports_parallel_tool_calls = true')
+        expect(text).toContain('supports_verbosity = true')
+        expect(text).toContain('context_window = 272000')
+        expect(text).toContain('[model_profiles."openai:gpt-5"]')
+        expect(text).toContain('context_window = 128000')
         expect(text).toContain('[mcp_servers.remote]')
         expect(text).toContain('type = "streamable_http"')
         expect(text).toContain('url = "https://example.com/mcp"')
@@ -182,6 +199,11 @@ current_provider = "deepseek"
 max_prompt_tokens = 150000
 active_mcp_servers = ["remote2"]
 
+[model_profiles.gpt-5]
+supports_parallel_tool_calls = true
+supports_reasoning_content = true
+context_window = 272000
+
 [[providers.deepseek]]
 name = "deepseek"
 env_api_key = "DEEPSEEK_API_KEY"
@@ -201,6 +223,11 @@ url = "https://example.com/mcp-2"
         const servers = loaded.config.mcp_servers ?? {}
         expect(loaded.config.max_prompt_tokens).toBe(150000)
         expect(loaded.config.active_mcp_servers).toEqual(['remote2'])
+        expect(loaded.config.model_profiles?.['gpt-5']).toEqual({
+            supports_parallel_tool_calls: true,
+            supports_reasoning_content: true,
+            context_window: 272000,
+        })
         const remote = servers.remote
         expectHttpServer(remote)
         expect(remote.type ?? 'streamable_http').toBe('streamable_http')
@@ -247,5 +274,97 @@ model = "deepseek-chat"
 
         const loaded = await loadMemoConfig()
         expect(loaded.config.max_prompt_tokens).toBe(120000)
+    })
+
+    test('loadMemoConfig ignores invalid model_profiles entries', async () => {
+        const home = join(tempBase, 'memo-home-invalid-model-profiles')
+        process.env.MEMO_HOME = home
+        await mkdir(home, { recursive: true })
+        const configText = `
+current_provider = "deepseek"
+
+[[providers.deepseek]]
+name = "deepseek"
+env_api_key = "DEEPSEEK_API_KEY"
+model = "deepseek-chat"
+
+[model_profiles.gpt-5]
+context_window = "invalid"
+supports_parallel_tool_calls = "yes"
+`
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
+
+        const loaded = await loadMemoConfig()
+        expect(loaded.config.model_profiles).toBeUndefined()
+    })
+})
+
+describe('resolveContextWindowForProvider', () => {
+    test('uses provider:model override before model override', () => {
+        const contextWindow = resolveContextWindowForProvider(
+            {
+                model_profiles: {
+                    'gpt-5': { context_window: 272000 },
+                    'openai:gpt-5': { context_window: 128000 },
+                },
+            },
+            { name: 'openai', model: 'gpt-5', env_api_key: 'OPENAI_API_KEY' },
+        )
+
+        expect(contextWindow).toBe(128000)
+    })
+
+    test('uses model override when provider:model override is missing', () => {
+        const contextWindow = resolveContextWindowForProvider(
+            {
+                model_profiles: {
+                    'gpt-5': { context_window: 272000 },
+                },
+            },
+            { name: 'openai', model: 'gpt-5', env_api_key: 'OPENAI_API_KEY' },
+        )
+
+        expect(contextWindow).toBe(272000)
+    })
+
+    test('falls back to default when context_window is not configured', () => {
+        const contextWindow = resolveContextWindowForProvider(
+            {
+                model_profiles: {
+                    'gpt-5': { supports_parallel_tool_calls: true },
+                },
+            },
+            { name: 'openai', model: 'gpt-5', env_api_key: 'OPENAI_API_KEY' },
+        )
+
+        expect(contextWindow).toBe(120000)
+    })
+
+    test('matches keys case-insensitively and trims surrounding spaces', () => {
+        const contextWindow = resolveContextWindowForProvider(
+            {
+                model_profiles: {
+                    ' GPT-5 ': { context_window: 180000 },
+                    ' OpenAI:GPT-5 ': { context_window: 128000 },
+                },
+            },
+            { name: '  OpenAI ', model: ' gpt-5 ', env_api_key: 'OPENAI_API_KEY' },
+        )
+
+        expect(contextWindow).toBe(128000)
+    })
+
+    test('falls back from invalid provider override to valid model override', () => {
+        const contextWindow = resolveContextWindowForProvider(
+            {
+                model_profiles: {
+                    'openai:gpt-5': { context_window: -1 },
+                    'gpt-5': { context_window: 200000 },
+                },
+            },
+            { name: 'openai', model: 'gpt-5', env_api_key: 'OPENAI_API_KEY' },
+        )
+
+        expect(contextWindow).toBe(200000)
     })
 })

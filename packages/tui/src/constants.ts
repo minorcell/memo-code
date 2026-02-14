@@ -1,8 +1,3 @@
-export const CONTEXT_LIMIT_CHOICES = [80000, 120000, 150000, 200000] as const
-export type ContextLimitChoice = (typeof CONTEXT_LIMIT_CHOICES)[number]
-
-export const DEFAULT_CONTEXT_LIMIT: ContextLimitChoice = CONTEXT_LIMIT_CHOICES[1]
-
 export const SLASH_COMMANDS = {
     HELP: 'help',
     EXIT: 'exit',
@@ -10,7 +5,6 @@ export const SLASH_COMMANDS = {
     RESUME: 'resume',
     REVIEW: 'review',
     MODELS: 'models',
-    CONTEXT: 'context',
     TOOLS: 'tools',
     MCP: 'mcp',
     INIT: 'init',

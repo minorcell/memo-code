@@ -7,7 +7,8 @@ category: 'Getting Started'
 
 # Configuration
 
-Memo uses `config.toml` to manage provider selection, context limits, and MCP servers.
+Memo uses `config.toml` to manage provider selection, model profile overrides, and MCP servers.
+This page focuses on what each key means and how Memo resolves model behavior at runtime.
 
 ## Config File Location
 
@@ -19,13 +20,23 @@ If `MEMO_HOME` is set:
 
 - config path becomes `$MEMO_HOME/config.toml`
 
+## How Config Is Applied
+
+Memo runtime uses config in this order:
+
+1. Select active provider by `current_provider`.
+2. Read that provider's `model`.
+3. Resolve model profile overrides from `model_profiles`.
+4. Resolve session context window from `context_window` policy.
+
+`/models` switch in TUI re-runs this resolution for the selected provider/model.
+
 ## Provider Configuration
 
 ### Minimal Example
 
 ```toml
 current_provider = "deepseek"
-max_prompt_tokens = 120000
 
 [[providers.deepseek]]
 name = "deepseek"
@@ -34,11 +45,10 @@ model = "deepseek-chat"
 base_url = "https://api.deepseek.com"
 ```
 
-### Multiple Providers Example
+### Multiple Providers
 
 ```toml
 current_provider = "deepseek"
-max_prompt_tokens = 120000
 
 [[providers.deepseek]]
 name = "deepseek"
@@ -53,28 +63,95 @@ model = "gpt-4.1-mini"
 base_url = "https://api.openai.com/v1"
 ```
 
-### Provider Fields
+### Provider Keys
 
-- `current_provider`: default provider name.
-- `max_prompt_tokens`: context limit for sessions.
-- `providers.<name>` entries:
-    - `name`: provider identifier.
-    - `env_api_key`: environment variable used for API key lookup.
-    - `model`: model ID.
-    - `base_url` (optional): OpenAI-compatible API endpoint.
+- `current_provider`
+    - Default provider name for new sessions.
+    - Must match one configured provider `name`.
+- `providers.<name>.name`
+    - Provider identifier shown in `/models`.
+- `providers.<name>.env_api_key`
+    - Environment variable name used as first-priority API key lookup.
+- `providers.<name>.model`
+    - Model ID sent to the upstream API.
+- `providers.<name>.base_url` (optional)
+    - OpenAI-compatible endpoint.
+    - Useful for custom gateways or compatible providers.
 
-## Context Limit
+## Model Profiles (Overrides)
 
-`max_prompt_tokens` is also managed by `/context` in TUI.
+Memo uses conservative defaults for model capabilities and gates request options through local
+`config.toml` overrides:
 
-Supported values in current TUI command flow:
+```toml
+[model_profiles.gpt-5]
+supports_parallel_tool_calls = true
+supports_reasoning_content = true
+supports_verbosity = true
+context_window = 272000
 
-- `80000`
-- `120000`
-- `150000`
-- `200000`
+# Provider-specific override, key format: "<provider>:<model>"
+[model_profiles."openai:gpt-5"]
+supports_parallel_tool_calls = false
+```
 
-Changing `/context` starts a new session and persists the value to config.
+### Supported Fields
+
+- `supports_parallel_tool_calls`
+    - Controls whether Memo sends `parallel_tool_calls`.
+- `supports_reasoning_content`
+    - Controls whether reasoning content is carried in tool-call follow-up rounds.
+- `supports_verbosity`
+    - Controls whether verbosity-related request options are enabled.
+- `context_window`
+    - Session prompt/context hard limit used by Memo runtime.
+    - Must be a positive number.
+
+### Key Formats
+
+- `[model_profiles.<model>]`
+    - Model-level override, for all providers using this model name.
+- `[model_profiles."provider:model"]`
+    - Provider-specific override, for one provider + model pair.
+    - Use quotes because `:` is in the key.
+
+Example:
+
+- `[model_profiles.gpt-5]` applies to any provider using `gpt-5`.
+- `[model_profiles."openai:gpt-5"]` only applies when provider is `openai` and model is `gpt-5`.
+
+## Context Window Policy
+
+Session context window is resolved with this priority:
+
+1. `model_profiles."provider:model".context_window`
+2. `model_profiles."<model>".context_window`
+3. default `120000`
+
+Memo applies this at startup and re-applies it when switching models with `/models`.
+
+### Practical Example
+
+```toml
+[model_profiles.gpt-5]
+context_window = 272000
+
+[model_profiles."openai:gpt-5"]
+context_window = 128000
+```
+
+Result:
+
+- `openai:gpt-5` -> `128000`
+- other providers using `gpt-5` -> `272000`
+- any model without `context_window` override -> `120000`
+
+### About `max_prompt_tokens`
+
+`max_prompt_tokens` is retained for backward compatibility in config files.
+
+- It is no longer the primary control for session context size.
+- Prefer `model_profiles.*.context_window` for new configuration.
 
 ## MCP Server Configuration
 

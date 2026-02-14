@@ -6,6 +6,7 @@ import { render } from 'ink'
 import {
     createAgentSession,
     loadMemoConfig,
+    resolveContextWindowForProvider,
     writeMemoConfig,
     selectProvider,
     getSessionsDir,
@@ -123,11 +124,12 @@ async function ensureProviderConfig(mode: 'plain' | 'tui') {
 async function runPlainMode(parsed: ParsedArgs) {
     const loaded = await ensureProviderConfig('plain')
     const provider = selectProvider(loaded.config)
+    const contextWindow = resolveContextWindowForProvider(loaded.config, provider)
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        maxPromptTokens: loaded.config.max_prompt_tokens,
+        maxPromptTokens: contextWindow,
         activeMcpServers: loaded.config.active_mcp_servers,
         generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
@@ -192,11 +194,12 @@ async function runPlainMode(parsed: ParsedArgs) {
 async function runInteractiveTui(parsed: ParsedArgs) {
     const loaded = await ensureProviderConfig('tui')
     const provider = selectProvider(loaded.config)
+    const contextWindow = resolveContextWindowForProvider(loaded.config, provider)
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        maxPromptTokens: loaded.config.max_prompt_tokens,
+        maxPromptTokens: contextWindow,
         activeMcpServers: loaded.config.active_mcp_servers,
         generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
@@ -219,6 +222,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             cwd={process.cwd()}
             sessionsDir={sessionsDir}
             providers={loaded.config.providers}
+            modelProfiles={loaded.config.model_profiles}
             dangerous={parsed.options.dangerous}
             needsSetup={loaded.needsSetup}
         />,
