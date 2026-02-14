@@ -1,5 +1,6 @@
 // CLI entry: interactive/one-off modes with session management and logs.
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { render } from 'ink'
@@ -12,54 +13,16 @@ import {
     getSessionsDir,
     type AgentSessionDeps,
     type AgentSessionOptions,
+    type ChatMessage,
     type MemoConfig,
 } from '@memo/core'
 import { App } from './App'
 import { findLocalPackageInfoSync } from './version'
 import { runMcpCommand } from './mcp'
-
-type CliOptions = {
-    dangerous: boolean
-    showVersion: boolean
-    removedOnceFlag: boolean
-}
-
-type ParsedArgs = {
-    question: string
-    options: CliOptions
-}
-
-/** Minimal argv parsing, supports --dangerous. */
-function parseArgs(argv: string[]): ParsedArgs {
-    const options: CliOptions = {
-        dangerous: false,
-        showVersion: false,
-        removedOnceFlag: false,
-    }
-    const questionParts: string[] = []
-
-    for (let i = 0; i < argv.length; i++) {
-        const arg = argv[i]
-        if (arg === undefined) {
-            continue
-        }
-        if (arg === '--version' || arg === '-v') {
-            options.showVersion = true
-            continue
-        }
-        if (arg === '--once') {
-            options.removedOnceFlag = true
-            continue
-        }
-        if (arg === '--dangerous' || arg === '-d') {
-            options.dangerous = true
-            continue
-        }
-        questionParts.push(arg)
-    }
-
-    return { question: questionParts.join(' '), options }
-}
+import { parseHistoryLog, type ParsedHistoryLog } from './controllers/history_parser'
+import { loadSessionHistoryEntries } from './controllers/session_history'
+import { parseArgs, type ParsedArgs } from './cli_args'
+import { routeCli } from './cli_router'
 
 async function ensureProviderConfig(mode: 'plain' | 'tui') {
     const loaded = await loadMemoConfig()
@@ -121,6 +84,28 @@ async function ensureProviderConfig(mode: 'plain' | 'tui') {
     }
 }
 
+async function loadPreviousSession(
+    sessionsDir: string,
+    cwd: string,
+): Promise<ParsedHistoryLog | null> {
+    const entries = await loadSessionHistoryEntries({
+        sessionsDir,
+        cwd,
+        limit: 1,
+    })
+    const latest = entries[0]
+    if (!latest) return null
+    const raw = await readFile(latest.sessionFile, 'utf8')
+    return parseHistoryLog(raw)
+}
+
+function restoreHistoryMessages(session: { history: ChatMessage[] }, messages: ChatMessage[]) {
+    if (!messages.length) return
+    const systemMessage = session.history[0]
+    if (!systemMessage) return
+    session.history.splice(0, session.history.length, systemMessage, ...messages)
+}
+
 async function runPlainMode(parsed: ParsedArgs) {
     const loaded = await ensureProviderConfig('plain')
     const provider = selectProvider(loaded.config)
@@ -133,6 +118,15 @@ async function runPlainMode(parsed: ParsedArgs) {
         activeMcpServers: loaded.config.active_mcp_servers,
         generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
+    }
+    const sessionsDir = getSessionsDir(loaded, sessionOptions)
+    const previousSession = parsed.options.prev
+        ? await loadPreviousSession(sessionsDir, process.cwd())
+        : null
+    if (parsed.options.prev && !previousSession) {
+        console.error('No previous session found for current directory.')
+        process.exitCode = 1
+        return
     }
 
     // Show warning in dangerous mode
@@ -165,6 +159,10 @@ async function runPlainMode(parsed: ParsedArgs) {
     }
 
     const session = await createAgentSession(deps, sessionOptions)
+    if (previousSession) {
+        restoreHistoryMessages(session, previousSession.messages)
+        console.log('[session] Continued from previous session context.')
+    }
 
     let question = parsed.question
     if (!question && !process.stdin.isTTY) {
@@ -205,6 +203,14 @@ async function runInteractiveTui(parsed: ParsedArgs) {
         dangerous: parsed.options.dangerous,
     }
     const sessionsDir = getSessionsDir(loaded, sessionOptions)
+    const previousSession = parsed.options.prev
+        ? await loadPreviousSession(sessionsDir, process.cwd())
+        : null
+    if (parsed.options.prev && !previousSession) {
+        console.error('No previous session found for current directory.')
+        process.exitCode = 1
+        return
+    }
 
     // 危险模式下显示警告
     if (parsed.options.dangerous) {
@@ -225,6 +231,7 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             modelProfiles={loaded.config.model_profiles}
             dangerous={parsed.options.dangerous}
             needsSetup={loaded.needsSetup}
+            initialHistory={previousSession ?? undefined}
         />,
         {
             exitOnCtrlC: false,
@@ -236,19 +243,14 @@ async function runInteractiveTui(parsed: ParsedArgs) {
 
 async function main() {
     const argv = process.argv.slice(2)
-    if (argv[0] === 'mcp' || (argv[0] === '--' && argv[1] === 'mcp')) {
-        const offset = argv[0] === '--' ? 2 : 1
-        await runMcpCommand(argv.slice(offset))
-        return
+    const route = routeCli(argv)
+    if (route.kind === 'subcommand') {
+        if (route.name === 'mcp') {
+            await runMcpCommand(route.args)
+            return
+        }
     }
-    const parsed = parseArgs(argv)
-    if (parsed.options.removedOnceFlag) {
-        console.error(
-            '`--once` has been removed. Use `memo` (interactive) or pipe input to `memo`.',
-        )
-        process.exitCode = 1
-        return
-    }
+    const parsed = parseArgs(route.args)
     if (parsed.options.showVersion) {
         const info = findLocalPackageInfoSync()
         const version = info?.version ?? 'unknown'
@@ -256,7 +258,7 @@ async function main() {
         return
     }
     const isInteractive = process.stdin.isTTY && process.stdout.isTTY
-    if (!isInteractive) {
+    if (parsed.options.once || !isInteractive) {
         await runPlainMode(parsed)
         return
     }

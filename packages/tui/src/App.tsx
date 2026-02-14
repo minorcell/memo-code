@@ -47,6 +47,7 @@ import {
     TOOL_PERMISSION_MODES,
     type ToolPermissionMode,
 } from './constants'
+import type { ParsedHistoryLog } from './controllers/history_parser'
 
 export type AppProps = {
     sessionOptions: AgentSessionOptions
@@ -60,6 +61,7 @@ export type AppProps = {
     modelProfiles?: Record<string, ModelProfileOverride>
     dangerous?: boolean
     needsSetup?: boolean
+    initialHistory?: ParsedHistoryLog
 }
 
 function normalizeActiveMcpServers(
@@ -108,6 +110,7 @@ export function App({
     modelProfiles,
     dangerous = false,
     needsSetup = false,
+    initialHistory,
 }: AppProps) {
     const { exit } = useApp()
     const availableMcpServerNames = useMemo(
@@ -181,6 +184,25 @@ export function App({
     const dispatch = useCallback((action: ChatTimelineAction) => {
         dispatchTimeline(action)
     }, [])
+
+    useEffect(() => {
+        if (!initialHistory) return
+        dispatch({ type: 'clear_current_timeline' })
+        dispatch({
+            type: 'replace_history',
+            turns: initialHistory.turns,
+            maxSequence: initialHistory.maxSequence,
+        })
+        setPendingHistoryMessages(initialHistory.messages)
+        if (initialHistory.summary.trim()) {
+            dispatch({
+                type: 'append_system_message',
+                title: 'History',
+                content: initialHistory.summary,
+                tone: 'info',
+            })
+        }
+    }, [dispatch, initialHistory])
 
     useEffect(() => {
         if (setupPending) return
