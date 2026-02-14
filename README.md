@@ -56,6 +56,7 @@ memo
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
 - Startup project guidance: if `AGENTS.md` exists in the startup root, Memo appends it to the system prompt automatically.
+- Skills: Memo auto-discovers `SKILL.md` files and appends an available-skills section into the system prompt.
 - MCP activation selection: when MCP servers are configured, startup shows a multi-select to activate servers for this run.
 - Session titles: Memo generates a short title from the first user prompt and uses it in history/resume lists.
 
@@ -83,7 +84,6 @@ Optional: override model capability profiles (local capability gating) without c
 [model_profiles.gpt-5]
 supports_parallel_tool_calls = true
 supports_reasoning_content = true
-supports_verbosity = true
 context_window = 272000
 
 [model_profiles."openai:gpt-5"]
@@ -133,6 +133,33 @@ memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var
 memo mcp get remote
 memo mcp remove remote
 ```
+
+## Skills
+
+Memo supports Agent Skills and auto-discovers `SKILL.md` files at startup.
+
+### Discovery Paths
+
+- Project scope: project root `.<agent>/skills` directories (for example: `.agents/skills`, `.claude/skills`, `.codex/skills`)
+- User scope: `$MEMO_HOME/skills` (or `~/.memo/skills`)
+- Not scanned: `~/.xxx/skills` hidden directories outside Memo home
+
+### Minimal Skill File
+
+```md
+---
+name: doc-writing
+description: Generate and update technical documentation.
+---
+
+# Doc Writing
+```
+
+Memo reads `name` and `description` from frontmatter and injects each skill as metadata:
+
+- `- <name>: <description> (file: <absolute-path-to-SKILL.md>)`
+
+In prompts, users can explicitly mention a skill with `$skill-name` (for example, `$doc-writing`).
 
 ## Built-in Tools
 

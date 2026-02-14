@@ -87,7 +87,6 @@ Memo uses conservative defaults for model capabilities and gates request options
 [model_profiles.gpt-5]
 supports_parallel_tool_calls = true
 supports_reasoning_content = true
-supports_verbosity = true
 context_window = 272000
 
 # Provider-specific override, key format: "<provider>:<model>"
@@ -101,8 +100,6 @@ supports_parallel_tool_calls = false
     - Controls whether Memo sends `parallel_tool_calls`.
 - `supports_reasoning_content`
     - Controls whether reasoning content is carried in tool-call follow-up rounds.
-- `supports_verbosity`
-    - Controls whether verbosity-related request options are enabled.
 - `context_window`
     - Session prompt/context hard limit used by Memo runtime.
     - Must be a positive number.
@@ -209,6 +206,34 @@ memo mcp help
 ### Common optional
 
 - `MEMO_HOME`: override Memo home directory.
+
+## Skills Discovery
+
+Memo auto-discovers Agent Skills (`SKILL.md`) at startup and appends available skill metadata
+into the runtime system prompt.
+
+### Discovery Paths
+
+- Project scope: project root `.<agent>/skills` directories (for example: `.agents/skills`, `.claude/skills`, `.codex/skills`)
+- User scope: `$MEMO_HOME/skills` (or `~/.memo/skills`)
+- Not scanned: `~/.xxx/skills` hidden directories outside Memo home
+
+### Minimal `SKILL.md`
+
+```md
+---
+name: doc-writing
+description: Generate and update technical documentation.
+---
+
+# Doc Writing
+```
+
+Memo reads `name` + `description` frontmatter and exposes each discovered skill to the model as:
+
+- `- <name>: <description> (file: <absolute-path-to-SKILL.md>)`
+
+Users can explicitly invoke by mentioning `$skill-name` in the prompt (example: `$doc-writing`).
 
 ### Advanced tool/runtime switches
 

@@ -3,6 +3,7 @@ import os from 'node:os'
 import { readFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadSkills, renderSkillsSection } from '@memo/core/runtime/skills'
 
 const TEMPLATE_PATTERN = /{{\s*([\w.-]+)\s*}}/g
 
@@ -21,6 +22,14 @@ function resolveUsername(): string {
 type LoadSystemPromptOptions = {
     /** Project root at process startup; defaults to current working directory. */
     cwd?: string
+    /** Optional explicit skill roots, useful in tests and custom embeddings. */
+    skillRoots?: string[]
+    /** Optional custom home directory, defaults to OS home directory. */
+    homeDir?: string
+    /** Optional memo home override, defaults to MEMO_HOME or ~/.memo. */
+    memoHome?: string
+    /** Disable skills injection into system prompt when false. */
+    includeSkills?: boolean
 }
 
 async function readProjectAgentsMd(
@@ -50,6 +59,12 @@ Loaded from: ${agents.path}
 ${agents.content}`
 }
 
+function appendSkillsPrompt(basePrompt: string, skillsSection: string): string {
+    return `${basePrompt}
+
+${skillsSection}`
+}
+
 /**
  * Load built-in system prompt template.
  * Can be overridden externally via dependency injection.
@@ -64,10 +79,24 @@ export async function loadSystemPrompt(options: LoadSystemPromptOptions = {}): P
         user: resolveUsername(),
         pwd: startupRoot,
     }
-    const renderedPrompt = renderTemplate(prompt, vars)
+    let composedPrompt = renderTemplate(prompt, vars)
     const agents = await readProjectAgentsMd(startupRoot)
-    if (!agents) {
-        return renderedPrompt
+    if (agents) {
+        composedPrompt = appendProjectAgentsPrompt(composedPrompt, agents)
     }
-    return appendProjectAgentsPrompt(renderedPrompt, agents)
+
+    if (options.includeSkills !== false) {
+        const skills = await loadSkills({
+            cwd: startupRoot,
+            skillRoots: options.skillRoots,
+            homeDir: options.homeDir,
+            memoHome: options.memoHome,
+        })
+        const skillsSection = renderSkillsSection(skills)
+        if (skillsSection) {
+            composedPrompt = appendSkillsPrompt(composedPrompt, skillsSection)
+        }
+    }
+
+    return composedPrompt
 }

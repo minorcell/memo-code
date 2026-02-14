@@ -11,7 +11,6 @@ function sampleProfile(overrides: Partial<ModelProfile> = {}): ModelProfile {
         wireApi: 'chat_completions',
         supportsParallelToolCalls: false,
         supportsReasoningContent: false,
-        supportsVerbosity: false,
         isFallback: false,
         ...overrides,
     }

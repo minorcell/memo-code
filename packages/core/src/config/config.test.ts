@@ -121,7 +121,6 @@ describe('mcp config serialization', () => {
             model_profiles: {
                 'gpt-5': {
                     supports_parallel_tool_calls: true,
-                    supports_verbosity: true,
                     context_window: 272000,
                 },
                 'openai:gpt-5': {
@@ -152,7 +151,6 @@ describe('mcp config serialization', () => {
         expect(text).toContain('active_mcp_servers = ["remote"]')
         expect(text).toContain('[model_profiles.gpt-5]')
         expect(text).toContain('supports_parallel_tool_calls = true')
-        expect(text).toContain('supports_verbosity = true')
         expect(text).toContain('context_window = 272000')
         expect(text).toContain('[model_profiles."openai:gpt-5"]')
         expect(text).toContain('context_window = 128000')
