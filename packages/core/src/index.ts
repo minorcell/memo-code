@@ -1,6 +1,7 @@
 /** @file Core package entry point, aggregates runtime/config/tools common APIs. */
 export * from '@memo/core/types'
 export * from '@memo/core/runtime/prompt'
+export * from '@memo/core/runtime/skills'
 export * from '@memo/core/runtime/history'
 export * from '@memo/core/runtime/defaults'
 export * from '@memo/core/config/config'

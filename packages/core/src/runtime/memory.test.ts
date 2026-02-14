@@ -119,4 +119,97 @@ describe('runtime prompt injection', () => {
             await removeDir(projectRoot)
         }
     })
+
+    test('appends discovered skills into system prompt', async () => {
+        const projectRoot = await makeTempDir('memo-core-skills-project')
+        const skillsRoot = join(projectRoot, '.codex', 'skills')
+        const skillDir = join(skillsRoot, 'doc-writing')
+        const skillPath = join(skillDir, 'SKILL.md')
+        const marker = 'memo-test-skill-doc-writing'
+        await mkdir(skillDir, { recursive: true })
+        await writeFile(
+            skillPath,
+            `---
+name: doc-writing
+description: ${marker}
+---
+# Doc Writing
+`,
+            'utf-8',
+        )
+
+        const session = await createAgentSession(
+            {
+                callLLM: async () => ({
+                    content: [{ type: 'text', text: 'ok' }],
+                    stop_reason: 'end_turn',
+                }),
+                loadPrompt: () =>
+                    loadSystemPrompt({
+                        cwd: projectRoot,
+                        skillRoots: [skillsRoot],
+                        homeDir: projectRoot,
+                        memoHome: join(projectRoot, '.memo'),
+                    }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+            },
+            { mode: 'interactive' },
+        )
+
+        try {
+            const systemPrompt = session.history[0]?.content ?? ''
+            assert.ok(systemPrompt.includes('## Skills'))
+            assert.ok(systemPrompt.includes('### Available skills'))
+            assert.ok(systemPrompt.includes(`- doc-writing: ${marker} (file: ${skillPath})`))
+        } finally {
+            await session.close()
+            await removeDir(projectRoot)
+        }
+    })
+
+    test('ignores invalid skills without required frontmatter fields', async () => {
+        const projectRoot = await makeTempDir('memo-core-skills-invalid')
+        const skillsRoot = join(projectRoot, '.codex', 'skills')
+        const skillDir = join(skillsRoot, 'broken-skill')
+        const skillPath = join(skillDir, 'SKILL.md')
+        await mkdir(skillDir, { recursive: true })
+        await writeFile(
+            skillPath,
+            `---
+name: broken-skill
+---
+# Missing description in frontmatter
+`,
+            'utf-8',
+        )
+
+        const session = await createAgentSession(
+            {
+                callLLM: async () => ({
+                    content: [{ type: 'text', text: 'ok' }],
+                    stop_reason: 'end_turn',
+                }),
+                loadPrompt: () =>
+                    loadSystemPrompt({
+                        cwd: projectRoot,
+                        skillRoots: [skillsRoot],
+                        homeDir: projectRoot,
+                        memoHome: join(projectRoot, '.memo'),
+                    }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+            },
+            { mode: 'interactive' },
+        )
+
+        try {
+            const systemPrompt = session.history[0]?.content ?? ''
+            assert.ok(!systemPrompt.includes('## Skills'))
+            assert.ok(!systemPrompt.includes('broken-skill'))
+        } finally {
+            await session.close()
+            await removeDir(projectRoot)
+        }
+    })
 })

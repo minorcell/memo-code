@@ -52,6 +52,7 @@ memo
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 - 查看版本：`memo --version` 或 `memo -v`。
 - 启动目录约定：若启动根目录存在 `AGENTS.md`，Memo 会自动将其拼接进系统提示词。
+- Skills：Memo 会自动发现 `SKILL.md` 并把可用 skills 列表拼接进系统提示词。
 - MCP 启动选择：当配置了 MCP server 时，启动会弹出多选以决定本次会话激活哪些 server。
 - 会话标题：Memo 会基于首条用户输入生成简短标题，并在历史/恢复列表中展示。
 
@@ -110,6 +111,33 @@ memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var
 memo mcp get remote
 memo mcp remove remote
 ```
+
+## Skills
+
+Memo 支持 Agent Skills，并会在启动时自动发现 `SKILL.md`。
+
+### 发现路径
+
+- 项目级：项目根目录下 `.<agent>/skills`（例如：`.agents/skills`、`.claude/skills`、`.codex/skills`）
+- 用户级：`$MEMO_HOME/skills`（或 `~/.memo/skills`）
+- 不扫描：Memo Home 之外的 `~/.xxx/skills` 隐藏目录
+
+### 最小 Skill 文件示例
+
+```md
+---
+name: doc-writing
+description: Generate and update technical documentation.
+---
+
+# Doc Writing
+```
+
+Memo 会读取 frontmatter 的 `name` 和 `description`，并以元数据形式注入：
+
+- `- <name>: <description> (file: <absolute-path-to-SKILL.md>)`
+
+在对话里可通过 `$skill-name` 显式提及某个 skill（例如 `$doc-writing`）。
 
 ## 内置工具
 
