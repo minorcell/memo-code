@@ -91,28 +91,39 @@ export function DocPageClient({ page, pages, neighbors, lang }: DocPageClientPro
                                         href={`/${lang}/docs/${neighbors.previous.slug}/`}
                                         className="group flex flex-col items-start"
                                     >
-                                        <span className="text-xs text-[var(--text-tertiary)] mb-1">{t('docs.previous')}</span>
+                                        <span className="text-xs text-[var(--text-tertiary)] mb-1">
+                                            {t('docs.previous')}
+                                        </span>
                                         <span className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)] group-hover:underline">
                                             ← {neighbors.previous.title}
                                         </span>
                                     </a>
-                                ) : <div />}
+                                ) : (
+                                    <div />
+                                )}
                                 {neighbors.next ? (
                                     <a
                                         href={`/${lang}/docs/${neighbors.next.slug}/`}
                                         className="group flex flex-col items-end"
                                     >
-                                        <span className="text-xs text-[var(--text-tertiary)] mb-1">{t('docs.next')}</span>
+                                        <span className="text-xs text-[var(--text-tertiary)] mb-1">
+                                            {t('docs.next')}
+                                        </span>
                                         <span className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)] group-hover:underline">
                                             {neighbors.next.title} →
                                         </span>
                                     </a>
-                                ) : <div />}
+                                ) : (
+                                    <div />
+                                )}
                             </nav>
                         )}
                     </article>
                 </div>
-                <DocToc sections={page.sections.map(s => ({ id: s.id, title: s.title }))} lang={lang} />
+                <DocToc
+                    sections={page.sections.map((s) => ({ id: s.id, title: s.title }))}
+                    lang={lang}
+                />
             </DocsShell>
         </main>
     )

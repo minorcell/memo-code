@@ -131,13 +131,13 @@ function moveCursorVertical(
 
 ### Behavior Pattern Recognition
 
-| Input Pattern             | Recognized As | Handling                         |
-| ------------------------- | -------------- | -------------------------------- |
-| `a` (interval > 8ms)      | Normal input   | Insert directly                  |
-| `abc` (interval < 8ms)    | Paste          | Buffer then batch insert         |
-| `你好世界` (Chinese)      | Possible paste | Treat as paste when length ≥ 16  |
-| `Shift+Enter`             | New line insert| Insert `\n`                     |
-| `Enter` (during paste)   | New line insert| Insert `\n` instead of submit   |
+| Input Pattern          | Recognized As   | Handling                        |
+| ---------------------- | --------------- | ------------------------------- |
+| `a` (interval > 8ms)   | Normal input    | Insert directly                 |
+| `abc` (interval < 8ms) | Paste           | Buffer then batch insert        |
+| `你好世界` (Chinese)   | Possible paste  | Treat as paste when length ≥ 16 |
+| `Shift+Enter`          | New line insert | Insert `\n`                     |
+| `Enter` (during paste) | New line insert | Insert `\n` instead of submit   |
 
 ## Multiline Editing Implementation Strategies
 

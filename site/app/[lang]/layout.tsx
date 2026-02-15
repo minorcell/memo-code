@@ -15,7 +15,11 @@ export function generateStaticParams() {
     return locales.map((locale) => ({ lang: locale }))
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: string }>
+}): Promise<Metadata> {
     const { lang } = await params
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
@@ -72,5 +76,9 @@ export default async function LangLayout({
 
     const messages = messagesByLocale[lang as Locale]
 
-    return <IntlProvider messages={messages} locale={lang}>{children}</IntlProvider>
+    return (
+        <IntlProvider messages={messages} locale={lang}>
+            {children}
+        </IntlProvider>
+    )
 }

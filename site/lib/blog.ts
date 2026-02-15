@@ -130,7 +130,9 @@ const loadPostByFileName = cache(async (fileName: string, locale: string): Promi
 
 export const listBlogPosts = cache(async (locale: string = 'en'): Promise<BlogPostSummary[]> => {
     const fileNames = await listMarkdownFiles(locale)
-    const posts = await Promise.all(fileNames.map((fileName) => loadPostByFileName(fileName, locale)))
+    const posts = await Promise.all(
+        fileNames.map((fileName) => loadPostByFileName(fileName, locale)),
+    )
     return posts
         .sort((a, b) => b.order - a.order || b.publishedAt.localeCompare(a.publishedAt))
         .map(({ slug, title, summary, publishedAt, order }) => ({

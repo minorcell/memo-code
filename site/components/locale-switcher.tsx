@@ -35,10 +35,7 @@ export function LocaleSwitcher({ lang: currentLocale }: LocaleSwitcherProps) {
 
             {isOpen && (
                 <>
-                    <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setIsOpen(false)}
-                    />
+                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
                     <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] py-1 shadow-lg">
                         {locales.map((l) => (
                             <button

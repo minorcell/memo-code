@@ -15,7 +15,11 @@ export async function generateStaticParams() {
     return params
 }
 
-export default async function DocPage({ params }: { params: Promise<{ lang: string; slug: string }> }) {
+export default async function DocPage({
+    params,
+}: {
+    params: Promise<{ lang: string; slug: string }>
+}) {
     const { lang, slug } = await params
     const [page, pages, neighbors] = await Promise.all([
         getDocPage(slug, lang),
@@ -27,12 +31,5 @@ export default async function DocPage({ params }: { params: Promise<{ lang: stri
         return <div>Page not found</div>
     }
 
-    return (
-        <DocPageClient
-            page={page}
-            pages={pages}
-            neighbors={neighbors}
-            lang={lang}
-        />
-    )
+    return <DocPageClient page={page} pages={pages} neighbors={neighbors} lang={lang} />
 }

@@ -17,6 +17,6 @@ export default async function BlogIndexPage({ params }: { params: Promise<{ lang
     const { lang } = await params
     const posts = await listBlogPosts(lang)
     const messages = messagesByLocale[lang] || messagesByLocale.en
-    
+
     return <BlogIndexClient posts={posts} lang={lang} messages={messages} />
 }

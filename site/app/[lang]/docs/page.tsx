@@ -17,6 +17,6 @@ export default async function DocsIndexPage({ params }: { params: Promise<{ lang
     const { lang } = await params
     const pages = await listDocPages(lang)
     const messages = messagesByLocale[lang] || messagesByLocale.en
-    
+
     return <DocsIndexClient pages={pages} lang={lang} messages={messages} />
 }

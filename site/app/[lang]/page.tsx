@@ -15,6 +15,6 @@ export async function generateStaticParams() {
 export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
     const { lang } = await params
     const messages = messagesByLocale[lang] || messagesByLocale.en
-    
+
     return <HomeClient lang={lang} messages={messages} />
 }

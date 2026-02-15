@@ -53,12 +53,12 @@ There'"'"'s risk when Agents call tools. `read_file` can read files it shouldn'"
 
 memo classifies risk into four levels (from low to high):
 
-| Level       | Meaning                | Approval Strategy              |
-| ----------- | ---------------------- | ------------------------------ |
-| `read`      | Read operations       | Auto-pass in auto mode         |
-| `write`     | Write/modify operations| Approval cached after first    |
-| `execute`   | Execute commands/subprocesses | Approval required each time |
-| `critical`  | High-risk operations (reserved) | Approval required each time |
+| Level      | Meaning                         | Approval Strategy           |
+| ---------- | ------------------------------- | --------------------------- |
+| `read`     | Read operations                 | Auto-pass in auto mode      |
+| `write`    | Write/modify operations         | Approval cached after first |
+| `execute`  | Execute commands/subprocesses   | Approval required each time |
+| `critical` | High-risk operations (reserved) | Approval required each time |
 
 Classification rules are placed in `packages/tools/src/approval/classifier.ts`, with core logic being keyword matching:
 
@@ -184,20 +184,20 @@ This way the same tool with same parameters won'"'"'t pop up the approval dialog
 
 ## Current State of memo'"'"'s Built-in Tools
 
-| Tool                  | Function            | Risk Level | Supports Parallel |
-| --------------------- | ------------------- | ---------- | ----------------- |
-| `read_file`           | Read file           | read       | ✓                 |
-| `apply_patch`         | Edit file           | write      | ✗                 |
-| `grep_files`          | Search content      | read       | ✓                 |
-| `list_dir`            | List directory     | read       | ✓                 |
-| `exec_command`        | Execute command    | execute    | ✓                 |
-| `write_stdin`         | Write to stdin      | execute    | ✓                 |
-| `webfetch`            | HTTP request        | write      | ✓                 |
-| `spawn_agent`         | Spawn sub-agent     | execute    | ✓                 |
-| `update_plan`         | Update task plan    | read       | ✗                 |
-| `get_memory`          | Get persistent memory | read     | ✗                 |
-| `list_mcp_resources`  | List MCP resources | read       | ✓                 |
-| `read_mcp_resource`   | Read MCP resource   | read       | ✓                 |
+| Tool                 | Function              | Risk Level | Supports Parallel |
+| -------------------- | --------------------- | ---------- | ----------------- |
+| `read_file`          | Read file             | read       | ✓                 |
+| `apply_patch`        | Edit file             | write      | ✗                 |
+| `grep_files`         | Search content        | read       | ✓                 |
+| `list_dir`           | List directory        | read       | ✓                 |
+| `exec_command`       | Execute command       | execute    | ✓                 |
+| `write_stdin`        | Write to stdin        | execute    | ✓                 |
+| `webfetch`           | HTTP request          | write      | ✓                 |
+| `spawn_agent`        | Spawn sub-agent       | execute    | ✓                 |
+| `update_plan`        | Update task plan      | read       | ✗                 |
+| `get_memory`         | Get persistent memory | read       | ✗                 |
+| `list_mcp_resources` | List MCP resources    | read       | ✓                 |
+| `read_mcp_resource`  | Read MCP resource     | read       | ✓                 |
 
 ## 常见调用示例
 

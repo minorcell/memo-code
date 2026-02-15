@@ -149,13 +149,13 @@ No matter how many layers of `sudo env bash -c` are outside, the actual command 
 
 Currently, memo intercepts these categories (`packages/tools/src/tools/command_guard.ts`):
 
-| Rule                           | Trigger Condition                                       | Danger Level |
-| ------------------------------ | ------------------------------------------------------- | ------------ |
-| `rm_recursive_critical_target` | `rm -rf` target contains `/`, `~`, `$HOME`, etc.      | Critical     |
-| `mkfs_filesystem_create`       | `mkfs`/`mkfs.xxx`                                     | Critical     |
+| Rule                           | Trigger Condition                                    | Danger Level |
+| ------------------------------ | ---------------------------------------------------- | ------------ |
+| `rm_recursive_critical_target` | `rm -rf` target contains `/`, `~`, `$HOME`, etc.     | Critical     |
+| `mkfs_filesystem_create`       | `mkfs`/`mkfs.xxx`                                    | Critical     |
 | `dd_write_block_device`        | `dd` writing to block devices under `/dev/`          | Critical     |
-| `disk_mutation_block_device`  | `fdisk`/`parted/`shred` etc. operating block devices  | High         |
-| `redirect_block_device`       | Output redirection to `/dev/` block devices            | High         |
+| `disk_mutation_block_device`   | `fdisk`/`parted/`shred` etc. operating block devices | High         |
+| `redirect_block_device`        | Output redirection to `/dev/` block devices          | High         |
 
 What'"'"'s returned after interception is a `<system_hint>` tag, not a direct error, making it easier for Agents to understand why they were blocked:
 
@@ -179,11 +179,11 @@ The command guard is the first checkpoint, but there are still "not dangerous bu
 
 memo classifies tools into three levels (`packages/tools/src/approval/constants.ts`):
 
-| Level     | Meaning      | Approval Strategy (auto mode) |
-| --------- | ------------ | ------------------------------ |
-| `read`    | Read-only   | No approval needed             |
-| `write`   | File modify | Approval required              |
-| `execute` | Execute cmd | Approval required              |
+| Level     | Meaning     | Approval Strategy (auto mode) |
+| --------- | ----------- | ----------------------------- |
+| `read`    | Read-only   | No approval needed            |
+| `write`   | File modify | Approval required             |
+| `execute` | Execute cmd | Approval required             |
 
 ### Approval Modes
 
