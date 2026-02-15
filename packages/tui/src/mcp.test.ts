@@ -183,4 +183,160 @@ describe('runMcpCommand', () => {
             },
         )
     })
+
+    test('list text output includes auth_status and falls back on status lookup errors', async () => {
+        await withMemoHome(
+            {
+                ...baseConfig(),
+                mcp_servers: {
+                    local: {
+                        command: 'node',
+                        args: ['server.js'],
+                    },
+                    remote: {
+                        type: 'streamable_http',
+                        url: 'https://example.com/mcp',
+                    },
+                },
+            },
+            async () => {
+                const { logs } = captureConsole()
+                vi.mocked(getMcpAuthStatus).mockImplementation(async (config) => {
+                    if ('url' in config) {
+                        throw new Error('status failed')
+                    }
+                    return 'unsupported'
+                })
+
+                await runMcpCommand(['list'])
+
+                const text = logs.join('\n')
+                expect(text).toContain('MCP servers (2):')
+                expect(text).toContain('local')
+                expect(text).toContain('remote')
+                expect(text).toContain('auth_status: unsupported')
+            },
+        )
+    })
+
+    test('login validates scope arguments', async () => {
+        await withMemoHome(baseConfig(), async () => {
+            const { errors } = captureConsole()
+
+            await runMcpCommand(['login', '--scopes'])
+
+            assert.strictEqual(process.exitCode, 1)
+            expect(errors.join('\n')).toContain('Missing value for --scopes.')
+        })
+    })
+
+    test('login prints OAuth URL and reports errors', async () => {
+        await withMemoHome(
+            {
+                ...baseConfig(),
+                mcp_servers: {
+                    remote: {
+                        type: 'streamable_http',
+                        url: 'https://example.com/mcp',
+                    },
+                },
+            },
+            async () => {
+                const { logs, errors } = captureConsole()
+                vi.mocked(loginMcpServerOAuth).mockImplementation(async (options) => {
+                    options.onAuthorizationUrl?.('https://example.com/oauth/authorize')
+                    options.onBrowserOpenFailure?.(new Error('open failed'), 'https://example.com')
+                    throw new Error('oauth failed')
+                })
+
+                await runMcpCommand(['login', 'remote'])
+
+                expect(logs.join('\n')).toContain('Starting OAuth login for "remote"...')
+                expect(logs.join('\n')).toContain(
+                    'Open this URL to authorize:\nhttps://example.com/oauth/authorize',
+                )
+                expect(logs.join('\n')).toContain(
+                    'Browser launch failed. Open the URL above manually.',
+                )
+                expect(errors.join('\n')).toContain('oauth failed')
+                assert.strictEqual(process.exitCode, 1)
+            },
+        )
+    })
+
+    test('logout prints not found message when nothing is removed', async () => {
+        await withMemoHome(
+            {
+                ...baseConfig(),
+                mcp_servers: {
+                    remote: {
+                        type: 'streamable_http',
+                        url: 'https://example.com/mcp',
+                    },
+                },
+            },
+            async () => {
+                const { logs } = captureConsole()
+                vi.mocked(logoutMcpServerOAuth).mockResolvedValue({
+                    backend: 'file',
+                    removed: false,
+                })
+
+                await runMcpCommand(['logout', 'remote'])
+
+                expect(logs.join('\n')).toContain('No OAuth credentials stored for "remote".')
+            },
+        )
+    })
+
+    test('logout handles unknown and non-http servers', async () => {
+        await withMemoHome(
+            {
+                ...baseConfig(),
+                mcp_servers: {
+                    local: {
+                        command: 'node',
+                        args: ['server.js'],
+                    },
+                },
+            },
+            async () => {
+                const { errors } = captureConsole()
+
+                await runMcpCommand(['logout', 'missing'])
+                assert.strictEqual(process.exitCode, 1)
+                expect(errors.join('\n')).toContain('Unknown MCP server "missing".')
+
+                process.exitCode = undefined
+                await runMcpCommand(['logout', 'local'])
+                assert.strictEqual(process.exitCode, 1)
+                expect(errors.join('\n')).toContain(
+                    'OAuth logout only applies to streamable HTTP servers.',
+                )
+            },
+        )
+    })
+
+    test('logout surfaces provider errors', async () => {
+        await withMemoHome(
+            {
+                ...baseConfig(),
+                mcp_servers: {
+                    remote: {
+                        type: 'streamable_http',
+                        url: 'https://example.com/mcp',
+                    },
+                },
+            },
+            async () => {
+                const { errors } = captureConsole()
+                vi.mocked(logoutMcpServerOAuth).mockRejectedValue(new Error('logout failed'))
+
+                await runMcpCommand(['logout', 'remote'])
+
+                assert.strictEqual(process.exitCode, 1)
+                expect(errors.join('\n')).toContain('logout failed')
+            },
+        )
+    })
 })
