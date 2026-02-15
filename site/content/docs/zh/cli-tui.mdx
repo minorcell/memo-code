@@ -1,0 +1,109 @@
+---
+title: 'CLI & TUI 指南'
+description: '交互式和纯文本运行模式、命令和快捷键。'
+order: 2
+category: 'Getting Started'
+---
+
+# CLI & TUI 指南
+
+Memo 有两种运行模式：用于日常开发的交互式 TUI，以及用于非交互式管道的纯文本模式。
+
+## 运行时架构（当前）
+
+- `packages/tui`：终端运行时包（`memo` 入口、参数解析、模式分发、纯文本模式 + 交互式 TUI 运行时）。
+- `packages/core`：两种模式使用的会话状态机和工具调用运行时。
+
+## 运行模式
+
+### 交互式 TUI
+
+```bash
+memo
+```
+
+最适合：
+
+- 多轮编程对话
+- 工具审批提示
+- 会话恢复和模型切换
+
+### 纯文本模式
+
+```bash
+echo "your prompt" | memo
+```
+
+当 stdin 或 stdout 不是 TTY 时，自动使用纯文本模式。
+
+最适合：
+
+- 脚本和 CI
+- 一次性自动化任务
+
+重要限制：
+
+- 纯文本模式无法显示交互式审批 UI；除非使用 `--dangerous`，否则需要审批的工具会被拒绝。
+
+## 输入增强
+
+### 使用 `@` 引用文件
+
+输入 `@` 后跟路径片段，然后按 `Tab` 接受建议。
+
+示例：
+
+- `Review @package.json and explain scripts`
+- `Compare @packages/core/src/runtime/session.ts with @packages/tools/src/index.ts`
+
+### 会话恢复 (`resume`)
+
+在输入框中输入：
+
+- `resume`
+- `resume keyword`
+- `/resume`（相同触发器）
+
+然后选择一个会话建议来加载历史上下文。
+
+## 斜杠命令
+
+使用 `/` 打开命令建议。
+
+- `/help`：显示帮助和快捷键
+- `/new`：开始新会话并清屏
+- `/exit`：退出 Memo
+- `/resume`：显示历史加载指南
+- `/models`：列出/切换已配置的提供商和模型
+- `/review <prNumber>`：审阅 GitHub PR 并发布评论（优先使用活跃的 GitHub MCP，回退到 `gh` CLI）
+- `/mcp`：显示已配置的 MCP 服务器
+- `/init`：让 Memo 为当前项目生成 `AGENTS.md`
+
+注意：
+
+- 输入 `exit`（不带斜杠）也会退出。
+- `/models <provider-or-model>` 也可以工作（用于直接切换）。
+
+## 快捷键
+
+- `Enter`：发送消息
+- `Shift+Enter`：插入换行
+- `Tab`：接受当前建议
+- `Up/Down`：在建议列表中移动，或浏览输入历史
+- `Esc`：关闭建议面板
+- `Esc Esc`：
+    - 运行时：取消当前轮次
+    - 空闲时：清除当前输入
+- `Ctrl+L`：清屏并开始新会话
+- `Ctrl+C`：退出
+
+## TUI 中的审批
+
+当工具需要审批时，会出现一个模态框，包含：
+
+- `Allow once`（允许一次）
+- `Allow for this session`（允许本次会话）
+- `Deny`（拒绝）
+- Memo 还会响终端铃并尝试桌面通知，当审批请求出现时。
+
+详见 [安全与审批](./approval-safety.md) 了解策略详情。

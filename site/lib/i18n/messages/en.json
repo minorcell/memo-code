@@ -1,0 +1,121 @@
+{
+    "metadata": {
+        "title": "Memo CLI - AI Coding Agent for Terminal",
+        "description": "Memo is a lightweight, open-source coding agent that runs in your terminal. Code faster with AI assistance through natural language.",
+        "template": "%s | Memo CLI"
+    },
+    "nav": {
+        "docs": "Documentation",
+        "blog": "Blog",
+        "github": "GitHub",
+        "npm": "npm"
+    },
+    "home": {
+        "badge": "Open-source terminal coding agent",
+        "title": "A lightweight coding agent that runs in your terminal.",
+        "subtitle": "Memo understands your project structure, runs tools safely, and helps you move from prompt to patch without leaving the shell.",
+        "cta": {
+            "getStarted": "Get Started",
+            "viewOnGithub": "View on GitHub"
+        },
+        "features": {
+            "title": "Built for real engineering workflows",
+            "subtitle": "Keep the stack simple: clean output, explicit steps, and tooling that fits daily development.",
+            "items": {
+                "terminalNative": {
+                    "title": "Terminal-native",
+                    "description": "Works where you already ship: directly inside your terminal workflow."
+                },
+                "fastFeedback": {
+                    "title": "Fast feedback",
+                    "description": "Optimized for quick iteration, from reading code to applying changes."
+                },
+                "builtInTools": {
+                    "title": "Built-in tools",
+                    "description": "File I/O, grep, commands, and patching are available out of the box."
+                },
+                "approvalControls": {
+                    "title": "Approval controls",
+                    "description": "Dangerous operations can require confirmation before execution."
+                },
+                "mcpReady": {
+                    "title": "MCP ready",
+                    "description": "Connect external capabilities through the Model Context Protocol."
+                },
+                "multiAgent": {
+                    "title": "Multi-agent mode",
+                    "description": "Delegate subtasks to subagents when work needs to fan out."
+                }
+            }
+        },
+        "architecture": {
+            "badge": "Architecture",
+            "title": "System architecture design",
+            "subtitle": "A clean layered map of Memo CLI internals, kept consistent with the current Linear-style visual language."
+        },
+        "quickstart": {
+            "badge": "Quick Start",
+            "title": "Get productive in under a minute",
+            "subtitle": "Install, configure a provider, and launch the interactive CLI.",
+            "steps": {
+                "install": {
+                    "title": "Install",
+                    "description": "Install once and run anywhere."
+                },
+                "configure": {
+                    "title": "Configure",
+                    "description": "Use OpenAI-compatible or DeepSeek providers."
+                },
+                "launch": {
+                    "title": "Launch",
+                    "description": "Start the interactive TUI session."
+                }
+            },
+            "terminal": {
+                "label": "terminal"
+            }
+        },
+        "ctaSection": {
+            "title": "Ready to try Memo CLI?",
+            "subtitle": "Install Memo and start working with an agent that stays inside your terminal.",
+            "readDocs": "Read Documentation",
+            "npmInstall": "npm install"
+        },
+        "footer": {
+            "copyright": "© 2025 Memo CLI · MIT License"
+        }
+    },
+    "docs": {
+        "title": "Documentation",
+        "description": "Learn how to install, configure, and use Memo CLI.",
+        "quickStart": "Quick Start",
+        "allGuides": "All Guides",
+        "needHelp": {
+            "title": "Need help?",
+            "description": "Check troubleshooting or open an issue if something is unclear.",
+            "troubleshooting": "Troubleshooting",
+            "openIssue": "Open an issue"
+        },
+        "editOnGithub": "Edit on GitHub",
+        "onThisPage": "On this page",
+        "previous": "Previous",
+        "next": "Next"
+    },
+    "blog": {
+        "title": "Blog",
+        "subtitle": "Engineering practices and design notes from Memo Code.",
+        "readArticle": "Read article",
+        "breadcrumb": {
+            "home": "Home"
+        }
+    },
+    "notFound": {
+        "title": "Page not found",
+        "description": "The page you are looking for does not exist.",
+        "backHome": "Back to home"
+    },
+    "localeSwitcher": {
+        "label": "Language",
+        "switchTo": "Switch to {locale}"
+    }
+}

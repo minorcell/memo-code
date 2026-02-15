@@ -116,8 +116,9 @@ describe('mcp config serialization', () => {
 
         await writeMemoConfig(configPath, {
             current_provider: 'deepseek',
-            max_prompt_tokens: 120000,
             active_mcp_servers: ['remote'],
+            mcp_oauth_credentials_store_mode: 'file',
+            mcp_oauth_callback_port: 8765,
             model_profiles: {
                 'gpt-5': {
                     supports_parallel_tool_calls: true,
@@ -147,8 +148,9 @@ describe('mcp config serialization', () => {
 
         const text = await readFile(configPath, 'utf-8')
         expect(text).toContain('[[providers.deepseek]]')
-        expect(text).toContain('max_prompt_tokens = 120000')
         expect(text).toContain('active_mcp_servers = ["remote"]')
+        expect(text).toContain('mcp_oauth_credentials_store_mode = "file"')
+        expect(text).toContain('mcp_oauth_callback_port = 8765')
         expect(text).toContain('[model_profiles.gpt-5]')
         expect(text).toContain('supports_parallel_tool_calls = true')
         expect(text).toContain('context_window = 272000')
@@ -194,8 +196,9 @@ url = "https://example.com/mcp"
         await mkdir(home, { recursive: true })
         const configText = `
 current_provider = "deepseek"
-max_prompt_tokens = 150000
 active_mcp_servers = ["remote2"]
+mcp_oauth_credentials_store_mode = "keyring"
+mcp_oauth_callback_port = 12345
 
 [model_profiles.gpt-5]
 supports_parallel_tool_calls = true
@@ -219,8 +222,9 @@ url = "https://example.com/mcp-2"
 
         const loaded = await loadMemoConfig()
         const servers = loaded.config.mcp_servers ?? {}
-        expect(loaded.config.max_prompt_tokens).toBe(150000)
         expect(loaded.config.active_mcp_servers).toEqual(['remote2'])
+        expect(loaded.config.mcp_oauth_credentials_store_mode).toBe('keyring')
+        expect(loaded.config.mcp_oauth_callback_port).toBe(12345)
         expect(loaded.config.model_profiles?.['gpt-5']).toEqual({
             supports_parallel_tool_calls: true,
             supports_reasoning_content: true,
@@ -256,7 +260,7 @@ model = "legacy-model"
         expect(loaded.config.current_provider).not.toBe('legacy')
     })
 
-    test('loadMemoConfig falls back to default max_prompt_tokens when missing', async () => {
+    test('loadMemoConfig falls back to defaults when context_window is not configured', async () => {
         const home = join(tempBase, 'memo-home-missing-limit')
         process.env.MEMO_HOME = home
         await mkdir(home, { recursive: true })
@@ -271,7 +275,26 @@ model = "deepseek-chat"
         await writeFile(join(home, 'config.toml'), configText, 'utf-8')
 
         const loaded = await loadMemoConfig()
-        expect(loaded.config.max_prompt_tokens).toBe(120000)
+        expect(loaded.config.mcp_oauth_credentials_store_mode).toBe('auto')
+    })
+
+    test('loadMemoConfig ignores legacy max_prompt_tokens', async () => {
+        const home = join(tempBase, 'memo-home-legacy-max-prompt-tokens')
+        process.env.MEMO_HOME = home
+        await mkdir(home, { recursive: true })
+        const configText = `
+current_provider = "deepseek"
+max_prompt_tokens = 150000
+
+[[providers.deepseek]]
+name = "deepseek"
+env_api_key = "DEEPSEEK_API_KEY"
+model = "deepseek-chat"
+`
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
+
+        const loaded = await loadMemoConfig()
+        expect('max_prompt_tokens' in loaded.config).toBe(false)
     })
 
     test('loadMemoConfig ignores invalid model_profiles entries', async () => {

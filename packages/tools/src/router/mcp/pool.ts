@@ -2,7 +2,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
+import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { MCPServerConfig, McpClientConnection } from '../types'
+import { createRuntimeMcpOAuthProvider, type McpOAuthSettings } from './oauth'
 
 type ClientTransport = StdioClientTransport | StreamableHTTPClientTransport
 
@@ -52,18 +55,29 @@ function resolveHttpHeaders(config: Extract<MCPServerConfig, { url: string }>) {
 
 /** 通过 HTTP 连接 MCP Server */
 async function connectOverHttp(
+    name: string,
     config: Extract<MCPServerConfig, { url: string }>,
+    oauthSettings: McpOAuthSettings | undefined,
 ): Promise<{ client: Client; transport: ClientTransport }> {
     const baseUrl = new URL(config.url)
     const requestInit = buildRequestInit(resolveHttpHeaders(config))
+    const authProvider = await createRuntimeMcpOAuthProvider({
+        serverName: name,
+        config,
+        settings: oauthSettings,
+    })
 
     try {
         const client = createMcpClient()
-        const transport = new StreamableHTTPClientTransport(baseUrl, { requestInit })
+        const transport = new StreamableHTTPClientTransport(baseUrl, {
+            requestInit,
+            ...(authProvider ? { authProvider } : {}),
+        })
         await client.connect(transport)
         return { client, transport }
     } catch (streamErr) {
-        const message = `Failed to connect via streamable_http (${(streamErr as Error).message})`
+        const authHint = isAuthFailure(streamErr) ? ` Run "memo mcp login ${name}".` : ''
+        const message = `Failed to connect via streamable_http (${(streamErr as Error).message}).${authHint}`
         const error = new Error(message)
         ;(error as any).cause = streamErr
         throw error
@@ -72,10 +86,12 @@ async function connectOverHttp(
 
 /** 根据配置建立连接 */
 async function connectWithConfig(
+    name: string,
     config: MCPServerConfig,
+    oauthSettings: McpOAuthSettings | undefined,
 ): Promise<{ client: Client; transport: ClientTransport }> {
     if ('url' in config) {
-        return connectOverHttp(config)
+        return connectOverHttp(name, config, oauthSettings)
     }
 
     // stdio 类型
@@ -102,9 +118,11 @@ export class McpClientPool {
     private connections: Map<string, McpClientConnection> = new Map()
     private pendingConnections: Map<string, Promise<McpClientConnection>> = new Map()
     private serverConfigs: Map<string, MCPServerConfig> = new Map()
+    private oauthSettings: McpOAuthSettings | undefined
 
-    setServerConfigs(servers: Record<string, MCPServerConfig>) {
+    setServerConfigs(servers: Record<string, MCPServerConfig>, oauthSettings?: McpOAuthSettings) {
         this.serverConfigs = new Map(Object.entries(servers))
+        this.oauthSettings = oauthSettings
     }
 
     hasServer(name: string): boolean {
@@ -140,7 +158,11 @@ export class McpClientPool {
 
         const pending = (async () => {
             // Establish new connection
-            const { client, transport } = await connectWithConfig(effectiveConfig)
+            const { client, transport } = await connectWithConfig(
+                name,
+                effectiveConfig,
+                this.oauthSettings,
+            )
 
             try {
                 // Get tool list
@@ -247,4 +269,18 @@ export class McpClientPool {
     get size(): number {
         return this.connections.size
     }
+}
+
+function isAuthFailure(error: unknown): boolean {
+    if (error instanceof UnauthorizedError) return true
+    if (error instanceof StreamableHTTPError) {
+        return error.code === 401 || error.code === 403
+    }
+    const message = (error as Error)?.message?.toLowerCase() ?? ''
+    return (
+        message.includes('unauthorized') ||
+        message.includes('401') ||
+        message.includes('403') ||
+        message.includes('oauth')
+    )
 }

@@ -1,4 +1,10 @@
 import { loadMemoConfig, writeMemoConfig, type MCPServerConfig } from '@memo/core'
+import {
+    getMcpAuthStatus,
+    loginMcpServerOAuth,
+    logoutMcpServerOAuth,
+    type McpAuthStatus,
+} from '@memo/tools/router/mcp/oauth'
 
 type McpCommand = 'list' | 'get' | 'add' | 'remove' | 'login' | 'logout' | 'help'
 
@@ -26,6 +32,11 @@ function printHelp() {
     console.log(HELP_TEXT.trim())
 }
 
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message
+    return String(error)
+}
+
 function parseEnvAssignment(raw: string): { key: string; value: string } | null {
     const index = raw.indexOf('=')
     if (index <= 0) return null
@@ -35,9 +46,12 @@ function parseEnvAssignment(raw: string): { key: string; value: string } | null 
     return { key, value }
 }
 
-function formatServer(name: string, config: MCPServerConfig): string {
+function formatServer(name: string, config: MCPServerConfig, authStatus?: McpAuthStatus): string {
     const lines: string[] = []
     lines.push(`${name}`)
+    if (authStatus) {
+        lines.push(`  auth_status: ${authStatus}`)
+    }
     if ('url' in config) {
         lines.push(`  type: ${config.type ?? 'streamable_http'}`)
         lines.push(`  url: ${config.url}`)
@@ -173,6 +187,62 @@ function pickName(rest: string[], flagsWithValue: string[] = []): string | null 
     return null
 }
 
+function parseScopes(raw: string): string[] {
+    return raw
+        .split(/[,\s]+/g)
+        .map((scope) => scope.trim())
+        .filter(Boolean)
+}
+
+function parseLoginArgs(rest: string[]): {
+    name?: string
+    scopes?: string[]
+    error?: string
+    showHelp?: boolean
+} {
+    let name: string | undefined
+    let scopes: string[] | undefined
+
+    for (let i = 0; i < rest.length; i += 1) {
+        const arg = rest[i]
+        if (!arg) continue
+        if (arg === '--help' || arg === '-h') {
+            return { showHelp: true }
+        }
+        if (arg === '--scopes') {
+            const next = rest[i + 1]
+            if (!next) {
+                return { error: 'Missing value for --scopes.' }
+            }
+            const parsedScopes = parseScopes(next)
+            if (parsedScopes.length === 0) {
+                return { error: 'Invalid --scopes value. Use comma-separated scopes.' }
+            }
+            scopes = parsedScopes
+            i += 1
+            continue
+        }
+        if (arg.startsWith('--')) {
+            return { error: `Unknown option: ${arg}` }
+        }
+        if (!name) {
+            name = arg
+            continue
+        }
+        return { error: `Unexpected argument: ${arg}` }
+    }
+
+    return { name, scopes }
+}
+
+function oauthSettingsFromLoaded(loaded: Awaited<ReturnType<typeof loadMemoConfig>>) {
+    return {
+        memoHome: loaded.home,
+        storeMode: loaded.config.mcp_oauth_credentials_store_mode,
+        callbackPort: loaded.config.mcp_oauth_callback_port,
+    }
+}
+
 export async function runMcpCommand(args: string[]): Promise<void> {
     const { command, rest } = parseCommand(args)
 
@@ -185,11 +255,36 @@ export async function runMcpCommand(args: string[]): Promise<void> {
         const json = rest.includes('--json')
         const loaded = await loadMemoConfig()
         const servers = loaded.config.mcp_servers ?? {}
+        const names = Object.keys(servers)
+        const settings = oauthSettingsFromLoaded(loaded)
+        const authStatuses = new Map<string, McpAuthStatus>()
+        await Promise.all(
+            names.map(async (name) => {
+                const config = servers[name]
+                if (!config) return
+                try {
+                    const status = await getMcpAuthStatus(config, settings)
+                    authStatuses.set(name, status)
+                } catch {
+                    authStatuses.set(name, 'unsupported')
+                }
+            }),
+        )
+
         if (json) {
-            console.log(JSON.stringify(servers, null, 2))
+            const withAuthStatus: Record<string, MCPServerConfig & { auth_status: McpAuthStatus }> =
+                {}
+            for (const name of names) {
+                const server = servers[name]
+                if (!server) continue
+                withAuthStatus[name] = {
+                    ...(server as MCPServerConfig),
+                    auth_status: authStatuses.get(name) ?? 'unsupported',
+                }
+            }
+            console.log(JSON.stringify(withAuthStatus, null, 2))
             return
         }
-        const names = Object.keys(servers)
         if (names.length === 0) {
             console.log(`No MCP servers configured. Add one with "memo mcp add".`)
             return
@@ -198,7 +293,7 @@ export async function runMcpCommand(args: string[]): Promise<void> {
         for (const name of names) {
             const config = servers[name]
             if (!config) continue
-            console.log(formatServer(name, config))
+            console.log(formatServer(name, config, authStatuses.get(name) ?? 'unsupported'))
         }
         return
     }
@@ -305,8 +400,18 @@ export async function runMcpCommand(args: string[]): Promise<void> {
         return
     }
 
-    if (command === 'login' || command === 'logout') {
-        const name = pickName(rest, ['--scopes'])
+    if (command === 'login') {
+        const parsed = parseLoginArgs(rest)
+        if (parsed.showHelp) {
+            printHelp()
+            return
+        }
+        if (parsed.error) {
+            console.error(parsed.error)
+            process.exitCode = 1
+            return
+        }
+        const name = parsed.name
         if (!name) {
             console.error('Missing server name.')
             process.exitCode = 1
@@ -320,14 +425,69 @@ export async function runMcpCommand(args: string[]): Promise<void> {
             return
         }
         if (!('url' in server)) {
-            console.error('OAuth login/logout only applies to streamable HTTP servers.')
+            console.error('OAuth login only applies to streamable HTTP servers.')
             process.exitCode = 1
             return
         }
-        console.error(
-            `OAuth login/logout is not supported in memo yet. Configure a bearer token env var instead.`,
-        )
-        process.exitCode = 1
+
+        console.log(`Starting OAuth login for "${name}"...`)
+        try {
+            const result = await loginMcpServerOAuth({
+                serverName: name,
+                config: server,
+                scopes: parsed.scopes,
+                settings: oauthSettingsFromLoaded(loaded),
+                onAuthorizationUrl: (url) => {
+                    console.log(`Open this URL to authorize:\n${url}`)
+                },
+                onBrowserOpenFailure: () => {
+                    console.log('Browser launch failed. Open the URL above manually.')
+                },
+            })
+            console.log(
+                `OAuth login completed for "${name}" (credentials stored in ${result.backend}).`,
+            )
+        } catch (error) {
+            console.error(getErrorMessage(error))
+            process.exitCode = 1
+        }
+        return
+    }
+
+    if (command === 'logout') {
+        const name = pickName(rest)
+        if (!name) {
+            console.error('Missing server name.')
+            process.exitCode = 1
+            return
+        }
+        const loaded = await loadMemoConfig()
+        const server = loaded.config.mcp_servers?.[name]
+        if (!server) {
+            console.error(`Unknown MCP server "${name}".`)
+            process.exitCode = 1
+            return
+        }
+        if (!('url' in server)) {
+            console.error('OAuth logout only applies to streamable HTTP servers.')
+            process.exitCode = 1
+            return
+        }
+
+        try {
+            const result = await logoutMcpServerOAuth({
+                config: server,
+                settings: oauthSettingsFromLoaded(loaded),
+            })
+            if (result.removed) {
+                console.log(`Removed OAuth credentials for "${name}".`)
+            } else {
+                console.log(`No OAuth credentials stored for "${name}".`)
+            }
+        } catch (error) {
+            console.error(getErrorMessage(error))
+            process.exitCode = 1
+        }
         return
     }
 

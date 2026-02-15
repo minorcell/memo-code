@@ -4,6 +4,7 @@ import type { McpTool, ToolRegistry, MCPServerConfig } from '../types'
 import { McpClientPool } from './pool'
 import { getGlobalMcpCacheStore, type CachedMcpToolDescriptor } from './cache_store'
 import { setActiveMcpCacheStore, setActiveMcpPool } from './context'
+import type { McpOAuthSettings } from './oauth'
 
 /** MCP tool registry */
 export class McpToolRegistry {
@@ -131,12 +132,19 @@ export class McpToolRegistry {
      * @returns number of successfully loaded tools
      */
     async loadServers(servers: Record<string, MCPServerConfig> | undefined): Promise<number> {
+        return this.loadServersWithOptions(servers)
+    }
+
+    async loadServersWithOptions(
+        servers: Record<string, MCPServerConfig> | undefined,
+        oauthSettings?: McpOAuthSettings,
+    ): Promise<number> {
         if (!servers || Object.keys(servers).length === 0) {
             return 0
         }
 
         const entries = Object.entries(servers)
-        this.pool.setServerConfigs(servers)
+        this.pool.setServerConfigs(servers, oauthSettings)
         this.removeToolsForMissingServers(new Set(entries.map(([name]) => name)))
 
         const syncRefreshTasks: Promise<void>[] = []

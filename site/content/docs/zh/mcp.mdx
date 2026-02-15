@@ -1,0 +1,107 @@
+---
+title: 'MCP 集成'
+description: '连接和管理 MCP 服务器以获得外部能力。'
+order: 7
+category: 'Extensions'
+---
+
+# MCP 集成
+
+MCP（模型上下文协议）让 Memo 连接到外部工具服务器和资源系统。
+
+## 通过 CLI 管理 MCP
+
+### 列出和检查
+
+```bash
+memo mcp list
+memo mcp list --json
+memo mcp get <name>
+memo mcp get <name> --json
+```
+
+### 添加服务器
+
+添加本地 stdio 服务器：
+
+```bash
+memo mcp add local_tools -- /path/to/mcp-server --flag
+```
+
+添加远程 streamable HTTP 服务器：
+
+```bash
+memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var MCP_TOKEN
+```
+
+对于 stdio 服务器，可以使用重复的 `--env KEY=VALUE` 传递环境变量。
+
+### 移除服务器
+
+```bash
+memo mcp remove <name>
+```
+
+### 帮助
+
+```bash
+memo mcp help
+```
+
+### 登录/注销命令
+
+```bash
+memo mcp login <name>
+memo mcp logout <name>
+```
+
+这些命令目前尚未实现 OAuth 流程。对于远程认证，优先使用 bearer-token 环境变量。
+
+## 手动 `config.toml` 示例
+
+### 本地 Stdio MCP
+
+```toml
+[mcp_servers.local_tools]
+command = "/path/to/mcp-server"
+args = ["--flag"]
+# 可选：
+# env = { API_TOKEN = "..." }
+# stderr = "inherit"
+```
+
+### 远程 Streamable HTTP MCP
+
+```toml
+[mcp_servers.remote]
+type = "streamable_http"
+url = "https://your-mcp-server.com/mcp"
+bearer_token_env_var = "MCP_TOKEN"
+# 可选：
+# http_headers = { "X-Team" = "platform" }
+```
+
+## 在 TUI 中查看 MCP
+
+使用斜杠命令：
+
+```text
+/mcp
+```
+
+它显示为当前会话配置的 MCP 服务器。
+
+## 配置更改何时生效
+
+MCP 服务器在创建会话时加载。
+
+添加/更新/移除 MCP 配置后：
+
+- 重启 `memo`，或
+- 开始新会话（`/new`）
+
+## 常见问题
+
+- `memo mcp list` 有条目但 `/mcp` 看起来陈旧：重新创建会话。
+- 远程服务器认证失败：检查当前 shell 中是否存在 token 环境变量。
+- 本地服务器启动失败：验证 `command`、`args` 和可执行路径。

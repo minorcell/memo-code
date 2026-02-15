@@ -1,0 +1,120 @@
+---
+title: '多代理（子代理）'
+description: '子代理的工作原理以及何时使用多代理执行。'
+order: 6
+category: 'Core Features'
+---
+
+# 多代理（子代理）
+
+子代理让 Memo 将大任务拆分为更小的并行作业，并将结果收集回主会话。
+
+## 什么是子代理
+
+子代理是由当前会话创建的子 Memo 运行，用于执行有范围的任务。
+
+子代理工具族：
+
+- `spawn_agent`
+- `send_input`
+- `resume_agent`
+- `wait`
+- `close_agent`
+
+## 何时使用
+
+良好的用例：
+
+- 跨多个文件夹的并行审计
+- 独立调查（错误、测试、日志）
+- 可以清晰分解的大任务
+
+不太理想：
+
+- 微小的单文件编辑
+- 需要严格逐步依赖的任务
+
+## 启用/禁用
+
+默认启用。
+
+禁用所有子代理工具：
+
+```bash
+export MEMO_ENABLE_COLLAB_TOOLS=0
+```
+
+常见调优：
+
+```bash
+export MEMO_SUBAGENT_COMMAND="memo --dangerous"
+export MEMO_SUBAGENT_MAX_AGENTS=4
+```
+
+默认值：
+
+- 最大并发运行子代理数：`4`
+- 生成命令：
+    - 如果设置了 `MEMO_SUBAGENT_COMMAND`
+    - 否则如果 `dist/index.js` 存在则为 `node <cwd>/dist/index.js --dangerous`
+    - 否则为 `memo --dangerous`
+
+## 生命周期
+
+典型流程：
+
+1. `spawn_agent` 创建代理并开始其第一个提交。
+2. `wait` 轮询直到一个目标代理达到最终状态。
+3. `send_input` 继续同一代理。
+4. `close_agent` 完成时。
+5. `resume_agent` 仅在你需要重新打开已关闭的代理记录时使用。
+
+## 行为说明
+
+### `spawn_agent`
+
+- 立即以 `message` 开始
+- 如果运行代理计数达到 `MEMO_SUBAGENT_MAX_AGENTS` 则失败
+
+### `send_input`
+
+- 如果代理正在运行则返回忙碌错误
+- 使用 `interrupt=true` 取消当前提交并发送新输入
+
+### `wait`
+
+- 超时范围被限制在 `10s` 到 `300s`
+- 默认超时为 `30s`
+- 仅在 `status/details` 中返回最终状态
+- 如果在超时前没有达到最终状态则返回 `timed_out=true`
+
+### `close_agent`
+
+- 将代理标记为 `closed`
+- 如果有正在运行的提交则终止
+
+### `resume_agent`
+
+- 重新打开已关闭状态
+- 本身不会开始新的提交
+
+## 状态值
+
+主要状态：
+
+- `running`（运行中）
+- `completed`（已完成）
+- `errored`（出错）
+- `closed`（已关闭）
+
+`wait` 也可能对未知 ID 报告 `not_found`。
+
+## 安全性
+
+子代理工具默认自动批准，因此任务范围很重要。
+
+推荐：
+
+- 保持提示具体且有边界
+- 为每个子代理设置清晰的交付物
+- 关闭未使用的代理以减少噪音和资源使用

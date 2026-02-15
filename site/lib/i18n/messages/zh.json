@@ -1,0 +1,121 @@
+{
+    "metadata": {
+        "title": "Memo CLI - 终端 AI 编程助手",
+        "description": "Memo 是一个轻量级开源编程助手，直接在终端中运行。通过自然语言获得 AI 辅助，更快地编写代码。",
+        "template": "%s | Memo CLI"
+    },
+    "nav": {
+        "docs": "文档",
+        "blog": "博客",
+        "github": "GitHub",
+        "npm": "npm"
+    },
+    "home": {
+        "badge": "开源终端编程助手",
+        "title": "运行在终端中的轻量级编程助手",
+        "subtitle": "Memo 理解你的项目结构，安全地运行工具，帮助你在不离开 shell 的情况下从提示词到代码补丁。",
+        "cta": {
+            "getStarted": "开始使用",
+            "viewOnGithub": "查看 GitHub"
+        },
+        "features": {
+            "title": "为真实工程工作流打造",
+            "subtitle": "保持技术栈简洁：清晰的输出、明确的步骤，以及适合日常开发的工具。",
+            "items": {
+                "terminalNative": {
+                    "title": "终端原生",
+                    "description": "在你常用的终端环境中工作，直接集成到你的终端工作流中。"
+                },
+                "fastFeedback": {
+                    "title": "快速反馈",
+                    "description": "为快速迭代优化，从阅读代码到应用变更一气呵成。"
+                },
+                "builtInTools": {
+                    "title": "内置工具",
+                    "description": "文件 I/O、grep、命令执行和代码补丁开箱即用。"
+                },
+                "approvalControls": {
+                    "title": "审批控制",
+                    "description": "危险操作可以在执行前要求确认。"
+                },
+                "mcpReady": {
+                    "title": "MCP 就绪",
+                    "description": "通过模型上下文协议连接外部能力。"
+                },
+                "multiAgent": {
+                    "title": "多代理模式",
+                    "description": "当工作需要分散处理时，将子任务委派给子代理。"
+                }
+            }
+        },
+        "architecture": {
+            "badge": "架构",
+            "title": "系统架构设计",
+            "subtitle": "Memo CLI 内部的清晰分层架构图，保持与当前 Linear 风格视觉语言一致。"
+        },
+        "quickstart": {
+            "badge": "快速开始",
+            "title": "一分钟内提高工作效率",
+            "subtitle": "安装、配置提供商，启动交互式 CLI。",
+            "steps": {
+                "install": {
+                    "title": "安装",
+                    "description": "一次安装，随处运行。"
+                },
+                "configure": {
+                    "title": "配置",
+                    "description": "使用 OpenAI 兼容或 DeepSeek 提供商。"
+                },
+                "launch": {
+                    "title": "启动",
+                    "description": "启动交互式 TUI 会话。"
+                }
+            },
+            "terminal": {
+                "label": "终端"
+            }
+        },
+        "ctaSection": {
+            "title": "准备好试用 Memo CLI 了吗？",
+            "subtitle": "安装 Memo，开始使用一个始终运行在终端中的助手。",
+            "readDocs": "阅读文档",
+            "npmInstall": "npm 安装"
+        },
+        "footer": {
+            "copyright": "© 2025 Memo CLI · MIT 许可证"
+        }
+    },
+    "docs": {
+        "title": "文档",
+        "description": "学习如何安装、配置和使用 Memo CLI。",
+        "quickStart": "快速开始",
+        "allGuides": "所有指南",
+        "needHelp": {
+            "title": "需要帮助？",
+            "description": "查看故障排除指南，如果有不清楚的地方可以提交 issue。",
+            "troubleshooting": "故障排除",
+            "openIssue": "提交问题"
+        },
+        "editOnGithub": "在 GitHub 上编辑",
+        "onThisPage": "本页内容",
+        "previous": "上一页",
+        "next": "下一页"
+    },
+    "blog": {
+        "title": "博客",
+        "subtitle": "Memo Code 的工程实践记录与设计说明。",
+        "readArticle": "阅读文章",
+        "breadcrumb": {
+            "home": "首页"
+        }
+    },
+    "notFound": {
+        "title": "页面未找到",
+        "description": "你查找的页面不存在。",
+        "backHome": "返回首页"
+    },
+    "localeSwitcher": {
+        "label": "语言",
+        "switchTo": "切换到 {locale}"
+    }
+}

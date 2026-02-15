@@ -19,6 +19,8 @@ export type ModelProfileOverride = {
     context_window?: number
 }
 
+export type McpOAuthCredentialsStoreMode = 'auto' | 'keyring' | 'file'
+
 export type MCPServerConfig =
     | {
           /** Default: start local process, connect via stdio. */
@@ -44,14 +46,16 @@ export type MCPServerConfig =
 
 export type MemoConfig = {
     current_provider: string
-    /** Persistent prompt token limit (maps to AgentSessionOptions.maxPromptTokens). */
-    max_prompt_tokens?: number
     /** Optional model capability overrides keyed by model slug or provider:model. */
     model_profiles?: Record<string, ModelProfileOverride>
     /** Map of server name to server configuration */
     mcp_servers?: Record<string, MCPServerConfig>
     /** Persisted default active MCP servers for interactive sessions. */
     active_mcp_servers?: string[]
+    /** MCP OAuth credential store policy. */
+    mcp_oauth_credentials_store_mode?: McpOAuthCredentialsStoreMode
+    /** Optional callback port for MCP OAuth browser login. */
+    mcp_oauth_callback_port?: number
     providers: ProviderConfig[]
 }
 
@@ -63,7 +67,7 @@ const DEFAULT_CONTEXT_WINDOW = 120000
 
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
-    max_prompt_tokens: DEFAULT_CONTEXT_WINDOW,
+    mcp_oauth_credentials_store_mode: 'auto',
     providers: [
         {
             name: 'deepseek',
@@ -260,11 +264,20 @@ function serializeConfig(config: MemoConfig) {
     }
 
     const mainLines = [`current_provider = "${config.current_provider}"`]
-    if (typeof config.max_prompt_tokens === 'number' && Number.isFinite(config.max_prompt_tokens)) {
-        mainLines.push(`max_prompt_tokens = ${Math.floor(config.max_prompt_tokens)}`)
-    }
     if (Array.isArray(config.active_mcp_servers)) {
         mainLines.push(`active_mcp_servers = ${JSON.stringify(config.active_mcp_servers)}`)
+    }
+    const oauthStoreMode = config.mcp_oauth_credentials_store_mode
+    if (oauthStoreMode === 'auto' || oauthStoreMode === 'keyring' || oauthStoreMode === 'file') {
+        mainLines.push(`mcp_oauth_credentials_store_mode = ${JSON.stringify(oauthStoreMode)}`)
+    }
+    if (
+        typeof config.mcp_oauth_callback_port === 'number' &&
+        Number.isInteger(config.mcp_oauth_callback_port) &&
+        config.mcp_oauth_callback_port > 0 &&
+        config.mcp_oauth_callback_port <= 65535
+    ) {
+        mainLines.push(`mcp_oauth_callback_port = ${config.mcp_oauth_callback_port}`)
     }
     const mainConfig = mainLines.join('\n')
 
@@ -291,21 +304,29 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
         const text = await readFile(configPath, 'utf-8')
         const parsed = parseToml(text) as ParsedMemoConfig
         const providers = normalizeProviders(parsed.providers)
-        const maxPromptTokens =
-            typeof parsed.max_prompt_tokens === 'number' &&
-            Number.isFinite(parsed.max_prompt_tokens) &&
-            parsed.max_prompt_tokens > 0
-                ? Math.floor(parsed.max_prompt_tokens)
-                : undefined
         const activeMcpServers = Array.isArray(parsed.active_mcp_servers)
             ? parsed.active_mcp_servers.filter(
                   (name): name is string => typeof name === 'string' && name.trim().length > 0,
               )
             : undefined
+        const oauthStoreMode =
+            parsed.mcp_oauth_credentials_store_mode === 'auto' ||
+            parsed.mcp_oauth_credentials_store_mode === 'keyring' ||
+            parsed.mcp_oauth_credentials_store_mode === 'file'
+                ? parsed.mcp_oauth_credentials_store_mode
+                : DEFAULT_CONFIG.mcp_oauth_credentials_store_mode
+        const oauthCallbackPort =
+            typeof parsed.mcp_oauth_callback_port === 'number' &&
+            Number.isInteger(parsed.mcp_oauth_callback_port) &&
+            parsed.mcp_oauth_callback_port > 0 &&
+            parsed.mcp_oauth_callback_port <= 65535
+                ? parsed.mcp_oauth_callback_port
+                : undefined
         const modelProfiles = normalizeModelProfiles(parsed.model_profiles)
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
-            max_prompt_tokens: maxPromptTokens ?? DEFAULT_CONFIG.max_prompt_tokens,
+            mcp_oauth_credentials_store_mode: oauthStoreMode,
+            mcp_oauth_callback_port: oauthCallbackPort,
             providers,
             model_profiles: modelProfiles,
             mcp_servers: parsed.mcp_servers ?? {},

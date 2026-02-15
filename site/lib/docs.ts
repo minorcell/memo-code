@@ -46,12 +46,20 @@ type ParsedDocFile = {
 
 const DOC_CATEGORIES = ['Getting Started', 'Core Features', 'Extensions', 'Operations'] as const
 const DOC_CATEGORY_SET = new Set<DocCategory>(DOC_CATEGORIES)
-const DOCS_DIR = resolve(process.cwd(), 'content', 'docs')
-const USER_GUIDE_FILE = 'README.mdx'
 const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---\n?/
 
-function normalizeDocLinks(markdown: string) {
-    return markdown.replace(/\]\((?:\.\/)?([a-z0-9-]+)\.mdx?\)/gi, '](/docs/$1)')
+function getDocsDir(locale: string) {
+    return resolve(process.cwd(), 'content', 'docs', locale)
+}
+
+const USER_GUIDE_FILE = 'README.mdx'
+
+function normalizeDocLinks(markdown: string, locale: string) {
+    const localePrefix = locale || 'en'
+
+    return markdown
+        .replace(/\]\((?:\.\/)?([a-z0-9-]+)\.mdx?\)/gi, `](/${localePrefix}/docs/$1)`)
+        .replace(/\]\(\/docs\/([a-z0-9-]+)\/?\)/gi, `](/${localePrefix}/docs/$1)`)
 }
 
 function slugifyHeading(text: string) {
@@ -102,7 +110,7 @@ function parseFrontmatterFields(block: string) {
         const value = line
             .slice(separatorIndex + 1)
             .trim()
-            .replace(/^['\"]|['\"]$/g, '')
+            .replace(/^['"]|['"]$/g, '')
         fieldMap.set(key, value)
     }
 
@@ -160,8 +168,8 @@ type SplitDocResult = {
     sections: Array<{ id: string; title: string; markdown: string }>
 }
 
-function splitMarkdownDoc(markdown: string): SplitDocResult {
-    const normalized = normalizeDocLinks(markdown).replace(/\r/g, '').trim()
+function splitMarkdownDoc(markdown: string, locale: string): SplitDocResult {
+    const normalized = normalizeDocLinks(markdown, locale).replace(/\r/g, '').trim()
     const body = normalized.replace(/^#\s+.+\n*/, '').trim()
     const sectionMatches = [...body.matchAll(/^##\s+(.+)$/gm)]
 
@@ -183,6 +191,7 @@ function splitMarkdownDoc(markdown: string): SplitDocResult {
     const firstSectionIndex = sectionMatches[0]?.index ?? 0
     const introMarkdown = body.slice(0, firstSectionIndex).trim()
 
+    const usedIds = new Set<string>()
     const sections = sectionMatches.map((match, index) => {
         const sectionTitle = match[1].trim()
         const contentStart = (match.index ?? 0) + match[0].length
@@ -192,8 +201,17 @@ function splitMarkdownDoc(markdown: string): SplitDocResult {
                 : body.length
         const sectionMarkdown = body.slice(contentStart, contentEnd).trim()
 
+        let id = slugifyHeading(sectionTitle)
+        let uniqueId = id
+        let counter = 1
+        while (usedIds.has(uniqueId)) {
+            uniqueId = `${id}-${counter}`
+            counter++
+        }
+        usedIds.add(uniqueId)
+
         return {
-            id: slugifyHeading(sectionTitle),
+            id: uniqueId,
             title: sectionTitle,
             markdown: sectionMarkdown,
         }
@@ -219,8 +237,9 @@ function splitMarkdownDoc(markdown: string): SplitDocResult {
     }
 }
 
-const listDocFiles = cache(async () => {
-    const entries = await readdir(DOCS_DIR, { withFileTypes: true })
+const listDocFiles = cache(async (locale: string) => {
+    const docsDir = getDocsDir(locale)
+    const entries = await readdir(docsDir, { withFileTypes: true })
     return entries
         .filter(
             (entry) =>
@@ -232,15 +251,16 @@ const listDocFiles = cache(async () => {
         .sort((a, b) => a.localeCompare(b))
 })
 
-const loadMarkdownFile = cache(async (fileName: string) => {
-    const fullPath = resolve(DOCS_DIR, fileName)
+const loadMarkdownFile = cache(async (fileName: string, locale: string) => {
+    const docsDir = getDocsDir(locale)
+    const fullPath = resolve(docsDir, fileName)
     return readFile(fullPath, 'utf8')
 })
 
-const loadDocByFileName = cache(async (fileName: string): Promise<DocPage> => {
-    const markdown = await loadMarkdownFile(fileName)
+const loadDocByFileName = cache(async (fileName: string, locale: string): Promise<DocPage> => {
+    const markdown = await loadMarkdownFile(fileName, locale)
     const parsedFile = parseDocFile(markdown, fileName)
-    const parsedBody = splitMarkdownDoc(parsedFile.body)
+    const parsedBody = splitMarkdownDoc(parsedFile.body, locale)
     const summary =
         parsedFile.meta.description || parsedBody.summary || `Read ${parsedFile.meta.title}`
 
@@ -268,20 +288,20 @@ const loadDocByFileName = cache(async (fileName: string): Promise<DocPage> => {
     }
 })
 
-export const listDocPages = cache(async () => {
-    const fileNames = await listDocFiles()
-    const docs = await Promise.all(fileNames.map((fileName) => loadDocByFileName(fileName)))
+export const listDocPages = cache(async (locale: string = 'en') => {
+    const fileNames = await listDocFiles(locale)
+    const docs = await Promise.all(fileNames.map((fileName) => loadDocByFileName(fileName, locale)))
 
     return docs.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
 })
 
-export const getDocPage = cache(async (slug: string) => {
-    const pages = await listDocPages()
+export const getDocPage = cache(async (slug: string, locale: string = 'en') => {
+    const pages = await listDocPages(locale)
     return pages.find((page) => page.slug === slug)
 })
 
-export async function getDocNeighbors(slug: string) {
-    const pages = await listDocPages()
+export async function getDocNeighbors(slug: string, locale: string = 'en') {
+    const pages = await listDocPages(locale)
     const index = pages.findIndex((page) => page.slug === slug)
     if (index === -1) {
         return { previous: undefined, next: undefined }
@@ -293,9 +313,11 @@ export async function getDocNeighbors(slug: string) {
     }
 }
 
-export const getDocsHome = cache(async (): Promise<DocsHome> => {
-    const markdown = await loadMarkdownFile(USER_GUIDE_FILE)
-    const parsed = splitMarkdownDoc(markdown)
+export const getDocsHome = cache(async (locale: string = 'en'): Promise<DocsHome> => {
+    const docsDir = getDocsDir(locale)
+    const fullPath = resolve(docsDir, USER_GUIDE_FILE)
+    const markdown = await readFile(fullPath, 'utf8')
+    const parsed = splitMarkdownDoc(markdown, locale)
     const title = extractMarkdownTitle(markdown)
 
     const mergedMarkdown = [

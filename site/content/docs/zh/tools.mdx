@@ -1,0 +1,130 @@
+---
+title: '内置工具'
+description: '内置工具、类别和运行时控制。'
+order: 4
+category: 'Core Features'
+---
+
+# 内置工具
+
+Memo 包含一套 codex 风格的工具集，并可通过 MCP 服务器扩展能力。
+
+## 默认工具集
+
+默认情况下，Memo 启用以下类别：
+
+- 命令执行
+- 文件读取/搜索/编辑
+- MCP 资源浏览
+- 网页获取
+- 会话内规划
+- 可选内存读取
+- 可选子代理协作
+
+## 工具类别
+
+### 命令执行
+
+默认模式（`MEMO_SHELL_TOOL_TYPE=unified_exec`）：
+
+- `exec_command`
+- `write_stdin`
+
+兼容模式：
+
+- `shell`（argv 形式）当 `MEMO_SHELL_TOOL_TYPE=shell`
+- `shell_command`（字符串形式）当 `MEMO_SHELL_TOOL_TYPE=shell_command`
+
+禁用执行工具：
+
+- `MEMO_SHELL_TOOL_TYPE=disabled`
+
+### 文件和搜索
+
+- `read_file`
+- `list_dir`
+- `grep_files`
+- `apply_patch`
+
+注意：
+
+- `read_file` 和 `list_dir` 需要绝对路径。
+- `grep_files` 需要 PATH 中有 `rg`（ripgrep）。
+- `apply_patch` 是结构化写入工具。
+
+### MCP 资源工具
+
+- `list_mcp_resources`
+- `list_mcp_resource_templates`
+- `read_mcp_resource`
+
+这些与当前会话加载的 MCP 服务器一起工作。
+
+### 上下文和规划
+
+- `webfetch`
+- `update_plan`
+- `get_memory`（除非 `MEMO_ENABLE_MEMORY_TOOL=0`，否则启用）
+
+`get_memory` 从 `~/.memo/Agents.md`（或 `$MEMO_HOME/Agents.md`）读取。
+
+### 子代理协作
+
+- `spawn_agent`
+- `send_input`
+- `resume_agent`
+- `wait`
+- `close_agent`
+
+除非 `MEMO_ENABLE_COLLAB_TOOLS=0`，否则启用。
+
+## 功能开关
+
+- `MEMO_SHELL_TOOL_TYPE`
+- `MEMO_EXPERIMENTAL_TOOLS`
+- `MEMO_ENABLE_MEMORY_TOOL`
+- `MEMO_ENABLE_COLLAB_TOOLS`
+- `MEMO_SUBAGENT_COMMAND`
+- `MEMO_SUBAGENT_MAX_AGENTS`
+
+### 实验性工具开关行为
+
+`MEMO_EXPERIMENTAL_TOOLS` 控制：
+
+- `read_file`
+- `list_dir`
+- `grep_files`
+
+行为：
+
+- 空或未设置：三个都启用
+- 非空列表：仅列出已启用的工具
+
+示例：
+
+```bash
+export MEMO_EXPERIMENTAL_TOOLS=read_file,list_dir
+```
+
+## 审批概述
+
+默认风险模型：
+
+- 只读工具：自动批准
+- 写入工具：需要审批
+- 执行工具：需要审批
+- 子代理工具族：自动批准
+
+详见 [安全与审批](./approval-safety.md)。
+
+## 实用技巧
+
+- 明确范围：说明允许哪些文件/目录。
+- 优先读取流程：在修改前先检查。
+- 添加约束：如有需要，禁用破坏性命令。
+- 保持工具输出可管理：缩小路径/模式/限制。
+- 如果输出太长，缩小搜索范围并重新运行。
+
+## 详细参数参考
+
+有关确切的模式和示例，请参阅本仓库中的 `docs/tool/*`。

@@ -1,0 +1,257 @@
+---
+title: 'Agent Tool System Design: Unified Approach for Definition, Classification, and Orchestration'
+description: 'Extracted from memo'"'"'s practice: three-layer architecture for tool systems—definition layer uses declarative DSL, risk layer uses keyword classification, and orchestration layer provides unified interception. This approach helps establish a clear, maintainable tool governance mechanism in Agent projects.'
+date: '2026-02-13'
+order: 2
+---
+
+# Agent Tool System Design: Unified Approach for Definition, Classification, and Orchestration
+
+When building memo ([https://github.com/minorcell/memo-code](https://github.com/minorcell/memo-code)), the tool system was an unavoidable component. What can an Agent do? How to control risk? How to troubleshoot when issues arise—these questions become exponentially more complex as tool count grows.
+
+This post isn'"'"'t about "what a tool is" but **how to establish a maintainable tool governance scheme in real projects**. The approach comes from memo'"'"'s real evolution, hoping to provide reference for other Agent developers.
+
+## Breaking It Down First: Three-Layer Responsibilities of Tool Systems
+
+memo'"'"'s tool system is divided into three layers, each with its own responsibilities:
+
+<ToolSystemArchitectureDiagram />
+
+The benefit of this layering is: **each layer has a single concern, and change impact is controllable**. For example, to change approval policy, you don'"'"'t need to modify tool definitions; to add new tools, definition + orchestration automatically takes effect.
+
+## Layer 1: Tool Definition — Using Declarative DSL to Describe Capabilities
+
+The goal of tool definition is: **let the machine understand what this tool can do, what parameters it accepts, and whether it has side effects**.
+
+memo uses a lightweight DSL (`defineMcpTool`), placed in `packages/tools/src/tools/types.ts`:
+
+```typescript
+defineMcpTool({
+    name: 'apply_patch',
+    description: 'Edit a local file by direct string replacement.',
+    inputSchema: zod_schema,
+    isMutating: true,
+    supportsParallelToolCalls: false,
+    execute: async (input) => CallToolResult,
+})
+```
+
+Key fields:
+
+- `name`: Unique tool identifier, used by Agents to call this tool.
+- `description`: Capability description for the model; the model relies on this to understand when to use this tool.
+- `inputSchema`: Zod Schema, the orchestration layer automatically validates parameter legality.
+- `isMutating`: Marks whether there are write operations, important for risk classification.
+- `supportsParallelToolCalls`: Whether parallel calls are allowed, affects scheduling strategy.
+- `execute`: Actual execution logic, returns standardized results.
+
+**Why use declarative instead of writing functions directly?** Because Agents need a "discoverable tool list." The orchestration layer traverses all registered tools and generates a manifest for the model. Declarative makes this mechanical and reliable.
+
+## Layer 2: Risk Classification — Using Keywords for First-Pass Coarse Filtering
+
+There'"'"'s risk when Agents call tools. `read_file` can read files it shouldn'"'"'t, `exec_command` could delete databases and run away. So risk classification must be done first.
+
+memo classifies risk into four levels (from low to high):
+
+| Level      | Meaning                         | Approval Strategy           |
+| ---------- | ------------------------------- | --------------------------- |
+| `read`     | Read operations                 | Auto-pass in auto mode      |
+| `write`    | Write/modify operations         | Approval cached after first |
+| `execute`  | Execute commands/subprocesses   | Approval required each time |
+| `critical` | High-risk operations (reserved) | Approval required each time |
+
+Classification rules are placed in `packages/tools/src/approval/classifier.ts`, with core logic being keyword matching:
+
+```typescript
+function matchesAnyKeyword(name: string, keywords: readonly string[]): boolean {
+    return keywords.some((keyword) => name.includes(keyword))
+}
+```
+
+Keyword list:
+
+```typescript
+const EXECUTE_RISK_KEYWORDS = ['shell', 'exec', 'command', 'run', 'spawn'] as const
+const WRITE_RISK_KEYWORDS = ['patch', 'write', 'edit', 'create', 'delete'] as const
+const READ_RISK_KEYWORDS = ['read', 'file', 'list', 'grep', 'fetch', 'get'] as const
+```
+
+**Why use keywords instead of manual labeling?** Because after memo integrates MCP, the number of tools from external servers is unpredictable. Keyword fallback ensures "at least won'"'"'t be missed"; manual labeling is a supplement, not a replacement.
+
+Classification results enter the approval process. In `auto` mode, `read` passes directly; `write` needs approval first, then can cache decisions by `session` or `once`; `execute` needs approval every time. `strict` mode is more conservative—any risk gets intercepted.
+
+## Layer 3: Orchestrator — Unified Interception of All Tool Calls
+
+The orchestrator is the "gatekeeper" of the entire system—all tool calls must pass through it. memo'"'"'s orchestrator is in `packages/tools/src/orchestrator/index.ts`, responsible for four things:
+
+### 1. Input Validation
+
+```typescript
+function parseToolInput(tool: OrchestratorTool, rawInput: unknown): ParseToolInputResult {
+    if (typeof rawInput === 'string') {
+        // Support JSON string input
+        const trimmed = rawInput.trim()
+        if (trimmed) {
+            try {
+                candidate = JSON.parse(trimmed)
+            } catch {
+                candidate = trimmed
+            }
+        }
+    }
+    // Call the tool definition'"'"'s validateInput
+    if (typeof tool.validateInput === 'function') {
+        const validated = tool.validateInput(candidate)
+        if (!validated.ok) return validated
+    }
+    return { ok: true, data: candidate }
+}
+```
+
+### 2. Approval Interception
+
+```typescript
+async executeAction(action: ToolAction, options?: ToolApprovalHooks): Promise<ToolActionResult> {
+    const check = this.approvalManager.check(action.name, action.input)
+
+    if (check.needApproval) {
+        // Trigger approval callback
+        await options?.onApprovalRequest?.(request)
+        const decision = options?.requestApproval
+            ? await options.requestApproval(request)
+            : 'deny'
+        this.approvalManager.recordDecision(check.fingerprint, decision)
+
+        if (decision === 'deny') {
+            return { status: 'approval_denied', rejected: true }
+        }
+    }
+    // ...
+}
+```
+
+### 3. Result Trimming
+
+Tool output can be long, and Agent context is limited. The orchestrator applies default trimming:
+
+```typescript
+const DEFAULT_MAX_TOOL_RESULT_CHARS = 12_000
+```
+
+Adjustable via environment variable `MEMO_TOOL_RESULT_MAX_CHARS`. When exceeding the limit, a hint message is returned letting the model know output was truncated:
+
+```typescript
+function buildOversizeHintXml(toolName: string, actualChars: number, maxChars: number) {
+    return `<system_hint type="tool_output_omitted" tool="${toolName}" reason="too_long" actual_chars="${actualChars}" max_chars="${maxChars}">Tool output too long, automatically omitted.</system_hint>`
+}
+```
+
+### 4. Error Classification
+
+When tool execution fails, the orchestrator unifies classification:
+
+```typescript
+function classifyExecutionError(err: unknown): ToolActionErrorType {
+    const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
+    if (message.includes('sandbox') || message.includes('permission denied')) {
+        return 'sandbox_denied'
+    }
+    return 'execution_failed'
+}
+```
+
+This way Agents can implement retry or degradation strategies based on error type, instead of being overwhelmed by raw error messages.
+
+## Approval Caching — Avoiding Repeated Approval for the Same Operation
+
+If approval pops up every time, user experience suffers. memo implements three-level approval caching:
+
+- `session`: Continuously allowed within current session (suitable for "trust this tool for this session")
+- `once`: Allow only this call (suitable for "allow this special case this time, not afterward")
+- `deny`: Denied (user explicitly said no, won'"'"'t ask again)
+
+Cache key is generated from tool name + parameter fingerprint:
+
+```typescript
+function generateFingerprint(toolName: string, params: unknown): string {
+    return createHash('md5')
+        .update(`${toolName}:${JSON.stringify(params)}`)
+        .digest('hex')
+}
+```
+
+This way the same tool with same parameters won'"'"'t pop up the approval dialog repeatedly.
+
+## Current State of memo'"'"'s Built-in Tools
+
+| Tool                 | Function              | Risk Level | Supports Parallel |
+| -------------------- | --------------------- | ---------- | ----------------- |
+| `read_file`          | Read file             | read       | ✓                 |
+| `apply_patch`        | Edit file             | write      | ✗                 |
+| `grep_files`         | Search content        | read       | ✓                 |
+| `list_dir`           | List directory        | read       | ✓                 |
+| `exec_command`       | Execute command       | execute    | ✓                 |
+| `write_stdin`        | Write to stdin        | execute    | ✓                 |
+| `webfetch`           | HTTP request          | write      | ✓                 |
+| `spawn_agent`        | Spawn sub-agent       | execute    | ✓                 |
+| `update_plan`        | Update task plan      | read       | ✗                 |
+| `get_memory`         | Get persistent memory | read       | ✗                 |
+| `list_mcp_resources` | List MCP resources    | read       | ✓                 |
+| `read_mcp_resource`  | Read MCP resource     | read       | ✓                 |
+
+## 常见调用示例
+
+### `read_file`
+
+```typescript
+await read_file({ file_path: '/path/to/file.ts' })
+await read_file({ file_path: '/path/to/file.ts', offset: 10, limit: 50 })
+await read_file({
+    file_path: '/path/to/file.ts',
+    mode: 'indentation',
+    indentation: { anchor_line: 50, max_levels: 2 },
+})
+```
+
+### `apply_patch`
+
+```typescript
+await apply_patch({ file_path: '/path/to/file.ts', old_string: 'foo', new_string: 'bar' })
+await apply_patch({
+    file_path: '/path/to/file.ts',
+    edits: [{ old_string: 'foo', new_string: 'bar' }],
+    replace_all: true,
+})
+```
+
+### `exec_command`
+
+```typescript
+await exec_command({ cmd: 'ls -la' })
+await exec_command({ cmd: 'npm test', workdir: '/project/path' })
+await exec_command({ cmd: 'htop', tty: true })
+await exec_command({ cmd: 'docker build .', sandbox_permissions: 'require_escalated' })
+```
+
+## 这套方案可以迁移吗？
+
+可以。memo 的工具系统在设计上追求的是**与框架无关**：
+
+- 定义层只是一组 JSON Schema + 元数据
+- 分级层是可拔插的 classifier
+- 编排层依赖最少，可以复用在任何 Node.js Agent 项目
+
+如果你在做自己的 Agent，建议从这三层开始：
+
+1. 先有声明式定义，让工具可被发现
+2. 再有分级策略，让风险可控
+3. 最后有编排器，统一处理入参、审批、结果
+
+相关代码位置：
+
+- 定义层：`packages/tools/src/tools/types.ts`
+- 分级层：`packages/tools/src/approval/classifier.ts`
+- 审批层：`packages/tools/src/approval/manager.ts`
+- 编排层：`packages/tools/src/orchestrator/index.ts`
+
+（完）

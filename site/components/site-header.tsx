@@ -2,27 +2,34 @@
 
 import Image from 'next/image'
 import { Github, Package, Menu, X, BookOpen, NotebookPen } from 'lucide-react'
-import Link from 'next/link'
 import { useState } from 'react'
+import Link from 'next/link'
+import { LocaleSwitcher } from './locale-switcher'
+import { useT } from './intl-provider'
 
 const GITHUB_URL = 'https://github.com/minorcell/memo-code'
 const NPM_URL = 'https://www.npmjs.com/package/@memo-code/memo'
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
-const navItems = [
-    { href: '/docs', label: 'Docs', icon: BookOpen },
-    { href: '/blog', label: 'Blog', icon: NotebookPen },
-]
-
-export function SiteHeader() {
+export function SiteHeader({ lang }: { lang: string }) {
+    const t = useT()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const homeHref = `/${lang}`
+    const docsHref = `/${lang}/docs`
+    const blogHref = `/${lang}/blog`
+    const gettingStartedHref = `${docsHref}/getting-started`
+
+    const navItems = [
+        { href: docsHref, label: t('nav.docs'), icon: BookOpen },
+        { href: blogHref, label: t('nav.blog'), icon: NotebookPen },
+    ]
 
     return (
         <header className="sticky top-0 z-50 px-4 pt-3 md:px-8">
             <div className="mx-auto max-w-6xl">
                 <nav className="flex items-center justify-between rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5">
                     {/* Logo */}
-                    <Link href="/" className="group flex items-center gap-3">
+                    <Link href={homeHref} className="group flex items-center gap-3">
                         <div className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-tertiary)] transition-colors group-hover:border-[var(--border-hover)]">
                             <Image
                                 src={`${basePath}/logo-dark.svg`}
@@ -56,6 +63,7 @@ export function SiteHeader() {
 
                     {/* Right side actions */}
                     <div className="flex items-center gap-2">
+                        <LocaleSwitcher lang={lang} />
                         <a
                             href={GITHUB_URL}
                             target="_blank"
@@ -76,10 +84,10 @@ export function SiteHeader() {
                         </a>
 
                         <Link
-                            href="/docs/getting-started"
+                            href={gettingStartedHref}
                             className="hidden rounded-md border border-[var(--border-default)] bg-[var(--bg-tertiary)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-hover)] md:block"
                         >
-                            Get Started
+                            {t('home.cta.getStarted')}
                         </Link>
 
                         {/* Mobile menu button */}
@@ -113,11 +121,11 @@ export function SiteHeader() {
                         ))}
                         <div className="mt-2 border-t border-[var(--border-default)] pt-2">
                             <Link
-                                href="/docs/getting-started"
+                                href={gettingStartedHref}
                                 onClick={() => setMobileMenuOpen(false)}
                                 className="flex items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--bg-tertiary)] px-4 py-3 text-sm font-medium text-[var(--text-primary)]"
                             >
-                                Get Started
+                                {t('home.cta.getStarted')}
                             </Link>
                         </div>
                         <div className="mt-2 flex gap-2 border-t border-[var(--border-default)] pt-2">

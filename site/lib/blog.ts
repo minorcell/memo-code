@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { cache } from 'react'
 import type { ReactNode } from 'react'
 import { renderMdx } from '@/lib/mdx'
+import type { Locale } from '@/lib/i18n/config'
 
 export type BlogPostSummary = {
     slug: string
@@ -23,9 +24,12 @@ type BlogFrontmatter = {
     order: number
 }
 
-const BLOG_DIR = resolve(process.cwd(), 'content', 'blog')
 const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---\n?/
 const MARKDOWN_EXTENSIONS = ['.mdx', '.md'] as const
+
+function getBlogDir(locale: string) {
+    return resolve(process.cwd(), 'content', 'blog', locale)
+}
 
 function parseFrontmatter(markdown: string, slug: string) {
     const normalized = markdown.replace(/\r/g, '').trim()
@@ -93,22 +97,24 @@ function getSlugFromFileName(fileName: string) {
     return fileName.replace(/\.(mdx|md)$/i, '')
 }
 
-const listMarkdownFiles = cache(async () => {
-    const entries = await readdir(BLOG_DIR, { withFileTypes: true })
+const listMarkdownFiles = cache(async (locale: string) => {
+    const blogDir = getBlogDir(locale)
+    const entries = await readdir(blogDir, { withFileTypes: true })
     return entries
         .filter((entry) => entry.isFile() && isMarkdownEntry(entry.name))
         .map((entry) => entry.name)
         .sort((a, b) => a.localeCompare(b))
 })
 
-const loadMarkdownFile = cache(async (fileName: string) => {
-    const fullPath = resolve(BLOG_DIR, fileName)
+const loadMarkdownFile = cache(async (fileName: string, locale: string) => {
+    const blogDir = getBlogDir(locale)
+    const fullPath = resolve(blogDir, fileName)
     return readFile(fullPath, 'utf8')
 })
 
-const loadPostByFileName = cache(async (fileName: string): Promise<BlogPost> => {
+const loadPostByFileName = cache(async (fileName: string, locale: string): Promise<BlogPost> => {
     const slug = getSlugFromFileName(fileName)
-    const markdown = await loadMarkdownFile(fileName)
+    const markdown = await loadMarkdownFile(fileName, locale)
     const parsed = parseFrontmatter(markdown, slug)
     const contentBody = removeDuplicateTitleHeading(parsed.body, parsed.meta.title)
 
@@ -122,9 +128,11 @@ const loadPostByFileName = cache(async (fileName: string): Promise<BlogPost> => 
     }
 })
 
-export const listBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
-    const fileNames = await listMarkdownFiles()
-    const posts = await Promise.all(fileNames.map((fileName) => loadPostByFileName(fileName)))
+export const listBlogPosts = cache(async (locale: string = 'en'): Promise<BlogPostSummary[]> => {
+    const fileNames = await listMarkdownFiles(locale)
+    const posts = await Promise.all(
+        fileNames.map((fileName) => loadPostByFileName(fileName, locale)),
+    )
     return posts
         .sort((a, b) => b.order - a.order || b.publishedAt.localeCompare(a.publishedAt))
         .map(({ slug, title, summary, publishedAt, order }) => ({
@@ -136,9 +144,9 @@ export const listBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
         }))
 })
 
-export const getBlogPost = cache(async (slug: string) => {
-    const fileNames = await listMarkdownFiles()
+export const getBlogPost = cache(async (slug: string, locale: string = 'en') => {
+    const fileNames = await listMarkdownFiles(locale)
     const fileName = fileNames.find((name) => getSlugFromFileName(name) === slug)
     if (!fileName) return undefined
-    return loadPostByFileName(fileName)
+    return loadPostByFileName(fileName, locale)
 })
