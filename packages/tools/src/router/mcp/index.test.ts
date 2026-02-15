@@ -82,14 +82,21 @@ describe('mcp tool registry cache bootstrap', () => {
         const registry = new McpToolRegistry()
         const connectSpy = vi
             .spyOn(registry.getPool(), 'connect')
-            .mockImplementation(async () => createConnection('alpha', 'fresh_tool') as any)
+            .mockImplementation(
+                async () =>
+                    new Promise((resolve) =>
+                        setTimeout(
+                            () => resolve(createConnection('alpha', 'fresh_tool') as any),
+                            0,
+                        ),
+                    ),
+            )
 
         const loaded = await registry.loadServers({ alpha: config })
         assert.strictEqual(loaded, 1)
         assert.ok(registry.has('alpha_stale_tool'))
 
-        await Promise.resolve()
-        await Promise.resolve()
+        await vi.runAllTimersAsync()
 
         assert.ok(connectSpy.mock.calls.length >= 1)
         assert.ok(registry.has('alpha_fresh_tool'))

@@ -124,6 +124,11 @@ export async function withDefaultDeps(
     // 3. Load external MCP tools (follows MEMO_HOME)
     await router.loadMcpServers(
         filterMcpServersBySelection(config.mcp_servers, options.activeMcpServers),
+        {
+            memoHome: loaded.home,
+            storeMode: config.mcp_oauth_credentials_store_mode,
+            callbackPort: config.mcp_oauth_callback_port,
+        },
     )
 
     // 4. Merge user custom tools (deps.tools has highest priority)

@@ -99,6 +99,11 @@ url = "https://your-mcp-server.com/mcp"
 # 可选：启动时默认激活的 MCP server
 active_mcp_servers = ["local_tools", "remote"]
 # 可选：设为 [] 表示启动时不激活任何 MCP server
+
+# 可选：MCP OAuth 凭据存储模式：auto | keyring | file
+mcp_oauth_credentials_store_mode = "auto"
+# 可选：为 `memo mcp login` 指定固定本地回调端口
+# mcp_oauth_callback_port = 33333
 ```
 
 也可以通过 CLI 管理 MCP 配置（对齐 Codex CLI 风格）：
@@ -113,10 +118,16 @@ memo mcp add local_tools -- /path/to/mcp-server --flag
 # 添加远程 MCP server（streamable HTTP）
 memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var MCP_TOKEN
 
+# streamable_http server 的 OAuth 登录/登出
+memo mcp login remote --scopes read,write
+memo mcp logout remote
+
 # 查看/删除
 memo mcp get remote
 memo mcp remove remote
 ```
+
+`memo mcp list` 会输出每个 server 的 `auth_status`：`unsupported`、`not_logged_in`、`bearer_token`、`oauth`。
 
 ## Skills
 

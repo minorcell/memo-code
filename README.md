@@ -121,6 +121,11 @@ url = "https://your-mcp-server.com/mcp"
 # Optional: default active MCP servers at startup
 active_mcp_servers = ["local_tools", "remote"]
 # Optional: use [] to start with no MCP servers active
+
+# Optional: MCP OAuth credential storage mode: auto | keyring | file
+mcp_oauth_credentials_store_mode = "auto"
+# Optional: fixed localhost callback port for `memo mcp login`
+# mcp_oauth_callback_port = 33333
 ```
 
 You can also manage MCP configs via CLI (aligned with Codex CLI style):
@@ -135,10 +140,16 @@ memo mcp add local_tools -- /path/to/mcp-server --flag
 # Add remote MCP server (streamable HTTP)
 memo mcp add remote --url https://your-mcp-server.com/mcp --bearer-token-env-var MCP_TOKEN
 
+# OAuth login/logout for streamable_http servers
+memo mcp login remote --scopes read,write
+memo mcp logout remote
+
 # Show/remove
 memo mcp get remote
 memo mcp remove remote
 ```
+
+`memo mcp list` includes `auth_status` for each server: `unsupported`, `not_logged_in`, `bearer_token`, or `oauth`.
 
 ## Skills
 

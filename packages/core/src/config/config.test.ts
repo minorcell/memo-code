@@ -118,6 +118,8 @@ describe('mcp config serialization', () => {
             current_provider: 'deepseek',
             max_prompt_tokens: 120000,
             active_mcp_servers: ['remote'],
+            mcp_oauth_credentials_store_mode: 'file',
+            mcp_oauth_callback_port: 8765,
             model_profiles: {
                 'gpt-5': {
                     supports_parallel_tool_calls: true,
@@ -149,6 +151,8 @@ describe('mcp config serialization', () => {
         expect(text).toContain('[[providers.deepseek]]')
         expect(text).toContain('max_prompt_tokens = 120000')
         expect(text).toContain('active_mcp_servers = ["remote"]')
+        expect(text).toContain('mcp_oauth_credentials_store_mode = "file"')
+        expect(text).toContain('mcp_oauth_callback_port = 8765')
         expect(text).toContain('[model_profiles.gpt-5]')
         expect(text).toContain('supports_parallel_tool_calls = true')
         expect(text).toContain('context_window = 272000')
@@ -196,6 +200,8 @@ url = "https://example.com/mcp"
 current_provider = "deepseek"
 max_prompt_tokens = 150000
 active_mcp_servers = ["remote2"]
+mcp_oauth_credentials_store_mode = "keyring"
+mcp_oauth_callback_port = 12345
 
 [model_profiles.gpt-5]
 supports_parallel_tool_calls = true
@@ -221,6 +227,8 @@ url = "https://example.com/mcp-2"
         const servers = loaded.config.mcp_servers ?? {}
         expect(loaded.config.max_prompt_tokens).toBe(150000)
         expect(loaded.config.active_mcp_servers).toEqual(['remote2'])
+        expect(loaded.config.mcp_oauth_credentials_store_mode).toBe('keyring')
+        expect(loaded.config.mcp_oauth_callback_port).toBe(12345)
         expect(loaded.config.model_profiles?.['gpt-5']).toEqual({
             supports_parallel_tool_calls: true,
             supports_reasoning_content: true,
@@ -272,6 +280,7 @@ model = "deepseek-chat"
 
         const loaded = await loadMemoConfig()
         expect(loaded.config.max_prompt_tokens).toBe(120000)
+        expect(loaded.config.mcp_oauth_credentials_store_mode).toBe('auto')
     })
 
     test('loadMemoConfig ignores invalid model_profiles entries', async () => {

@@ -10,6 +10,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 import type { Tool, ToolRegistry, MCPServerConfig, ToolDescription, JSONSchema } from './types'
 import { NativeToolRegistry } from './native'
 import { McpToolRegistry } from './mcp'
+import type { McpOAuthSettings } from './mcp/oauth'
 
 export type {
     Tool,
@@ -20,6 +21,7 @@ export type {
     McpTool,
 } from './types'
 export { NativeToolRegistry, McpToolRegistry }
+export type { McpOAuthSettings } from './mcp/oauth'
 
 /** 工具路由管理器 */
 export class ToolRouter {
@@ -46,8 +48,11 @@ export class ToolRouter {
     }
 
     /** 连接并加载 MCP Servers */
-    async loadMcpServers(servers: Record<string, MCPServerConfig> | undefined): Promise<number> {
-        return this.mcpRegistry.loadServers(servers)
+    async loadMcpServers(
+        servers: Record<string, MCPServerConfig> | undefined,
+        oauthSettings?: McpOAuthSettings,
+    ): Promise<number> {
+        return this.mcpRegistry.loadServersWithOptions(servers, oauthSettings)
     }
 
     // ==================== 查询方法 ====================
@@ -219,6 +224,7 @@ export class ToolRouter {
 export async function createToolRouter(options: {
     nativeTools?: Tool[]
     mcpServers?: Record<string, MCPServerConfig>
+    mcpOAuthSettings?: McpOAuthSettings
 }): Promise<ToolRouter> {
     const router = new ToolRouter()
 
@@ -229,7 +235,7 @@ export async function createToolRouter(options: {
 
     // 加载 MCP Servers
     if (options.mcpServers && Object.keys(options.mcpServers).length > 0) {
-        await router.loadMcpServers(options.mcpServers)
+        await router.loadMcpServers(options.mcpServers, options.mcpOAuthSettings)
     }
 
     return router
