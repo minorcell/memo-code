@@ -9,6 +9,7 @@ const devServerTarget = process.env.VITE_SERVER_BASE_URL ?? 'http://127.0.0.1:54
 export default defineConfig({
     plugins: [react(), tailwindcss()],
     server: {
+        allowedHosts: ['.ngrok-free.app'],
         proxy: {
             '/api': {
                 target: devServerTarget,

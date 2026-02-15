@@ -4,10 +4,7 @@ export function stripThinkingBlocks(content: string): string {
     let sanitized = content
 
     // Remove fully closed thinking blocks.
-    sanitized = sanitized.replace(
-        /<\s*(think|thinking)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
-        '',
-    )
+    sanitized = sanitized.replace(/<\s*(think|thinking)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
     // Hide trailing streamed thinking content if the closing tag has not arrived yet.
     sanitized = sanitized.replace(/<\s*(think|thinking)\b[^>]*>[\s\S]*$/gi, '')
     // Drop any leftover standalone opening/closing tags.
@@ -17,4 +14,3 @@ export function stripThinkingBlocks(content: string): string {
 
     return sanitized
 }
-

@@ -30,7 +30,9 @@ export function ChatEmptyState({
             </div>
 
             <div className="mt-6 space-y-3">
-                <p className="text-sm text-muted-foreground">Select a project to start a new session.</p>
+                <p className="text-sm text-muted-foreground">
+                    Select a project to start a new session.
+                </p>
                 {workspaces.length > 0 ? (
                     <div className="mx-auto w-full max-w-[220px]">
                         <Select

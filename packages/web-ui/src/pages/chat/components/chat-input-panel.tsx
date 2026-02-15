@@ -186,7 +186,8 @@ export function ChatInputPanel({
             {pendingApproval ? (
                 <div className="mb-2 rounded-lg border border-border/70 px-3 py-2">
                     <p className="text-xs font-medium text-foreground">
-                        Approval required: <span className="font-semibold">{pendingApproval.toolName}</span>
+                        Approval required:{' '}
+                        <span className="font-semibold">{pendingApproval.toolName}</span>
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{pendingApproval.reason}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">

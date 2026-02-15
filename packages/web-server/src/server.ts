@@ -13,6 +13,7 @@ import { WsGatewayService } from './ws/ws-gateway.service';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 5494;
+const BUILTIN_ALLOWED_CORS_HOSTS = ['*.ngrok-free.app'];
 
 export type StartMemoWebServerOptions = {
   host?: string;
@@ -43,7 +44,28 @@ function allowCorsOrigin(
   if (!origin) return true;
   try {
     const url = new URL(origin);
-    return allowedHosts.includes(url.hostname);
+    const hostname = url.hostname.trim().toLowerCase();
+    if (!hostname) return false;
+
+    const normalizedAllowedHosts = allowedHosts
+      .map((item) => item.trim().toLowerCase())
+      .filter((item) => item.length > 0);
+
+    return normalizedAllowedHosts.some((pattern) => {
+      if (pattern === '*') return true;
+      if (pattern === hostname) return true;
+
+      if (pattern.startsWith('*.')) {
+        const suffix = pattern.slice(1);
+        return hostname.endsWith(suffix);
+      }
+
+      if (pattern.startsWith('.')) {
+        return hostname === pattern.slice(1) || hostname.endsWith(pattern);
+      }
+
+      return false;
+    });
   } catch {
     return false;
   }
@@ -97,13 +119,19 @@ export async function startMemoWebServer(
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ServerConfigService);
   const config = await configService.load();
+  const effectiveAllowedCorsHosts = Array.from(
+    new Set([
+      ...config.security.corsAllowedHosts,
+      ...BUILTIN_ALLOWED_CORS_HOSTS,
+    ]),
+  );
 
   const corsOptions: CorsOptions = {
     origin: (
       origin: string | undefined,
       callback: (error: Error | null, allow?: boolean) => void,
     ) => {
-      if (allowCorsOrigin(origin, config.security.corsAllowedHosts)) {
+      if (allowCorsOrigin(origin, effectiveAllowedCorsHosts)) {
         callback(null, true);
         return;
       }
@@ -135,9 +163,7 @@ export async function startMemoWebServer(
   const url = `http://${host}:${port}`;
   logger.log(`Memo web-server started at ${url}`);
   logger.log(`Using auth config: ${configService.getConfigPath()}`);
-  logger.log(
-    `Allowed CORS hosts: ${config.security.corsAllowedHosts.join(', ')}`,
-  );
+  logger.log(`Allowed CORS hosts: ${effectiveAllowedCorsHosts.join(', ')}`);
 
   return {
     app,

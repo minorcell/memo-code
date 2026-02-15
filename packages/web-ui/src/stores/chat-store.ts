@@ -698,11 +698,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
             if (!sessionId || !pendingApproval?.fingerprint) return false
 
             try {
-                await chatApi.approveSessionAction(
-                    sessionId,
-                    pendingApproval.fingerprint,
-                    decision,
-                )
+                await chatApi.approveSessionAction(sessionId, pendingApproval.fingerprint, decision)
                 return true
             } catch (error) {
                 set({ error: getErrorMessage(error, 'Failed to submit approval decision') })

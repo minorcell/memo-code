@@ -1316,10 +1316,7 @@ describe('session hooks & middleware', () => {
 
     test('emits session title only once across multiple turns', async () => {
         const events: HistoryEvent[] = []
-        const outputs: LLMResponse[] = [
-            endTurnResponse('done'),
-            endTurnResponse('done-again'),
-        ]
+        const outputs: LLMResponse[] = [endTurnResponse('done'), endTurnResponse('done-again')]
 
         const session = await createAgentSession(
             {

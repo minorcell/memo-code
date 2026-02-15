@@ -118,7 +118,9 @@ export function ToolStepCard({ step, cwd }: { step: SessionTurnStep; cwd: string
                         key={`${action.tool}-${index}`}
                         className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted/70 px-2 py-1 text-[11px]"
                     >
-                        <span className={cn('size-1.5 shrink-0 rounded-full', statusTone.dotClass)} />
+                        <span
+                            className={cn('size-1.5 shrink-0 rounded-full', statusTone.dotClass)}
+                        />
                         <span className="font-medium text-foreground">{action.tool}</span>
                         {param ? (
                             <span className="max-w-[280px] truncate text-muted-foreground">

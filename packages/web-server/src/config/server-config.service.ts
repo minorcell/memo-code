@@ -16,7 +16,12 @@ import {
 
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
-const DEFAULT_ALLOWED_CORS_HOSTS = ['localhost', '127.0.0.1', '::1'];
+const DEFAULT_ALLOWED_CORS_HOSTS = [
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  '*.ngrok-free.app',
+];
 const DEFAULT_WORKSPACE_ROOT_PATH = '/';
 
 type ParsedServerConfig = {
