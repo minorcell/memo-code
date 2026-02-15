@@ -6,6 +6,7 @@ import {
     splitStdinLines,
     trimPendingStdinBuffer,
 } from '@memo/tools/tools/command_guard'
+import { getRuntimeCwd } from '@memo/tools/runtime/context'
 
 const DEFAULT_EXEC_YIELD_TIME_MS = 10_000
 const DEFAULT_WRITE_YIELD_TIME_MS = 250
@@ -238,9 +239,10 @@ class UnifiedExecManager {
             login: request.login !== false,
         })
 
+        const runtimeCwd = getRuntimeCwd()
         const cwd = request.workdir?.trim()
-            ? resolve(process.cwd(), request.workdir.trim())
-            : process.cwd()
+            ? resolve(runtimeCwd, request.workdir.trim())
+            : runtimeCwd
 
         const proc = spawn(shellInvocation.file, shellInvocation.args, {
             cwd,

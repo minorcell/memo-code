@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { existsSync, statSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import ignore, { type Ignore } from 'ignore'
+import { getRuntimeCwd } from '@memo/tools/runtime/context'
 
 /**
  * 生成标准化的绝对路径，避免因工作目录差异导致的路径错误。
@@ -37,7 +38,7 @@ function parseWritableRootsFromEnv() {
 
 export function getWritableRoots() {
     const roots = new Set<string>()
-    roots.add(canonicalizePath(process.cwd()))
+    roots.add(canonicalizePath(getRuntimeCwd()))
     const memoHome = process.env.MEMO_HOME?.trim() || join(homedir(), '.memo')
     roots.add(canonicalizePath(memoHome))
     for (const item of parseWritableRootsFromEnv()) {
@@ -103,7 +104,7 @@ function findIgnoreRoot(startPath: string): string {
         }
     } catch {
         // ignore invalid paths; fall back to cwd
-        dir = process.cwd()
+        dir = getRuntimeCwd()
     }
     const initial = dir
 

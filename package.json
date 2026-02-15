@@ -11,6 +11,7 @@
         "dist/index.js",
         "dist/prompt.md",
         "dist/task-prompts/*.md",
+        "dist/web/**/*",
         "README.md",
         "LICENSE"
     ],
@@ -19,8 +20,14 @@
     },
     "scripts": {
         "start": "tsx packages/tui/src/cli.tsx",
-        "build": "tsup",
+        "build": "pnpm run web:build && tsup",
         "dev": "tsup --watch",
+        "web:dev": "pnpm -r --parallel --stream --filter @memo-code/web-server --filter @memo-code/web-ui dev",
+        "web:server:dev": "pnpm --filter @memo-code/web-server dev",
+        "web:ui:dev": "pnpm --filter @memo-code/web-ui dev",
+        "web:ui:build": "pnpm --filter @memo-code/web-ui build",
+        "web:server:build": "pnpm --filter @memo-code/web-server build",
+        "web:build": "pnpm run web:ui:build && pnpm run web:server:build",
         "site:dev": "pnpm --filter @memo-code/site dev",
         "site:build": "pnpm --filter @memo-code/site build",
         "site:start": "pnpm --filter @memo-code/site start",
@@ -49,6 +56,10 @@
         "vitest": "^2.1.8"
     },
     "dependencies": {
+        "@nestjs/common": "^11.0.1",
+        "@nestjs/core": "^11.0.1",
+        "@nestjs/jwt": "^11.0.1",
+        "@nestjs/platform-express": "^11.0.1",
         "@dqbd/tiktoken": "^1.0.22",
         "@inkjs/ui": "^2.0.0",
         "@modelcontextprotocol/sdk": "^1.24.3",
@@ -56,10 +67,14 @@
         "ink": "^6.7.0",
         "marked": "^17.0.1",
         "openai": "^6.10.0",
+        "reflect-metadata": "^0.2.2",
         "react": "^19.2.4",
         "react-reconciler": "^0.33.0",
+        "rxjs": "^7.8.1",
         "string-width": "^7.2.0",
         "toml": "^3.0.0",
+        "yaml": "^2.8.1",
+        "ws": "^8.18.3",
         "zod": "^4.3.6",
         "zod-to-json-schema": "^3.25.1"
     }

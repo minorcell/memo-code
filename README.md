@@ -61,10 +61,10 @@ memo
 - Continue latest local session: `memo --prev` or `memo -prev` (load latest session context for current directory).
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
+- Start web server (MVP): `memo web --host 127.0.0.1 --port 5494 --open` (requires built web UI assets).
 - Startup project guidance: if `AGENTS.md` exists in the startup root, Memo appends it to the system prompt automatically.
 - Skills: Memo auto-discovers `SKILL.md` files and appends an available-skills section into the system prompt.
 - MCP activation selection: when MCP servers are configured, startup shows a multi-select to activate servers for this run.
-- Session titles: Memo generates a short title from the first user prompt and uses it in history/resume lists.
 
 ## Configuration
 
@@ -236,7 +236,7 @@ pnpm start
 ### Build
 
 ```bash
-pnpm run build  # generates dist/index.js
+pnpm run build  # builds web-server/web-ui artifacts and generates dist/index.js
 ```
 
 ### Test

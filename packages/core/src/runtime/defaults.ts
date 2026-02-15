@@ -95,6 +95,11 @@ function extractReasoningContent(
     return trimmed.length > 0 ? trimmed : undefined
 }
 
+function isChatCompletionResponse(value: unknown): value is OpenAI.Chat.Completions.ChatCompletion {
+    if (!value || typeof value !== 'object') return false
+    return Array.isArray((value as { choices?: unknown }).choices)
+}
+
 /**
  * Complete dependencies with default strategy (tools, callLLM, prompt, history sinks, tokenizer).
  * Caller can provide only callbacks/overrides, rest use default implementations.
@@ -150,7 +155,12 @@ export async function withDefaultDeps(
 
     // 6. Build loadPrompt (includes tool descriptions)
     const loadPrompt = async () => {
-        let basePrompt = await (deps.loadPrompt ?? defaultLoadPrompt)()
+        let basePrompt = deps.loadPrompt
+            ? await deps.loadPrompt()
+            : await defaultLoadPrompt({
+                  cwd: options.cwd,
+                  memoHome: loaded.home,
+              })
 
         // Inject tool descriptions into prompt (for non-Tool Use API mode)
         const toolDescriptions = router.generateToolDescriptions()
@@ -208,6 +218,9 @@ export async function withDefaultDeps(
                 const data = await client.chat.completions.create(request, {
                     signal: callOptions?.signal,
                 })
+                if (!isChatCompletionResponse(data)) {
+                    throw new Error('Streaming response is not supported in core callLLM')
+                }
 
                 const message = data.choices?.[0]?.message
                 const reasoningContent = extractReasoningContent(message)

@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { z } from 'zod'
 import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
+import { getRuntimeCwd } from '@memo/tools/runtime/context'
 
 type AgentStatus = 'running' | 'completed' | 'errored' | 'closed'
 type WaitStatus = AgentStatus | 'not_found'
@@ -114,7 +115,7 @@ function resolveSubagentCommand() {
     const explicit = process.env.MEMO_SUBAGENT_COMMAND?.trim()
     if (explicit) return explicit
 
-    const distEntry = resolve(process.cwd(), 'dist/index.js')
+    const distEntry = resolve(getRuntimeCwd(), 'dist/index.js')
     if (existsSync(distEntry)) {
         return `node ${JSON.stringify(distEntry)} --dangerous`
     }
@@ -277,7 +278,7 @@ async function startSubmission(record: AgentRecord, message: string): Promise<st
     const submissionId = crypto.randomUUID()
     const command = resolveSubagentCommand()
     const proc = spawn(command, {
-        cwd: process.cwd(),
+        cwd: getRuntimeCwd(),
         env: {
             ...process.env,
         },

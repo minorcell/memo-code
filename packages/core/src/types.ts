@@ -1,6 +1,8 @@
 /** @file Common type declarations shared between Core and Runtime (reused by UI/Tools). */
 import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 import type { ToolActionStatus } from '@memo/tools/orchestrator'
+export type { ApprovalDecision, ApprovalRequest } from '@memo/tools/approval'
+export type { ToolActionStatus } from '@memo/tools/orchestrator'
 
 /**
  * Basic type declarations for Agent layer, covering conversation messages,
@@ -212,6 +214,8 @@ export type AgentSessionOptions = {
     providerName?: string
     /** Tokenizer encoding name, default cl100k_base. */
     tokenizerModel?: string
+    /** Working directory used by prompt/tool runtime for this session. */
+    cwd?: string
     /** Prompt warning threshold. */
     warnPromptTokens?: number
     /** Context window hard limit, rejects when still exceeded after compaction. */
@@ -220,8 +224,6 @@ export type AgentSessionOptions = {
     autoCompactThresholdPercent?: number
     /** Active MCP server names for current session (undefined means all configured servers). */
     activeMcpServers?: string[]
-    /** Generate a session title from the first user prompt (enabled by CLI). */
-    generateSessionTitle?: boolean
     /** Dangerous mode: skip approval (not equivalent to disabling sandbox). */
     dangerous?: boolean
     /** 工具权限模式：禁用工具 / 每次审批 / 全部放行。 */
@@ -365,7 +367,7 @@ export type AgentMiddleware = AgentHooks & {
 
 /** Session 对象，持有历史并可执行多轮对话。 */
 export type AgentSession = {
-    /** Session 标题（LLM 生成）。 */
+    /** Session 标题（默认取首条用户消息）。 */
     title?: string
     /** Session 唯一标识。 */
     id: string

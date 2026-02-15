@@ -1,26 +1,7 @@
-import type { ProviderConfig, MCPServerConfig } from '@memo/core'
-import type { SlashCommandName, ToolPermissionMode } from '../constants'
-
-export type SlashContext = {
-    configPath: string
-    providerName: string
-    model: string
-    mcpServers: Record<string, MCPServerConfig>
-    providers: ProviderConfig[]
-    toolPermissionMode: ToolPermissionMode
-}
-
-export type SlashCommandResult =
-    | { kind: 'exit' }
-    | { kind: 'new' }
-    | { kind: 'message'; title: string; content: string }
-    | { kind: 'review_pr'; prNumber: number }
-    | { kind: 'switch_model'; provider: ProviderConfig }
-    | { kind: 'set_tool_permission'; mode: ToolPermissionMode }
-    | { kind: 'compact' }
-    | { kind: 'init_agents_md' }
-
-export type SlashSpec = {
-    name: SlashCommandName
-    description: string
-}
+export type {
+    SlashContext,
+    SlashCommandResult,
+    SlashSpec,
+    SlashCommandName,
+} from '@memo/core/runtime/slash'
+export type { ToolPermissionMode } from '@memo/core/types'

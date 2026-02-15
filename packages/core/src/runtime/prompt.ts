@@ -65,14 +65,20 @@ function appendSkillsPrompt(basePrompt: string, skillsSection: string): string {
 ${skillsSection}`
 }
 
+function resolveModuleDir(): string {
+    if (typeof __dirname === 'string') {
+        return __dirname
+    }
+    return dirname(fileURLToPath(import.meta.url))
+}
+
 /**
  * Load built-in system prompt template.
  * Can be overridden externally via dependency injection.
  */
 export async function loadSystemPrompt(options: LoadSystemPromptOptions = {}): Promise<string> {
     const startupRoot = options.cwd ?? process.cwd()
-    const __dirname = dirname(fileURLToPath(import.meta.url))
-    const promptPath = join(__dirname, 'prompt.md')
+    const promptPath = join(resolveModuleDir(), 'prompt.md')
     const prompt = await readFile(promptPath, 'utf-8')
     const vars = {
         date: new Date().toISOString(),

@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { z } from 'zod'
 import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
+import { getRuntimeCwd } from '@memo/tools/runtime/context'
 
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 2000
@@ -87,16 +88,15 @@ export const grepFilesTool = defineMcpTool<GrepFilesInput>({
         }
 
         const limit = Math.min(input.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
-        const searchPath = input.path?.trim()
-            ? resolve(process.cwd(), input.path.trim())
-            : process.cwd()
+        const runtimeCwd = getRuntimeCwd()
+        const searchPath = input.path?.trim() ? resolve(runtimeCwd, input.path.trim()) : runtimeCwd
 
         try {
             const result = await runRg({
                 pattern,
                 include: input.include,
                 searchPath,
-                cwd: process.cwd(),
+                cwd: runtimeCwd,
                 limit,
             })
 

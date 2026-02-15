@@ -375,7 +375,7 @@ export function selectProvider(config: MemoConfig, preferred?: string): Provider
 export function getSessionsDir(loaded: LoadedConfig, options: AgentSessionOptions) {
     const base = options.historyDir ?? join(loaded.home, DEFAULT_SESSIONS_DIR)
     const absoluteBase = expandHome(base)
-    const projectPath = resolve(process.cwd())
+    const projectPath = resolve(options.cwd ?? process.cwd())
     const root = parsePath(projectPath).root
     const relative = projectPath.slice(root.length)
     const segments = relative.split(/[\\/]+/).filter(Boolean)

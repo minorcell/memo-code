@@ -19,12 +19,6 @@ export const DEFAULT_CONTEXT_WINDOW = 120_000
 export const TOOL_ACTION_SUCCESS_STATUS: ToolActionStatus = 'success'
 export const TOOL_DISABLED_ERROR_MESSAGE =
     'Tool usage is disabled in the current permission mode. Switch to /tools once or /tools full to enable tools.'
-export const SESSION_TITLE_SYSTEM_PROMPT = `Generate a concise session title based on the user's first prompt.
-Requirements:
-- 3 to 8 words when possible
-- Keep it specific and descriptive
-- Return title only, no quotes, no punctuation-only output
-`
 export const SESSION_TITLE_MAX_CHARS = 60
 export const TOOL_SKIPPED_AFTER_REJECTION_MESSAGE =
     'Skipped tool execution after previous rejection.'
@@ -137,7 +131,15 @@ export async function emitEventToSinks(event: HistoryEvent, sinks: HistorySink[]
 }
 
 export function isAbortError(err: unknown): err is Error {
-    return err instanceof Error && err.name === 'AbortError'
+    if (!(err instanceof Error)) return false
+    if (err.name === 'AbortError') return true
+
+    const message = err.message?.toLowerCase?.() ?? ''
+    return (
+        message.includes('request was aborted') ||
+        message.includes('operation was aborted') ||
+        message.includes('aborted')
+    )
 }
 
 // Stable serialization for duplicate action detection (ensures consistent key ordering)
@@ -225,11 +227,15 @@ export function truncateSessionTitle(input: string): string {
 
 export function normalizeSessionTitle(raw: string): string {
     const compact = raw
+        .replace(/<\s*(think|thinking)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, ' ')
+        .replace(/<\s*\/?\s*(think|thinking)\b[^>]*>/gi, ' ')
         .replace(/\r?\n+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
     if (!compact) return ''
-    const unquoted = compact.replace(/^["'`“”‘’]+|["'`“”‘’]+$/g, '').trim()
+    const unprefixed = compact.replace(/^(title|session title|标题)\s*[:：-]\s*/i, '').trim()
+    if (!unprefixed) return ''
+    const unquoted = unprefixed.replace(/^["'`“”‘’]+|["'`“”‘’]+$/g, '').trim()
     if (!unquoted) return ''
     return truncateSessionTitle(unquoted)
 }

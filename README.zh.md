@@ -57,10 +57,10 @@ memo
 - 继续最近会话：`memo --prev` 或 `memo -prev`（加载当前目录最近会话上下文）。
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 - 查看版本：`memo --version` 或 `memo -v`。
+- 启动 Web 服务（MVP）：`memo web --host 127.0.0.1 --port 5494 --open`（需先构建 web-ui 静态资源）。
 - 启动目录约定：若启动根目录存在 `AGENTS.md`，Memo 会自动将其拼接进系统提示词。
 - Skills：Memo 会自动发现 `SKILL.md` 并把可用 skills 列表拼接进系统提示词。
 - MCP 启动选择：当配置了 MCP server 时，启动会弹出多选以决定本次会话激活哪些 server。
-- 会话标题：Memo 会基于首条用户输入生成简短标题，并在历史/恢复列表中展示。
 
 ## 配置文件
 
@@ -207,7 +207,7 @@ pnpm start
 ### 构建
 
 ```bash
-pnpm run build  # 生成 dist/index.js
+pnpm run build  # 构建 web-server/web-ui 产物并生成 dist/index.js
 ```
 
 ### 测试
