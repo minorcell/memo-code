@@ -1,8 +1,17 @@
-import Link from 'next/link'
+'use client'
+
 import type { ReactNode } from 'react'
 import type { DocPageSummary } from '@/lib/docs'
 import { DocToc } from '@/components/doc-toc'
 import { ChevronRight } from 'lucide-react'
+import Link from 'next/link'
+import enMessages from '@/lib/i18n/messages/en.json'
+import zhMessages from '@/lib/i18n/messages/zh.json'
+
+const messagesByLocale: Record<string, typeof enMessages> = {
+    en: enMessages,
+    zh: zhMessages,
+}
 
 const CATEGORY_ORDER = ['Getting Started', 'Core Features', 'Extensions', 'Operations'] as const
 
@@ -14,10 +23,11 @@ export type DocSectionAnchor = {
 type DocsShellProps = {
     pages: DocPageSummary[]
     activeSlug?: string
-    title: string
+    title?: string
     description?: string
     sections?: DocSectionAnchor[]
     children: ReactNode
+    lang: string
 }
 
 export function DocsShell({
@@ -27,7 +37,20 @@ export function DocsShell({
     description,
     sections,
     children,
+    lang,
 }: DocsShellProps) {
+    const messages = messagesByLocale[lang] || messagesByLocale.en
+    const homeHref = `/${lang}`
+    const docsHref = `/${lang}/docs`
+    const t = (key: string): string => {
+        const keys = key.split('.')
+        let value: unknown = messages
+        for (const k of keys) {
+            value = (value as Record<string, unknown>)?.[k]
+        }
+        return (value as string) || key
+    }
+
     const activePage = pages.find((page) => page.slug === activeSlug)
     const hasSectionToc = Boolean(sections?.length)
 
@@ -43,12 +66,18 @@ export function DocsShell({
     return (
         <div className="mx-auto w-full max-w-[1300px] px-4 pb-20 pt-6 md:px-8">
             <nav className="mb-6 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                <Link href="/" className="transition-colors hover:text-[var(--text-primary)]">
-                    Home
+                <Link
+                    href={homeHref}
+                    className="transition-colors hover:text-[var(--text-primary)]"
+                >
+                    {t('blog.breadcrumb.home')}
                 </Link>
                 <ChevronRight className="h-3.5 w-3.5" />
-                <Link href="/docs" className="transition-colors hover:text-[var(--text-primary)]">
-                    Docs
+                <Link
+                    href={docsHref}
+                    className="transition-colors hover:text-[var(--text-primary)]"
+                >
+                    {t('nav.docs')}
                 </Link>
                 {activePage ? (
                     <>
@@ -60,7 +89,7 @@ export function DocsShell({
 
             <details className="group mb-4 lg:hidden">
                 <summary className="flex cursor-pointer items-center justify-between rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2.5 text-sm font-medium text-[var(--text-primary)]">
-                    <span>{activePage ? activePage.title : 'Documentation'}</span>
+                    <span>{activePage ? activePage.title : t('nav.docs')}</span>
                     <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
                 </summary>
                 <div className="mt-2 space-y-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-2">
@@ -73,7 +102,7 @@ export function DocsShell({
                                 {group.pages.map((page) => (
                                     <Link
                                         key={page.slug}
-                                        href={`/docs/${page.slug}`}
+                                        href={`${docsHref}/${page.slug}`}
                                         className={`block rounded-md px-2.5 py-2 text-sm transition-colors ${
                                             page.slug === activeSlug
                                                 ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
@@ -94,7 +123,7 @@ export function DocsShell({
                     <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-auto pr-1">
                         <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4">
                             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                                Documentation
+                                {t('nav.docs')}
                             </p>
                             <div className="space-y-4">
                                 {groupedPages.map((group) => (
@@ -108,7 +137,7 @@ export function DocsShell({
                                                 return (
                                                     <Link
                                                         key={page.slug}
-                                                        href={`/docs/${page.slug}`}
+                                                        href={`${docsHref}/${page.slug}`}
                                                         className={`block rounded-md px-2.5 py-2 transition-colors ${
                                                             isActive
                                                                 ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
@@ -152,7 +181,7 @@ export function DocsShell({
                             {sections?.length ? (
                                 <div className="mt-5 xl:hidden">
                                     <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                                        On this page
+                                        {t('docs.onThisPage')}
                                     </p>
                                     <div className="flex flex-wrap gap-2">
                                         {sections.map((section) => (
@@ -175,17 +204,17 @@ export function DocsShell({
                     {activePage ? (
                         <div className="mt-4">
                             <Link
-                                href="/docs"
+                                href={docsHref}
                                 className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
                             >
                                 <ChevronRight className="h-4 w-4 rotate-180" />
-                                All Documentation
+                                {t('docs.title')}
                             </Link>
                         </div>
                     ) : null}
                 </section>
 
-                {sections?.length ? <DocToc sections={sections} /> : null}
+                {sections?.length ? <DocToc sections={sections} lang={lang} /> : null}
             </div>
         </div>
     )

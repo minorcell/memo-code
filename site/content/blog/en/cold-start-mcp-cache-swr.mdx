@@ -1,0 +1,237 @@
+---
+title: 'Agent Cold Start Optimization: Unified SWR Strategy for MCP Caching'
+description: 'Tired of waiting for MCP server connections on every Agent startup? Redundant requests piling up? This post documents how memo unified startup and runtime caching into a single data layer using SWR concepts, reducing both cold start time and duplicate requests.'
+date: '2026-02-13'
+order: 3
+---
+
+# Agent Cold Start Optimization: Unified SWR Strategy for MCP Caching
+
+Anyone building Agents will likely encounter two pain points:
+
+1. **Slow cold start**: Upon session launch, Agents must connect to MCP servers and call `listTools`, tying first-screen interaction time to network and server status.
+2. **Redundant requests**: `list_mcp_resources` and `read_mcp_resource` generate obvious redundant requests across sessions and repeated calls.
+
+After several weeks of building MCP capabilities in memo ([https://github.com/minorcell/memo-code](https://github.com/minorcell/memo-code)), both issues became prominent. Connection pools can handle in-process reuse, but they don't cover "new process restart" scenarios, nor can they apply a unified caching strategy to both tool discovery and resource reading.
+
+This post explains how memo unified these two concerns using SWR (Stale-While-Revalidate).
+
+## Clarifying the Goal
+
+I wanted three things:
+
+- **Second launch should be fast**: Use local cache first, availability comes first.
+- **Single cache**: Startup cache and runtime cache should live in the same data structure, not two separate systems.
+- **Explainable strategy**: When to use cache, when to refresh, when to invalidate—all clearly defined.
+
+## Solution: Three-Layer SWR
+
+The core approach is `stale-while-revalidate`, broken into three layers:
+
+<McpCacheSWRDiagram />
+
+### Layer 1: Startup Phase — Tools Cache
+
+On startup, memo first reads `~/.memo/cache/mcp.json` (respecting the `MEMO_HOME` environment variable):
+
+```typescript
+// packages/tools/src/router/mcp/cache_store.ts
+
+async function ensureLoaded(): Promise<void> {
+    if (!isDiskCacheEnabled()) {
+        this.loaded = true
+        return
+    }
+    // ...
+    const cachePath = getCacheFilePath()
+    const raw = await readFile(cachePath, 'utf8')
+    const parsed = JSON.parse(raw)
+    // ...
+}
+```
+
+If `toolsByServer` hits cache:
+
+- **Register tools first**, immediately available
+- If cache `ageMs > fresh TTL (10min)`, refresh in background
+
+If no cache hit:
+
+- Use synchronous connection + `listTools` fetch, then write back to cache
+
+### Layer 2: Runtime Phase — Resources Cache
+
+`list_mcp_resources`, `list_mcp_resource_templates`, and `read_mcp_resource` all go through a unified cache layer (memory + disk):
+
+```typescript
+class McpCacheStore {
+    private responseInflight = new Map<string, Promise<unknown>>()
+
+    async getOrFetch<T>(key: string, fetcher: () => Promise<T>, ttlMs: number): Promise<T> {
+        // 1. Check cache
+        const cached = this.data.responses[key]
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.value as T
+        }
+
+        // 2. In-flight deduplication
+        const existing = this.responseInflight.get(key)
+        if (existing) return existing as Promise<T>
+
+        // 3. Make request
+        const promise = fetcher()
+        this.responseInflight.set(key, promise)
+
+        try {
+            const result = await promise
+            // 4. Write to cache
+            this.data.responses[key] = {
+                expiresAt: Date.now() + ttlMs,
+                value: result,
+            }
+            this.requestPersist()
+            return result
+        } finally {
+            this.responseInflight.delete(key)
+        }
+    }
+}
+```
+
+Cache supports:
+
+- **TTL expiration**: `list*` 15 seconds, `read` 60 seconds
+- **In-flight deduplication**: Concurrent requests with same key reuse the same Promise, preventing request storms
+- **Partial failure tolerance**: During full aggregation, single server failures are allowed, returning errors
+
+### Layer 3: Single Cache File
+
+Unified persistence to `~/.memo/cache/mcp.json`, internally split into two parts:
+
+```typescript
+type McpCacheFile = {
+    version: number
+    toolsByServer: Record<string, CachedServerToolsEntry>
+    responses: Record<string, CachedResponseEntry>
+}
+```
+
+- `toolsByServer`: For startup phase, organized by server name
+- `responses`: For runtime tool calls, organized by request key
+
+## Update and Invalidation Strategy
+
+### `toolsByServer`
+
+- `fresh TTL`: 10 minutes
+- `max-stale`: 24 hours
+- `configHash`: When MCP config changes, related server cache is immediately invalidated
+
+Behavior after expiration:
+
+- `<= max-stale`: Use cache first, refresh in background
+- `> max-stale`: Discard cache, fall back to synchronous fetch
+
+```typescript
+function configHash(config: MCPServerConfig): string {
+    return createHash('sha256').update(stableStringify(config)).digest('hex')
+}
+```
+
+### `responses`
+
+- `list*` default TTL: 15 seconds
+- `read` default TTL: 60 seconds
+- Concurrent requests with same key reuse the same Promise, preventing request storms
+
+## Fault Tolerance and Consistency — Four Key Designs
+
+### 1. Atomic Disk Writes
+
+Avoid cache corruption from intermediate state files:
+
+```typescript
+private async persistToDisk(): Promise<void> {
+    const cachePath = getCacheFilePath()
+    const tempPath = `${cachePath}.tmp`
+    await writeFile(tempPath, JSON.stringify(this.data), 'utf8')
+    await rename(tempPath, cachePath) // rename is atomic
+}
+```
+
+### 2. Write Throttling
+
+High-frequency IO impacts performance; use debounce to batch writes:
+
+```typescript
+private requestPersist(): void {
+    if (this.persistTimer) return
+    this.persistTimer = setTimeout(() => {
+        this.persistTimer = null
+        this.flushPersistQueue()
+    }, CACHE_PERSIST_DEBOUNCE_MS)
+}
+```
+
+`CACHE_PERSIST_DEBOUNCE_MS` is set to 120ms.
+
+### 3. Partial Failure Tolerance
+
+During full aggregation, single server failures don't block the entire operation:
+
+```typescript
+async function aggregateResources(): Promise<ResourceResult[]> {
+    const results = await Promise.allSettled(servers.map((s) => s.listResources()))
+    return results.map((r, i) => {
+        if (r.status === 'rejected') {
+            return { server: servers[i], error: r.reason }
+        }
+        return { server: servers[i], data: r.value }
+    })
+}
+```
+
+### 4. Lazy Connection Execution
+
+Tools restored from cache connect to servers only on first invocation, avoiding "connecting all just to register tools":
+
+```typescript
+// pool.ts
+async function getToolHandler(toolName: string): Promise<ToolHandler> {
+    // 先查缓存
+    const cached = this.toolCache.get(toolName)
+    if (cached) {
+        // 返回懒连接包装
+        return makeLazyHandler(cached, () => this.connectToServer(cached.server))
+    }
+    // ...
+}
+```
+
+## 关键代码位置
+
+- **统一缓存读写**：`packages/tools/src/router/mcp/cache_store.ts`
+- **启动流程**：`packages/tools/src/router/mcp/index.ts`
+- **连接池管理**：`packages/tools/src/router/mcp/pool.ts`
+- **资源工具切换**：`packages/tools/src/tools/mcp_resources.ts`
+
+## 预期收益
+
+1. **二次启动更快**：工具可以直接从缓存恢复，省去 MCP 握手和 `listTools` 网络开销
+2. **调用更稳**：重复请求减少，MCP server 压力下降
+3. **维护更简单**：启动和运行时缓存共用一套策略，不用维护两套逻辑
+
+## 关联
+
+- 相关 issue：[#155](https://github.com/minorcell/memo-code/issues/155)
+- 这篇可以当"冷启动 + MCP 缓存"后续演进的基线记录
+
+## 扩展思路
+
+如果你在做自己的 Agent，这套方案可以简化迁移：
+
+1. SWR 思想不限于 MCP，内部工具也可以用
+2. 单一缓存文件 + 分区设计，可以扩展到更多场景
+3. 懒连接 + in-flight 去重，是降低服务压力的通用手段
+
+（完）

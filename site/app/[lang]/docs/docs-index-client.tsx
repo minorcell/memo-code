@@ -1,52 +1,70 @@
-import Link from 'next/link'
+'use client'
+
 import { ArrowRight, ExternalLink } from 'lucide-react'
 import { DocsShell } from '@/components/docs-shell'
-import { listDocPages } from '@/lib/docs'
-
-const quickStartGuides = [
-    {
-        slug: 'getting-started',
-        title: 'Getting Started',
-        description: 'Installation and basic setup',
-    },
-    {
-        slug: 'cli-tui',
-        title: 'CLI & TUI',
-        description: 'Interactive terminal interface',
-    },
-    {
-        slug: 'configuration',
-        title: 'Configuration',
-        description: 'API keys and settings',
-    },
-]
+import Link from 'next/link'
+import type { DocPageSummary } from '@/lib/docs'
 
 const categoryOrder = ['Getting Started', 'Core Features', 'Extensions', 'Operations'] as const
 
-export default async function DocsIndexPage() {
-    const pages = await listDocPages()
+interface DocsIndexClientProps {
+    pages: DocPageSummary[]
+    lang: string
+    messages: typeof import('@/lib/i18n/messages/en.json')
+}
+
+export function DocsIndexClient({ pages, lang, messages }: DocsIndexClientProps) {
+    const docsHref = `/${lang}/docs`
+
+    const quickStartGuides = [
+        {
+            slug: 'getting-started',
+            title: lang === 'zh' ? '开始使用' : 'Getting Started',
+            description: lang === 'zh' ? '安装和基本设置' : 'Installation and basic setup',
+        },
+        {
+            slug: 'cli-tui',
+            title: lang === 'zh' ? 'CLI & TUI' : 'CLI & TUI',
+            description: lang === 'zh' ? '交互式终端界面' : 'Interactive terminal interface',
+        },
+        {
+            slug: 'configuration',
+            title: lang === 'zh' ? '配置' : 'Configuration',
+            description: lang === 'zh' ? 'API 密钥和设置' : 'API keys and settings',
+        },
+    ]
 
     const grouped = categoryOrder.map((category) => ({
         category,
         pages: pages.filter((page) => page.category === category),
     }))
 
+    const t = (key: string): string => {
+        const keys = key.split('.')
+        let value: unknown = messages
+        for (const k of keys) {
+            value = (value as Record<string, unknown>)?.[k]
+        }
+        return (value as string) || key
+    }
+
     return (
         <main className="docs-container min-h-screen">
             <DocsShell
                 pages={pages}
-                title="Documentation"
-                description="Learn how to install, configure, and use Memo CLI."
+                title={t('docs.title')}
+                description={t('docs.description')}
+                lang={lang}
             >
                 <section className="mb-10">
                     <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">
-                        Quick Start
+                        {t('docs.quickStart')}
                     </h2>
                     <div className="grid gap-3 md:grid-cols-3">
                         {quickStartGuides.map((guide) => (
                             <Link
                                 key={guide.slug}
-                                href={`/docs/${guide.slug}`}
+                                href={`${docsHref}/${guide.slug}`}
                                 className="group rounded-lg border border-[var(--border-default)] bg-[var(--bg-tertiary)] px-4 py-3 transition-colors hover:bg-[var(--bg-elevated)]"
                             >
                                 <div className="flex items-center justify-between">
@@ -65,7 +83,7 @@ export default async function DocsIndexPage() {
 
                 <section className="mb-10">
                     <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">
-                        All Guides
+                        {t('docs.allGuides')}
                     </h2>
                     <div className="grid gap-4 md:grid-cols-2">
                         {grouped.map((group) => (
@@ -80,7 +98,7 @@ export default async function DocsIndexPage() {
                                     {group.pages.map((page) => (
                                         <Link
                                             key={page.slug}
-                                            href={`/docs/${page.slug}`}
+                                            href={`${docsHref}/${page.slug}`}
                                             className="block rounded-md px-2 py-2 transition-colors hover:bg-[var(--bg-secondary)]"
                                         >
                                             <p className="text-sm font-medium text-[var(--text-primary)]">
@@ -99,14 +117,17 @@ export default async function DocsIndexPage() {
 
                 <section className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-tertiary)] p-5">
                     <h3 className="text-base font-semibold text-[var(--text-primary)]">
-                        Need help?
+                        {t('docs.needHelp.title')}
                     </h3>
                     <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                        Check troubleshooting or open an issue if something is unclear.
+                        {t('docs.needHelp.description')}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-3">
-                        <Link href="/docs/troubleshooting" className="btn-secondary text-sm">
-                            Troubleshooting
+                        <Link
+                            href={`${docsHref}/troubleshooting`}
+                            className="btn-secondary text-sm"
+                        >
+                            {t('docs.needHelp.troubleshooting')}
                         </Link>
                         <a
                             href="https://github.com/minorcell/memo-cli/issues"
@@ -114,7 +135,7 @@ export default async function DocsIndexPage() {
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
                         >
-                            Open an issue
+                            {t('docs.needHelp.openIssue')}
                             <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                     </div>

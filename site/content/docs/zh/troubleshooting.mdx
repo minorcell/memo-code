@@ -1,0 +1,148 @@
+---
+title: '故障排除'
+description: '常见运行时问题和实用修复。'
+order: 9
+category: 'Operations'
+---
+
+# 故障排除
+
+本页涵盖常见运行时问题和直接修复方法。
+
+## 缺少 API 密钥
+
+症状：
+
+- 错误如 `Missing env var ...`
+
+修复：
+
+1. 导出你的提供商 `env_api_key` 引用的环境变量。
+2. 检查 `config.toml` 中的 `current_provider` 和提供商条目。
+3. 从设置了环境变量的同一 shell 重启 Memo。
+
+## 纯文本模式无法执行风险工具
+
+症状：
+
+- 在管道模式下写入/执行操作被拒绝
+
+原因：
+
+- 纯文本模式没有交互式审批 UI
+
+修复：
+
+1. 运行交互式 TUI：`memo`
+2. 或在受控环境中使用 `memo --dangerous`
+3. 或保持任务只读
+
+## `grep_files` 失败因为缺少 `rg`
+
+症状：
+
+- `grep_files failed` 并显示 ripgrep 相关错误
+
+修复：
+
+- 安装 ripgrep（`rg`）并确保它在 PATH 中
+
+## 工具集看起来与预期不同
+
+检查环境开关：
+
+- `MEMO_SHELL_TOOL_TYPE`
+- `MEMO_EXPERIMENTAL_TOOLS`
+- `MEMO_ENABLE_MEMORY_TOOL`
+- `MEMO_ENABLE_COLLAB_TOOLS`
+
+非空的 `MEMO_EXPERIMENTAL_TOOLS` 仅启用列出的实验性工具。
+
+## 超出上下文限制
+
+症状：
+
+- 最终消息指示提示/上下文令牌超出限制
+
+修复：
+
+1. 使用 `/new` 重置会话上下文
+2. 缩小任务范围并分小块继续
+3. 如有需要，设置 `model_profiles.<model>.context_window`（或 `model_profiles."provider:model".context_window`）为更大的值
+
+## 会话中 MCP 服务器不可用
+
+症状：
+
+- `memo mcp list` 显示配置，但当前 TUI 会话未反映
+
+修复：
+
+1. 用 `/mcp` 检查
+2. 在 MCP 配置更改后创建新会话（`/new`）或重启 Memo
+
+## `memo mcp login/logout` 失败
+
+当前行为：
+
+- OAuth 登录/注销流程尚未实现
+
+修复：
+
+- 对远程 HTTP MCP 使用 `--bearer-token-env-var` 和导出的环境令牌
+
+## 子代理问题
+
+### `spawn_agent` 并发错误
+
+原因：
+
+- 运行子代理达到 `MEMO_SUBAGENT_MAX_AGENTS`
+
+修复：
+
+- 增加限制
+- 关闭已完成/未使用的代理
+- 减少并行分散
+
+### `send_input` 忙碌错误
+
+修复：
+
+- 等待当前提交完成，或
+- 使用 `interrupt=true` 发送
+
+### `wait` 持续超时
+
+修复：
+
+- 验证 `MEMO_SUBAGENT_COMMAND` 可执行
+- 增加 `timeout_ms`（有效范围 `10000` 到 `300000`）
+- 简化子代理任务范围
+
+## 工具输出被省略提示替换
+
+症状：
+
+- 工具结果被 `<system_hint ... tool_output_omitted ...>` 消息替换
+
+原因：
+
+- 工具输出超出 `MEMO_TOOL_RESULT_MAX_CHARS`
+
+修复：
+
+1. 缩小查询范围（路径、模式、限制）
+2. 将工作拆分为更小的调用
+3. 仅在必要时增加 `MEMO_TOOL_RESULT_MAX_CHARS`
+
+## `--once` 标志错误
+
+症状：
+
+- `--once has been removed`
+
+修复：
+
+- 交互模式使用 `memo`
+- 一次性纯文本模式使用 stdin 管道

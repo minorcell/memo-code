@@ -1,0 +1,80 @@
+---
+title: '会话与历史'
+description: '会话文件布局、恢复行为和本地历史管理。'
+order: 8
+category: 'Operations'
+---
+
+# 会话与历史
+
+Memo 将会话事件写入本地 JSONL 文件，用于恢复、调试和审计。
+
+## 存储位置
+
+默认基础目录：
+
+- `~/.memo/sessions/`
+
+如果设置了 `MEMO_HOME`：
+
+- `$MEMO_HOME/sessions/`
+
+项目范围结构：
+
+- `-<project_abs_path_flattened>/<YYYY-MM-DDTHH-MM-SS>-<sessionId>.jsonl`
+
+## JSONL 中的事件类型
+
+常见事件类型：
+
+- `session_start`（会话开始）
+- `turn_start`（轮次开始）
+- `assistant`（助手）
+- `action`（操作）
+- `observation`（观察）
+- `final`（最终）
+- `turn_end`（轮次结束）
+- `session_end`（会话结束）
+
+对于调试，`action` + `observation` + `final` 通常最有用。
+
+## TUI 中的恢复行为
+
+在输入中输入：
+
+- `resume`
+- `resume <keyword>`
+- `/resume`
+
+然后从建议中选择一个条目。
+
+当前行为：
+
+- 建议过滤为记录的 `cwd` 匹配当前工作目录的会话
+- 选择一个将历史对话上下文加载到当前会话
+- 当前活动会话文件从恢复建议中排除
+
+## 实用技巧
+
+- 在请他人调查行为时分享相关的 `.jsonl` 路径。
+- 如果上下文太大，使用 `/new` 重新开始。
+- 上下文窗口遵循模型配置（`context_window`），并在 `/models` 切换时重新应用。
+
+## 隐私说明
+
+会话日志可能包括：
+
+- 用户提示
+- 助手输出
+- 工具参数
+- 工具输出摘录
+
+在外部分享日志前请审查和编辑。
+
+## 可选清理
+
+示例清理命令：
+
+```bash
+find ~/.memo/sessions -type f -name '*.jsonl' -mtime +90 -delete
+```

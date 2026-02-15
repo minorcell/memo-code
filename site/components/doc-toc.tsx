@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DocSectionAnchor } from '@/components/docs-shell'
 import { ArrowUp } from 'lucide-react'
+import { useT } from './intl-provider'
 
 type DocTocProps = {
     sections: DocSectionAnchor[]
+    lang?: string
 }
 
 export function DocToc({ sections }: DocTocProps) {
+    const t = useT()
     const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
     const sectionIds = useMemo(() => sections.map((section) => section.id), [sections])
 
@@ -53,7 +56,7 @@ export function DocToc({ sections }: DocTocProps) {
             <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-auto">
                 <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4">
                     <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                        On this page
+                        {t('docs.onThisPage')}
                     </p>
                     <nav className="space-y-1">
                         {sections.map((section) => {
@@ -79,7 +82,7 @@ export function DocToc({ sections }: DocTocProps) {
                             className="inline-flex items-center gap-1.5 text-xs text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
                         >
                             <ArrowUp className="h-3.5 w-3.5" />
-                            Back to top
+                            {t('blog.breadcrumb.home')}
                         </a>
                     </div>
                 </div>

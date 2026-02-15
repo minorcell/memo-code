@@ -1,0 +1,86 @@
+---
+title: '开始使用'
+description: 'Memo CLI 的安装和首次运行设置。'
+order: 1
+category: 'Getting Started'
+---
+
+# 开始使用
+
+几分钟内完成 Memo 的设置：安装、配置 API 密钥，并运行你的第一个会话。
+
+## 前置条件
+
+- Node.js `>= 18`
+- 至少一个兼容的 API 密钥（例如 `DEEPSEEK_API_KEY` 或 `OPENAI_API_KEY`）
+
+## 安装
+
+```bash
+npm install -g @memo-code/memo
+# 或
+pnpm add -g @memo-code/memo
+# 或
+yarn global add @memo-code/memo
+# 或
+bun add -g @memo-code/memo
+```
+
+验证安装：
+
+```bash
+memo --version
+```
+
+## 配置 API 密钥
+
+运行时，Memo 会读取提供商配置的环境变量（`config` 中的 `env_api_key`）。
+
+示例：
+
+```bash
+export DEEPSEEK_API_KEY=your_key
+# 或
+export OPENAI_API_KEY=your_key
+```
+
+## 首次运行（推荐：TUI）
+
+以交互模式启动 Memo：
+
+```bash
+memo
+```
+
+首次运行时会发生什么：
+
+- 如果 Memo 可以使用现有的环境密钥配合默认提供商设置，它会自动写入 `~/.memo/config.toml`。
+- 否则，TUI 设置会要求输入提供商名称、密钥环境变量、模型和基础 URL，然后写入配置。
+
+## 纯文本模式（管道/脚本）
+
+当 stdin/stdout 不是 TTY 时，Memo 以纯文本模式运行。
+
+```bash
+echo "Summarize this repository structure" | memo
+```
+
+在脚本和 CI 中使用纯文本模式。对于交互式审批和更丰富的工作流，请使用 TUI 模式。
+
+## 危险模式
+
+跳过审批提示：
+
+```bash
+memo --dangerous
+# 或
+memo -d
+```
+
+仅在受信任的仓库和受控环境中使用此模式。
+
+## 下一步
+
+- 交互模型和快捷键：[CLI & TUI 指南](./cli-tui.md)
+- 提供商/MCP 设置详情：[配置](./configuration.md)
+- 工具功能和开关：[内置工具](./tools.md)

@@ -1,0 +1,217 @@
+---
+title: 'Implementing Multiline Text Editing in Terminal TUI: A通用 Solution Overcoming Ink Framework Limitations'
+description: 'With Ink lacking native textarea support, we break down a reusable multiline input implementation: state management, paste detection, and input adaptation.'
+date: '2026-02-12'
+order: 1
+---
+
+# Implementing Multiline Text Editing in Terminal TUI: A通用 Solution Overcoming Ink Framework Limitations
+
+## Problem Background
+
+When using React-based terminal UI frameworks like [Ink](https://github.com/vadimdemedes/ink), developers quickly encounter a core limitation: **Ink has no built-in multiline text input (textarea) component**. This problem is especially prominent in applications requiring complex input interactions, such as:
+
+- Code editors
+- Markdown editors
+- Chat application input fields
+- Configuration editors
+
+Traditional solutions either use external terminal editors (like vim/emacs) or accept single-line limitations. However, many scenarios require providing a smooth multiline editing experience **within the application**.
+
+## Solution Overview
+
+By analyzing memo'"'"'s implementation, we'"'"'ve summarized a general-purpose multiline text editing solution consisting of three core modules:
+
+### 1. Editor State Management Layer
+
+- **Core data structure**: `{value: string, cursor: number}` storing text and cursor position
+- **Cursor movement algorithm**: Properly handling Unicode surrogate pairs and cursor boundary detection
+- **Line operations**: Supporting cross-line cursor movement and row/column position memory
+
+### 2. Paste Detection Engine
+
+- **Time-based heuristic algorithm**: Identifying paste behavior based on input interval
+- **Multilingual support**: Differentiating handling strategies for ASCII and non-ASCII characters
+- **State machine design**: State transitions of pending → active → flush
+
+### 3. Input Processing Adapter
+
+- **Shortcut system**: Standard editor shortcuts like Ctrl+A/E/U/K/W
+- **Multiline commit strategy**: Shift+Enter inserts new line, Enter smart commits
+- **Visual line wrapping calculation**: Terminal width adaptation independent from logical line wrapping
+
+## Key Technical Implementations
+
+### Unicode-Aware Cursor Calculation
+
+```typescript
+// Key algorithm: Safe cursor boundary clamping
+function clampCursorToBoundary(value: string, cursor: number): number {
+    if (value.length === 0) return 0
+    const normalized = Math.floor(cursor)
+    const current = value.charCodeAt(normalized)
+    const previous = value.charCodeAt(normalized - 1)
+
+    // Handle Unicode surrogate pairs (like emojis)
+    if (isLowSurrogate(current) && isHighSurrogate(previous)) {
+        return normalized - 1
+    }
+    return normalized
+}
+```
+
+### Paste Detection State Machine
+
+```typescript
+// Core logic for paste detection
+class PasteBurst {
+    // State transitions:
+    // 1. Single char -> pendingFirstChar (wait for confirmation)
+    // 2. Fast multiple chars -> active (paste state)
+    // 3. Timeout -> flush (end processing)
+
+    onPlainChar(ch: string, nowMs: number): PasteBurstCharDecision {
+        if (this.active) {
+            return { type: 'buffer_append' }
+        }
+
+        if (this.consecutivePlainChars >= this.minChars) {
+            return { type: 'begin_buffer', retroChars: this.consecutivePlainChars - 1 }
+        }
+
+        // ... state transition logic
+    }
+}
+```
+
+### Multiline Navigation Algorithm
+
+```typescript
+// Core of vertical cursor movement: maintaining column position memory
+function moveCursorVertical(
+    value: string,
+    cursor: number,
+    direction: 'up' | 'down',
+    preferredColumn?: number,
+): VerticalCursorMove {
+    const currentStart = lineStart(value, cursor)
+    const currentColumn = cursor - currentStart
+    const targetColumn = preferredColumn ?? currentColumn
+
+    // Calculate cursor position on target line
+    if (direction === 'up') {
+        const previousEnd = currentStart - 1
+        const previousStart = lineStart(value, previousEnd)
+        const nextCursor = Math.min(previousStart + targetColumn, previousEnd)
+        return { cursor: nextCursor, preferredColumn: targetColumn }
+    }
+
+    // ... logic for downward movement
+}
+```
+
+## Paste Detection Heuristic Rules
+
+### Rule 1: Time Interval Detection (Primary Mechanism)
+
+- **Threshold**: Character arrival interval < 8ms considered paste
+- **Principle**: Human typing speed is typically < 100ms/character, paste is typically < 5ms/character
+- **Advantage**: High accuracy for ASCII text
+
+### Rule 2: Character Count Detection (Fallback Mechanism)
+
+- **Threshold**: ≥ 16 consecutive characters (regardless of time interval)
+- **Application scenarios**: Chinese input, emoji paste, etc. non-ASCII content
+- **Principle**: Long strings are likely paste rather than character-by-character input
+
+### Rule 3: Space Detection (Auxiliary Mechanism)
+
+- **Condition**: Text contains spaces
+- **Purpose**: Combined with Rule 1 to improve accuracy
+
+### Behavior Pattern Recognition
+
+| Input Pattern             | Recognized As | Handling                         |
+| ------------------------- | -------------- | -------------------------------- |
+| `a` (interval > 8ms)      | Normal input   | Insert directly                  |
+| `abc` (interval < 8ms)    | Paste          | Buffer then batch insert         |
+| `你好世界` (Chinese)      | Possible paste | Treat as paste when length ≥ 16  |
+| `Shift+Enter`             | New line insert| Insert `\n`                     |
+| `Enter` (during paste)   | New line insert| Insert `\n` instead of submit   |
+
+## Multiline Editing Implementation Strategies
+
+### Strategy 1: Separate Logical Lines from Visual Lines
+
+- **Logical lines**: Real line structure separated by `\n`
+- **Visual lines**: Automatic line wrapping based on terminal width
+- **Advantage**: Supports editing long paragraphs while maintaining consistent editing experience
+
+### Strategy 2: Column Position Memory
+
+- Cursor stays in the same column during vertical movement
+- When target line is shorter, cursor stays at line end
+- Provides natural experience similar to modern editors
+
+### Strategy 3: Smart Line Wrap Commit
+
+- **Shift+Enter**: Always inserts new line
+- **Enter**: Inserts new line during paste, otherwise submits
+- **Post-paste window**: Enter still inserts new line within a short time window
+
+## Reusable Design Patterns
+
+### 1. State-First Design
+
+Separating editing state (text, cursor, paste state) from UI rendering, facilitating:
+
+- State serialization/deserialization
+- Undo/redo feature extension
+- Unit test writing
+
+### 2. Configurable Heuristic Parameters
+
+```typescript
+interface PasteDetectionConfig {
+    charIntervalMs: number // Default: 8ms
+    minChars: number // Default: 3 characters
+    enterSuppressWindowMs: number // Default: 120ms
+    // ... adjustable based on application scenarios
+}
+```
+
+### 3. Plugin-Based Shortcut System
+
+Designing shortcut handling as plugins, supporting:
+
+- Custom shortcut mappings
+- Context-aware shortcuts
+- Shortcut conflict resolution
+
+### 4. Responsive Line Wrapping Calculation
+
+```typescript
+// Real-time line wrapping based on terminal width
+function getWrappedCursorLayout(
+    value: string,
+    cursor: number,
+    columns: number,
+): WrappedCursorLayout {
+    // Dynamically calculate line wrap positions
+    // 支持终端resize事件
+}
+```
+
+## 结论
+
+通过 memo 的实践，我们证明了在 Ink 等终端UI框架中实现高质量多行文本编辑是完全可行的。核心在于：
+
+1. **正确的抽象层次**：将编辑逻辑与UI渲染分离
+2. **智能的启发式算法**：基于输入模式的智能识别
+3. **用户为中心的设计**：符合终端用户习惯的快捷键和操作
+
+这套解决方案不仅适用于 memo，也可为其他需要终端多行编辑的项目提供参考。通过模块化的设计，开发者可以按需选择组件集成到自己的应用中。
+
+---
+
+_本文基于 [memo](https://github.com/minorcell/memo-code) 项目的实现分析，相关代码可在 `packages/tui/src/bottom_pane/` 目录下查看。_

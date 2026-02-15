@@ -1,0 +1,269 @@
+---
+title: 'Memo Code Security Design: Unified Approach for Subprocess Protection, Command Guarding, and Permission Approval'
+description: 'Extracted from memo'"'"'s practice: three lines of defense—subprocess management to prevent memory leaks and resource exhaustion, command guard to intercept dangerous operations, and approval system to balance permission and experience. Plus the "double-edged sword"—dangerous mode.'
+date: '2026-02-14'
+order: 4
+---
+
+When building tools like Agents that can "do work on behalf of users," security is an unavoidable challenge.
+
+When I first built memo ([https://github.com/minorcell/memo-code](https://github.com/minorcell/memo-code)), I didn'"'"'t think much about security—getting it to work was enough. But as I added more tools and shell commands became more complex, I started hitting issues:
+
+- Forgetting to close child processes, memory gradually increasing
+- Almost running `rm -rf /` for real
+- Having to click approve for every execution, ruining the user experience
+
+These problems forced me to carefully design a complete security solution. Today I'"'"'m sharing the approach and implementation details, hoping they'"'"'ll help you.
+
+## Clarifying First: What Problems Does Security Design Need to Solve?
+
+I broke it down into three things:
+
+1. **Resource controllability**: Subprocesses can'"'"'t be opened unlimitedly or forgotten to close
+2. **Operation safety**: Dangerous commands must be blocked, accidental operations need a buffer
+3. **Permission balance**: Block what should be blocked, let through what should be allowed, and provide users a "backdoor"
+
+Below, I break each down.
+
+## First Line of Defense: Subprocess Management — Preventing Memory Leaks and Resource Exhaustion
+
+memo uses Node.js `child_process.spawn` for shell execution, but spawn alone isn'"'"'t enough—you also need to manage it.
+
+### Unified Session Manager
+
+I wrote an `UnifiedExecManager` (`packages/tools/src/tools/exec_runtime.ts`), with the core idea being **singleton + session pool**:
+
+```typescript
+class UnifiedExecManager {
+    private sessions = new Map<number, SessionState>()
+    private nextId = 1
+    private MAX_SESSIONS = 64
+}
+```
+
+The benefits are clear:
+
+- All child processes have unique IDs
+- Can query status, send signals, and get output at any time
+- Resource recovery has a unified entry point
+
+### Resource Limits: Count + Memory + Time
+
+First, count limits:
+
+```typescript
+async start(request: StartExecRequest) {
+    this.cleanupSessions()
+    if (this.activeSessionCount() >= MAX_SESSIONS) {
+        throw new Error(`too many active sessions (max ${MAX_SESSIONS})`)
+    }
+    // ...
+}
+```
+
+If more than 64 active sessions exist, reject directly to prevent LLM from maliciously exhausting system resources.
+
+Next, output limits. Agent interaction is token-based; subprocess output can'"'"'t be returned unlimitedly:
+
+```typescript
+function truncateByTokens(text: string, maxOutputTokens?: number) {
+    const maxChars = (maxOutputTokens || 2000) * 4
+    if (text.length <= maxChars) {
+        return { output: text, deliveredChars: text.length }
+    }
+    return {
+        output: text.slice(0, maxChars),
+        deliveredChars: maxChars,
+    }
+}
+```
+
+Default maximum is 8000 characters—adjustable if needed, but never unlimited.
+
+### Timeout Termination: SIGTERM → SIGKILL
+
+Subprocesses running away is a common issue. memo'"'"'s strategy is **polite first, then forceful**:
+
+```typescript
+private async terminateForTimeout(session: SessionState) {
+    if (session.exited) return
+    session.proc.kill('SIGTERM')
+    await waitForExit(session, 200)  // Wait 200ms
+    if (!session.exited) {
+        session.proc.kill('SIGKILL')  // Still not exited, kill directly
+        await waitForExit(session, 200)
+    }
+}
+```
+
+Why wait? Because some programs perform cleanup upon receiving SIGTERM (like writing cache, closing handles). Direct SIGKILL may cause data loss.
+
+### Memory Leak Protection: Auto-cleanup of Exited Sessions
+
+Sessions can'"'"'t only increase, never decrease. I added an auto-cleanup logic:
+
+```typescript
+private cleanupSessions() {
+    if (this.sessions.size <= MAX_SESSIONS) return
+    // Prioritize cleaning exited, sorted by startup time earliest to latest
+    const ended = Array.from(this.sessions.values())
+        .filter(session => session.exited)
+        .sort((a, b) => a.startedAtMs - b.startedAtMs)
+
+    for (const session of ended) {
+        if (this.sessions.size <= MAX_SESSIONS) break
+        this.sessions.delete(session.id)
+    }
+}
+```
+
+This way, even after running hundreds of commands, memory won'"'"'t grow indefinitely.
+
+## Second Line of Defense: Command Guard — Intercepting Dangerous Operations
+
+Managing subprocesses isn'"'"'t enough—you also need to control **what commands run**.
+
+I'"'"'ve seen too many "rm -rf /" disasters, and operations like `dd if=/dev/zero of=/dev/sda` that cause irreversible physical damage. memo'"'"'s approach is **command parsing + blacklist matching**.
+
+### Command Parsing: More Than String Matching
+
+Direct regex matching for `rm -rf` has vulnerabilities. For example, `sudo rm -rf /`, wrapped in `bash -c`, or even written in hex—all can bypass simple matching.
+
+memo'"'"'s approach is **first split the command into "segments," then parse each segment**:
+
+```typescript
+function splitCommandSegments(command: string) {
+    // Split by ; | && || , handle quotes and escapes
+    // Return each independent command segment
+}
+
+function parseSegment(segment: string) {
+    // Skip wrappers like sudo/env/nohup
+    // Extract actual command name and arguments
+}
+```
+
+No matter how many layers of `sudo env bash -c` are outside, the actual command can always be traced.
+
+### Dangerous Command Blacklist
+
+Currently, memo intercepts these categories (`packages/tools/src/tools/command_guard.ts`):
+
+| Rule                           | Trigger Condition                                       | Danger Level |
+| ------------------------------ | ------------------------------------------------------- | ------------ |
+| `rm_recursive_critical_target` | `rm -rf` target contains `/`, `~`, `$HOME`, etc.      | Critical     |
+| `mkfs_filesystem_create`       | `mkfs`/`mkfs.xxx`                                     | Critical     |
+| `dd_write_block_device`        | `dd` writing to block devices under `/dev/`          | Critical     |
+| `disk_mutation_block_device`  | `fdisk`/`parted/`shred` etc. operating block devices  | High         |
+| `redirect_block_device`       | Output redirection to `/dev/` block devices            | High         |
+
+What'"'"'s returned after interception is a `<system_hint>` tag, not a direct error, making it easier for Agents to understand why they were blocked:
+
+```xml
+<system_hint type="tool_call_denied"
+    tool="exec_command"
+    reason="dangerous_command"
+    policy="blacklist"
+    rule="rm_recursive_critical_target"
+    command="rm -rf /">
+    Blocked a high-risk shell command to prevent irreversible data loss.
+    Use a safer and scoped alternative.
+</system_hint>
+```
+
+## Third Line of Defense: Approval System — Balancing Permission and Experience
+
+The command guard is the first checkpoint, but there are still "not dangerous but need to know" operations like writing files or modifying configs. The approval system'"'"'s goal is **hierarchical management, traceability, and configurability**.
+
+### Risk Classification
+
+memo classifies tools into three levels (`packages/tools/src/approval/constants.ts`):
+
+| Level     | Meaning      | Approval Strategy (auto mode) |
+| --------- | ------------ | ------------------------------ |
+| `read`    | Read-only   | No approval needed             |
+| `write`   | File modify | Approval required              |
+| `execute` | Execute cmd | Approval required              |
+
+### Approval Modes
+
+- **auto mode**: Read-only tools skip approval, write/execute tools need approval
+- **strict mode**: All tools need approval, none can run without it
+
+```typescript
+check(toolName: string, params: unknown): ApprovalCheckResult {
+    if (ALWAYS_AUTO_APPROVE_TOOLS.has(toolName)) {
+        return { needApproval: false, decision: 'auto-execute' }
+    }
+
+    const riskLevel = classifier.getRiskLevel(toolName)
+    if (!classifier.needsApproval(riskLevel, approvalMode)) {
+        return { needApproval: false, decision: 'auto-execute' }
+    }
+    // 生成指纹，返回需要审批
+}
+```
+
+### 审批记忆：一次批准，记住一整场
+
+如果每次执行都要点批准，用户体验会非常差。memo 用**指纹 + 缓存**解决这个问题：
+
+```typescript
+const fingerprint = generateFingerprint(toolName, params)
+cache.toolByFingerprint.set(fingerprint, toolName)
+
+// 审批后记录
+recordDecision(fingerprint, decision: 'session' | 'once' | 'deny') {
+    switch (decision) {
+        case 'session': cache.sessionTools.add(toolName); break
+        case 'once': cache.onceTools.add(toolName); break
+        case 'deny': cache.deniedTools.add(toolName); break
+    }
+}
+```
+
+- **session**：这场对话内一直有效
+- **once**：用一次就失效
+- **deny**：以后再问直接拦截
+
+## dangerous 模式
+
+审批系统是安全了，但有时候用户就是想要「无限制」——比如在本地开发、或者明确知道自己在干什么。
+
+memo 提供了 `dangerous` 模式：
+
+```typescript
+if (dangerous) {
+    return {
+        isDangerousMode: true,
+        getRiskLevel: () => 'read', // 所有操作都视为最低风险
+        check: () => ({ needApproval: false, decision: 'auto-execute' }),
+        isGranted: () => true,
+    }
+}
+```
+
+开启也很简单，CLI 里加上 `--dangerous` 标记：
+
+```bash
+memo --dangerous
+```
+
+开启后：
+
+- 所有工具都免审批
+
+**这是一把双刃剑。** 我在 CLI 里加了这个选项，但默认是关闭的。开发者如果想用，需要明确加上 `--dangerous` 标记。
+
+## 总结：三层防护 + 一个后门
+
+memo 的安全设计可以总结为：
+
+1. **子进程管理**：数量限制 + 输出截断 + 超时终止 + 自动清理
+2. **命令守卫**：命令解析 + 黑名单拦截 + stdin 检测
+3. **审批系统**：风险分级 + 审批模式 + 记忆缓存
+4. **dangerous 模式**：留一个「我知道我在干什么」的后门
+
+这套方案不完美，还在持续迭代。比如命令守卫目前是硬编码的黑名单，后续可以考虑支持用户自定义规则；审批系统也可以考虑接入外部信任模型。
+
+（完）
