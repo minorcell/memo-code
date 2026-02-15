@@ -114,7 +114,8 @@ async function runPlainMode(parsed: ParsedArgs) {
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        maxPromptTokens: contextWindow,
+        contextWindow,
+        autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
         activeMcpServers: loaded.config.active_mcp_servers,
         generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
@@ -197,7 +198,8 @@ async function runInteractiveTui(parsed: ParsedArgs) {
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        maxPromptTokens: contextWindow,
+        contextWindow,
+        autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
         activeMcpServers: loaded.config.active_mcp_servers,
         generateSessionTitle: true,
         dangerous: parsed.options.dangerous,

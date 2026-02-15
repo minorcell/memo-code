@@ -74,6 +74,7 @@ Location: `~/.memo/config.toml` (can be changed via `MEMO_HOME`).
 
 ```toml
 current_provider = "deepseek"
+auto_compact_threshold_percent = 80
 
 [[providers.deepseek]]
 name = "deepseek"
@@ -101,6 +102,12 @@ Context window policy:
 - priority 1: `model_profiles."provider:model".context_window`
 - priority 2: `model_profiles."<model>".context_window`
 - fallback: `120000`
+
+Auto compaction policy:
+
+- threshold: `auto_compact_threshold_percent` (default `80`)
+- trigger: estimated prompt tokens at step start reaches threshold
+- frequency: at most once per turn
 
 ### MCP Tool Configuration
 
@@ -266,11 +273,13 @@ memo-cli/
 - `/help`: show help and shortcut guide.
 - `/models`: list available Provider/Model entries and switch with Enter; also supports direct selection like `/models deepseek`.
 - `/review <prNumber>`: run GitHub PR review and publish review comments (uses active GitHub MCP server first, then falls back to `gh` CLI).
+- `/compact`: manually compact current session context.
 - `/mcp`: show configured MCP servers in current session.
 - `resume` history: type `resume` to list and load past sessions for current directory.
 - Exit and clear: `exit` / `/exit`, `Ctrl+L` for new session, `Esc Esc` to cancel current run or clear input.
 - **Tool approval**: risky operations open an approval dialog with `once`/`session`/`deny`.
 - **Approval reminder**: risky approval prompts ring a bell and attempt a desktop notification in interactive TUI.
+- **Context percent**: footer updates on each step (not just turn end), based on next-step prompt token estimate.
 
 > Session logs are written only when a session contains user messages, to avoid empty files.
 

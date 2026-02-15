@@ -32,12 +32,12 @@ function printHelp() {
     console.log(HELP_TEXT.trim())
 }
 
-function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown): string {
     if (error instanceof Error) return error.message
     return String(error)
 }
 
-function parseEnvAssignment(raw: string): { key: string; value: string } | null {
+export function parseEnvAssignment(raw: string): { key: string; value: string } | null {
     const index = raw.indexOf('=')
     if (index <= 0) return null
     const key = raw.slice(0, index).trim()

@@ -202,4 +202,55 @@ describe('apply_patch tool (direct replace)', () => {
         await rm(linkPath, { force: true })
         await rm(outside, { force: true })
     })
+
+    test('rejects when both edits and old_string/new_string provided', async () => {
+        const target = join(tempDir, 'both-modes.txt')
+        await writeFile(target, 'hello', 'utf8')
+
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            old_string: 'hello',
+            new_string: 'world',
+            edits: [{ old_string: 'foo', new_string: 'bar' }],
+        })
+
+        assertPatchError(result, 'Use either edits or old_string/new_string')
+    })
+
+    test('rejects when edits array is empty', async () => {
+        const target = join(tempDir, 'empty-edits.txt')
+        await writeFile(target, 'hello', 'utf8')
+
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            edits: [],
+        })
+
+        assertPatchError(result)
+    })
+
+    test('rejects when edits contains empty old_string', async () => {
+        const target = join(tempDir, 'empty-old-string.txt')
+        await writeFile(target, 'hello', 'utf8')
+
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            edits: [{ old_string: '', new_string: 'world' }],
+        })
+
+        assertPatchError(result, 'old_string cannot be empty')
+    })
+
+    test('rejects when old_string is empty string', async () => {
+        const target = join(tempDir, 'empty-old-string-single.txt')
+        await writeFile(target, 'hello', 'utf8')
+
+        const result = await applyPatchTool.execute({
+            file_path: target,
+            old_string: '',
+            new_string: 'world',
+        })
+
+        assertPatchError(result, 'old_string cannot be empty')
+    })
 })

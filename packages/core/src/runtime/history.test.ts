@@ -74,6 +74,37 @@ describe('JsonlHistorySink', () => {
         expect(parsed[2]?.type === 'final').toBe(true)
     })
 
+    test('writes context usage and context compact event types', async () => {
+        const sink = new JsonlHistorySink(filePath)
+        const events = [
+            createHistoryEvent({
+                sessionId: 's-context',
+                type: 'context_usage',
+                turn: 1,
+                step: 0,
+                meta: { phase: 'step_start', prompt_tokens: 123 },
+            }),
+            createHistoryEvent({
+                sessionId: 's-context',
+                type: 'context_compact',
+                turn: 1,
+                step: 0,
+                meta: { reason: 'auto', status: 'success', before_tokens: 123, after_tokens: 80 },
+            }),
+        ]
+
+        for (const event of events) {
+            await sink.append(event)
+        }
+        await sink.flush()
+
+        const lines = (await readFile(filePath, 'utf8')).trim().split('\n').filter(Boolean)
+        expect(lines).toHaveLength(2)
+        const parsed = lines.map((line) => JSON.parse(line) as { type?: string })
+        expect(parsed[0]?.type).toBe('context_usage')
+        expect(parsed[1]?.type).toBe('context_compact')
+    })
+
     test('flush returns resolved promise', async () => {
         const sink = new JsonlHistorySink(filePath)
         await expect(sink.flush()).resolves.toBeUndefined()

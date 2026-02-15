@@ -10,7 +10,7 @@ export default defineConfig({
             provider: 'v8',
             all: false,
             include: ['packages/*/src/**/*.{ts,tsx}'],
-            exclude: ['**/*.d.ts', '**/*.test.{ts,tsx}'],
+            exclude: ['**/*.d.ts', '**/*.test.{ts,tsx}', 'packages/core/src/types.ts'],
             reporter: ['text', 'lcov'],
             reportsDirectory: './coverage',
             thresholds: {

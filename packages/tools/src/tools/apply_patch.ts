@@ -102,7 +102,13 @@ export const applyPatchTool = defineMcpTool<ApplyPatchInput>({
     supportsParallelToolCalls: false,
     isMutating: true,
     execute: async (input) => {
-        const userPath = normalizePath(input.file_path)
+        const parsed = APPLY_PATCH_INPUT_SCHEMA.safeParse(input)
+        if (!parsed.success) {
+            const detail = parsed.error.issues[0]?.message ?? 'invalid input'
+            return textResult(`apply_patch invalid input: ${detail}`, true)
+        }
+        const validInput = parsed.data
+        const userPath = normalizePath(validInput.file_path)
 
         try {
             await access(userPath)

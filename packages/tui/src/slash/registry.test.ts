@@ -16,6 +16,7 @@ describe('slash registry', () => {
         const help = buildHelpText()
         assert.ok(help.includes('/help'))
         assert.ok(help.includes('/models'))
+        assert.ok(help.includes('/compact'))
         assert.ok(!help.includes('/context'))
     })
 
@@ -61,5 +62,10 @@ describe('slash registry', () => {
         const result = resolveSlashCommand('/review', context)
         assert.strictEqual(result.kind, 'message')
         assert.strictEqual(result.title, 'Review')
+    })
+
+    test('compact command resolves correctly', () => {
+        const result = resolveSlashCommand('/compact', context)
+        assert.strictEqual(result.kind, 'compact')
     })
 })

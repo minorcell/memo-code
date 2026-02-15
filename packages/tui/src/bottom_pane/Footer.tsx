@@ -5,14 +5,12 @@ type FooterProps = {
     busy: boolean
     pendingApproval?: boolean
     contextPercent: number
-    tokenLine?: string
 }
 
 export const Footer = memo(function Footer({
     busy,
     pendingApproval = false,
     contextPercent,
-    tokenLine,
 }: FooterProps) {
     const context = `${contextPercent.toFixed(1)}%`
     const helpText = pendingApproval
@@ -28,10 +26,7 @@ export const Footer = memo(function Footer({
                     <Text color="gray">{helpText}</Text>
                 )}
             </Box>
-            <Text color="gray">
-                {tokenLine ? `${tokenLine} • ` : ''}
-                context: {context}
-            </Text>
+            <Text color="gray">context: {context}</Text>
         </Box>
     )
 })

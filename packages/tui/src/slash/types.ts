@@ -1,5 +1,5 @@
 import type { ProviderConfig, MCPServerConfig } from '@memo/core'
-import type { ToolPermissionMode } from '../constants'
+import type { SlashCommandName, ToolPermissionMode } from '../constants'
 
 export type SlashContext = {
     configPath: string
@@ -17,9 +17,10 @@ export type SlashCommandResult =
     | { kind: 'review_pr'; prNumber: number }
     | { kind: 'switch_model'; provider: ProviderConfig }
     | { kind: 'set_tool_permission'; mode: ToolPermissionMode }
+    | { kind: 'compact' }
     | { kind: 'init_agents_md' }
 
 export type SlashSpec = {
-    name: string
+    name: SlashCommandName
     description: string
 }

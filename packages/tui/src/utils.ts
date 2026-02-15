@@ -1,5 +1,4 @@
 import path from 'node:path'
-import type { TokenUsage } from '@memo/core'
 import type { ToolActionStatus } from '@memo/tools/orchestrator'
 import { TOOL_STATUS, type ToolStatus } from './types'
 
@@ -22,11 +21,6 @@ export function calculateContextPercent(currentTokens: number, contextLimit: num
     if (!contextLimit || contextLimit <= 0) return 0
     if (!currentTokens || currentTokens <= 0) return 0
     return Math.min(100, (currentTokens / contextLimit) * 100)
-}
-
-export function formatTokenUsage(usage?: TokenUsage): string {
-    if (!usage) return ''
-    return `tokens: ${usage.total} (prompt ${usage.prompt} / completion ${usage.completion})`
 }
 
 export function truncate(input: string, max = 80): string {

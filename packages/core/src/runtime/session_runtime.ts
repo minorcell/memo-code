@@ -2,12 +2,20 @@
 import { randomUUID } from 'node:crypto'
 import { createHistoryEvent } from '@memo/core/runtime/history'
 import { buildThinking } from '@memo/core/utils/utils'
+import {
+    buildCompactionUserPrompt,
+    CONTEXT_COMPACTION_SYSTEM_PROMPT,
+    CONTEXT_SUMMARY_PREFIX,
+    isContextSummaryMessage,
+} from '@memo/core/runtime/compact_prompt'
 import type {
     ChatMessage,
     AgentSession,
     AgentSessionDeps,
     AgentSessionOptions,
     AgentStepTrace,
+    CompactReason,
+    CompactResult,
     HistoryEvent,
     HistorySink,
     ParsedAssistant,
@@ -33,7 +41,7 @@ import {
     type ToolActionResult,
 } from '@memo/tools/orchestrator'
 import {
-    DEFAULT_MAX_PROMPT_TOKENS,
+    DEFAULT_CONTEXT_WINDOW,
     DEFAULT_SESSION_MODE,
     SESSION_TITLE_SYSTEM_PROMPT,
     TOOL_ACTION_SUCCESS_STATUS,
@@ -54,6 +62,9 @@ import {
     toToolHistoryMessage,
 } from '@memo/core/runtime/session_runtime_helpers'
 import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
+
+const DEFAULT_AUTO_COMPACT_THRESHOLD_PERCENT = 80
+const COMPACT_USER_MESSAGE_MAX_TOKENS = 20_000
 
 /** In-process conversation Session, implements multi-turn execution and log writing. */
 export class AgentSessionImpl implements AgentSession {
@@ -133,6 +144,241 @@ export class AgentSessionImpl implements AgentSession {
                 preview.length >= 200 ? '…' : ''
             }）。请确认是否陷入循环，必要时直接给出最终回答或调整参数。`
             this.history.push({ role: 'system', content: warning })
+        }
+    }
+
+    private resolveContextWindow(): number {
+        const configured = this.options.contextWindow
+        if (typeof configured === 'number' && Number.isFinite(configured) && configured > 0) {
+            return Math.floor(configured)
+        }
+        return DEFAULT_CONTEXT_WINDOW
+    }
+
+    private resolveAutoCompactThresholdPercent(): number {
+        const configured = this.options.autoCompactThresholdPercent
+        if (
+            typeof configured === 'number' &&
+            Number.isInteger(configured) &&
+            Number.isFinite(configured) &&
+            configured >= 1 &&
+            configured <= 100
+        ) {
+            return configured
+        }
+        return DEFAULT_AUTO_COMPACT_THRESHOLD_PERCENT
+    }
+
+    private resolveThresholdTokens(contextWindow: number): number {
+        const threshold = Math.floor(
+            (contextWindow * this.resolveAutoCompactThresholdPercent()) / 100,
+        )
+        return Math.max(1, threshold)
+    }
+
+    private calculateUsagePercent(promptTokens: number, contextWindow: number): number {
+        if (promptTokens <= 0 || contextWindow <= 0) return 0
+        return Math.round((promptTokens / contextWindow) * 10_000) / 100
+    }
+
+    private async emitContextUsage(
+        turn: number,
+        step: number,
+        promptTokens: number,
+        contextWindow: number,
+        thresholdTokens: number,
+        phase: 'turn_start' | 'step_start' | 'post_compact',
+    ) {
+        const usagePercent = this.calculateUsagePercent(promptTokens, contextWindow)
+        await this.emitEvent('context_usage', {
+            turn,
+            step,
+            meta: {
+                phase,
+                prompt_tokens: promptTokens,
+                context_window: contextWindow,
+                threshold_tokens: thresholdTokens,
+                usage_percent: usagePercent,
+            },
+        })
+        await runHook(this.hooks, 'onContextUsage', {
+            sessionId: this.id,
+            turn,
+            step,
+            promptTokens,
+            contextWindow,
+            thresholdTokens,
+            usagePercent,
+            phase,
+        })
+    }
+
+    private async emitContextCompacted(turn: number, step: number, result: CompactResult) {
+        await this.emitEvent('context_compact', {
+            turn,
+            step,
+            content: result.summary,
+            meta: {
+                reason: result.reason,
+                status: result.status,
+                before_tokens: result.beforeTokens,
+                after_tokens: result.afterTokens,
+                threshold_tokens: result.thresholdTokens,
+                reduction_percent: result.reductionPercent,
+                error_message: result.errorMessage,
+            },
+        })
+        await runHook(this.hooks, 'onContextCompacted', {
+            sessionId: this.id,
+            turn,
+            step,
+            reason: result.reason,
+            status: result.status,
+            beforeTokens: result.beforeTokens,
+            afterTokens: result.afterTokens,
+            thresholdTokens: result.thresholdTokens,
+            reductionPercent: result.reductionPercent,
+            summary: result.summary,
+            errorMessage: result.errorMessage,
+        })
+    }
+
+    private buildCompactedHistory(summary: string): ChatMessage[] {
+        const systemMessage = this.history[0]?.role === 'system' ? this.history[0] : undefined
+        const historyWithoutSystem = systemMessage ? this.history.slice(1) : this.history
+        const userMessages = historyWithoutSystem
+            .filter(
+                (message): message is ChatMessage & { role: 'user' } =>
+                    message.role === 'user' && !isContextSummaryMessage(message),
+            )
+            .map((message) => message.content)
+        const retainedUserMessages = this.selectCompactionUserMessages(userMessages).map(
+            (content) => ({ role: 'user', content }) as ChatMessage,
+        )
+        const summaryMessage: ChatMessage = {
+            role: 'user',
+            content: `${CONTEXT_SUMMARY_PREFIX}\n${summary}`,
+        }
+
+        if (systemMessage) {
+            return [systemMessage, ...retainedUserMessages, summaryMessage]
+        }
+        return [...retainedUserMessages, summaryMessage]
+    }
+
+    private selectCompactionUserMessages(messages: string[]): string[] {
+        if (!messages.length) {
+            return []
+        }
+
+        const selected: string[] = []
+        let remaining = COMPACT_USER_MESSAGE_MAX_TOKENS
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const message = messages[i]
+            if (!message) {
+                continue
+            }
+
+            const tokens = this.tokenCounter.countText(message)
+            if (tokens <= remaining) {
+                selected.push(message)
+                remaining = Math.max(0, remaining - tokens)
+                if (remaining === 0) {
+                    break
+                }
+                continue
+            }
+
+            if (remaining > 0) {
+                selected.push(message.slice(0, remaining))
+            }
+            break
+        }
+
+        selected.reverse()
+        return selected
+    }
+
+    private normalizeCompactionSummary(raw: string): string {
+        const withoutThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+        const normalized = (withoutThink || raw).replace(/\n{3,}/g, '\n\n').trim()
+        return normalized
+    }
+
+    private async compactHistoryInternal(
+        reason: CompactReason,
+        turn: number,
+        step: number,
+    ): Promise<CompactResult> {
+        const contextWindow = this.resolveContextWindow()
+        const thresholdTokens = this.resolveThresholdTokens(contextWindow)
+        const beforeTokens = this.tokenCounter.countMessages(this.history)
+        const systemMessage = this.history[0]?.role === 'system' ? this.history[0] : undefined
+        const historyWithoutSystem = systemMessage ? this.history.slice(1) : this.history.slice()
+
+        if (!historyWithoutSystem.length) {
+            const skipped: CompactResult = {
+                reason,
+                status: 'skipped',
+                beforeTokens,
+                afterTokens: beforeTokens,
+                thresholdTokens,
+                reductionPercent: 0,
+            }
+            await this.emitContextCompacted(turn, step, skipped)
+            return skipped
+        }
+
+        try {
+            const response = await this.deps.callLLM(
+                [
+                    { role: 'system', content: CONTEXT_COMPACTION_SYSTEM_PROMPT },
+                    { role: 'user', content: buildCompactionUserPrompt(historyWithoutSystem) },
+                ],
+                undefined,
+                { tools: [] },
+            )
+            const normalized = normalizeLLMResponse(response)
+            const summary = this.normalizeCompactionSummary(normalized.textContent)
+            if (!summary) {
+                throw new Error('Compaction model returned an empty summary.')
+            }
+
+            const compactedHistory = this.buildCompactedHistory(summary)
+            const afterTokens = this.tokenCounter.countMessages(compactedHistory)
+            this.history.splice(0, this.history.length, ...compactedHistory)
+
+            const reductionPercent =
+                beforeTokens > 0
+                    ? Math.max(
+                          0,
+                          Math.round(((beforeTokens - afterTokens) / beforeTokens) * 10_000) / 100,
+                      )
+                    : 0
+
+            const result: CompactResult = {
+                reason,
+                status: 'success',
+                beforeTokens,
+                afterTokens,
+                thresholdTokens,
+                reductionPercent,
+                summary,
+            }
+            await this.emitContextCompacted(turn, step, result)
+            return result
+        } catch (err) {
+            const result: CompactResult = {
+                reason,
+                status: 'failed',
+                beforeTokens,
+                afterTokens: beforeTokens,
+                thresholdTokens,
+                reductionPercent: 0,
+                errorMessage: (err as Error).message,
+            }
+            await this.emitContextCompacted(turn, step, result)
+            return result
         }
     }
 
@@ -240,7 +486,10 @@ export class AgentSessionImpl implements AgentSession {
         const steps: AgentStepTrace[] = []
         const turnUsage = emptyUsage()
         const turnStartedAt = Date.now()
-        const effectiveMaxPromptTokens = this.options.maxPromptTokens ?? DEFAULT_MAX_PROMPT_TOKENS
+        const contextWindow = this.resolveContextWindow()
+        const thresholdTokens = this.resolveThresholdTokens(contextWindow)
+        const autoCompactThresholdPercent = this.resolveAutoCompactThresholdPercent()
+        let autoCompactedThisTurn = false
 
         if (!this.sessionStartEmitted) {
             const systemPrompt =
@@ -253,7 +502,8 @@ export class AgentSessionImpl implements AgentSession {
                     cwd: process.cwd(),
                     tokenizer: this.tokenCounter.model,
                     warnPromptTokens: this.options.warnPromptTokens,
-                    maxPromptTokens: effectiveMaxPromptTokens,
+                    contextWindow,
+                    autoCompactThresholdPercent,
                     toolPermissionMode: this.toolPermissionMode,
                 },
             })
@@ -277,6 +527,14 @@ export class AgentSessionImpl implements AgentSession {
                 promptTokens,
                 history: snapshotHistory(this.history),
             })
+            await this.emitContextUsage(
+                turn,
+                0,
+                promptTokens,
+                contextWindow,
+                thresholdTokens,
+                'turn_start',
+            )
             if (this.options.generateSessionTitle) {
                 await this.maybeGenerateSessionTitle(turn, input, abortController.signal)
             }
@@ -290,8 +548,31 @@ export class AgentSessionImpl implements AgentSession {
 
             // ReAct 主循环
             for (let step = 0; ; step++) {
-                const estimatedPrompt = this.tokenCounter.countMessages(this.history)
-                if (estimatedPrompt > effectiveMaxPromptTokens) {
+                let estimatedPrompt = this.tokenCounter.countMessages(this.history)
+                await this.emitContextUsage(
+                    turn,
+                    step,
+                    estimatedPrompt,
+                    contextWindow,
+                    thresholdTokens,
+                    'step_start',
+                )
+
+                if (!autoCompactedThisTurn && estimatedPrompt >= thresholdTokens) {
+                    autoCompactedThisTurn = true
+                    await this.compactHistoryInternal('auto', turn, step)
+                    estimatedPrompt = this.tokenCounter.countMessages(this.history)
+                    await this.emitContextUsage(
+                        turn,
+                        step,
+                        estimatedPrompt,
+                        contextWindow,
+                        thresholdTokens,
+                        'post_compact',
+                    )
+                }
+
+                if (estimatedPrompt > contextWindow) {
                     const limitMessage = `Context tokens (${estimatedPrompt}) exceed the limit. Please shorten the input or restart the session.`
                     this.history.push({ role: 'assistant', content: limitMessage })
                     status = 'prompt_limit'
@@ -911,6 +1192,10 @@ export class AgentSessionImpl implements AgentSession {
             this.cancelling = true
             this.currentAbortController.abort()
         }
+    }
+
+    async compactHistory(reason: CompactReason = 'manual'): Promise<CompactResult> {
+        return this.compactHistoryInternal(reason, this.turnIndex, 0)
     }
 
     listToolNames() {

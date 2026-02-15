@@ -2,8 +2,12 @@
 import assert from 'node:assert'
 import { describe, test } from 'vitest'
 import { createAgentSession, createTokenCounter } from '@memo/core'
-import type { HistoryEvent, LLMResponse } from '@memo/core'
+import type { ChatMessage, HistoryEvent, LLMResponse, TokenCounter } from '@memo/core'
 import type { Tool } from '@memo/tools/router'
+import {
+    CONTEXT_COMPACTION_SYSTEM_PROMPT,
+    CONTEXT_SUMMARY_PREFIX,
+} from '@memo/core/runtime/compact_prompt'
 
 const echoTool: Tool = {
     name: 'echo',
@@ -69,6 +73,42 @@ function endTurnResponse(text: string = 'done'): LLMResponse {
         content: [{ type: 'text' as const, text }],
         stop_reason: 'end_turn',
     }
+}
+
+function createLengthTokenCounter(): TokenCounter {
+    return {
+        model: 'test-length-counter',
+        countText: (text: string) => text.length,
+        countMessages: (messages) =>
+            messages.reduce((sum, message) => sum + message.content.length, 0),
+        dispose: () => {},
+    }
+}
+
+function hasInvalidToolProtocol(messages: ChatMessage[]): boolean {
+    let pendingToolCallIds = new Set<string>()
+    for (const message of messages) {
+        if (pendingToolCallIds.size > 0) {
+            if (message.role !== 'tool') {
+                return true
+            }
+            if (!pendingToolCallIds.has(message.tool_call_id)) {
+                return true
+            }
+            pendingToolCallIds.delete(message.tool_call_id)
+            continue
+        }
+
+        if (message.role === 'assistant' && message.tool_calls?.length) {
+            pendingToolCallIds = new Set(message.tool_calls.map((toolCall) => toolCall.id))
+            continue
+        }
+
+        if (message.role === 'tool') {
+            return true
+        }
+    }
+    return pendingToolCallIds.size > 0
 }
 
 describe('session hooks & middleware', () => {
@@ -604,6 +644,277 @@ describe('session hooks & middleware', () => {
             const result = await session.runTurn('unknown')
             assert.strictEqual(result.status, 'ok')
             assert.strictEqual(result.finalText, '{"tool":"unknown","input":{}}')
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('emits context usage hooks at turn start and each step', async () => {
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'x' }),
+            endTurnResponse('done'),
+        ]
+        const phases: string[] = []
+
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+                hooks: {
+                    onContextUsage: ({ phase, step }) => {
+                        phases.push(`${phase}:${step}`)
+                    },
+                },
+            },
+            { contextWindow: 1_000_000 },
+        )
+        try {
+            const result = await session.runTurn('question')
+            assert.strictEqual(result.finalText, 'done')
+            assert.ok(phases.includes('turn_start:0'))
+            assert.ok(phases.includes('step_start:0'))
+            assert.ok(phases.includes('step_start:1'))
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('auto compaction is triggered at threshold and runs at most once per turn', async () => {
+        const outputs: LLMResponse[] = [
+            toolUseResponse('action-1', 'echo', { text: 'x' }),
+            toolUseResponse('action-2', 'echo', { text: 'y' }),
+            endTurnResponse('done'),
+        ]
+        let autoCompactionCalls = 0
+
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool },
+                callLLM: async (messages, _onChunk, options) => {
+                    const isCompactionCall =
+                        messages[0]?.role === 'system' &&
+                        messages[0].content === CONTEXT_COMPACTION_SYSTEM_PROMPT &&
+                        Array.isArray(options?.tools) &&
+                        options.tools.length === 0
+                    if (isCompactionCall) {
+                        autoCompactionCalls += 1
+                        return endTurnResponse('checkpoint')
+                    }
+                    return outputs.shift() ?? endTurnResponse('done')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+                requestApproval: async () => 'once',
+            },
+            {
+                contextWindow: 10_000,
+                autoCompactThresholdPercent: 1,
+            },
+        )
+        try {
+            const result = await session.runTurn('auto compact please '.repeat(20))
+            assert.strictEqual(result.status, 'ok')
+            assert.strictEqual(result.finalText, 'done')
+            assert.strictEqual(autoCompactionCalls, 1)
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('manual and auto compaction share the same engine', async () => {
+        let compactionCalls = 0
+        const compactedReasons: string[] = []
+
+        const session = await createAgentSession(
+            {
+                callLLM: async (messages, _onChunk, options) => {
+                    const isCompactionCall =
+                        messages[0]?.role === 'system' &&
+                        messages[0].content === CONTEXT_COMPACTION_SYSTEM_PROMPT &&
+                        Array.isArray(options?.tools) &&
+                        options.tools.length === 0
+                    if (isCompactionCall) {
+                        compactionCalls += 1
+                        return endTurnResponse(`summary-${compactionCalls}`)
+                    }
+                    return endTurnResponse('done')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+                hooks: {
+                    onContextCompacted: ({ reason }) => {
+                        compactedReasons.push(reason)
+                    },
+                },
+            },
+            {
+                contextWindow: 10_000,
+                autoCompactThresholdPercent: 1,
+            },
+        )
+
+        try {
+            const runResult = await session.runTurn('trigger auto compaction '.repeat(20))
+            assert.strictEqual(runResult.status, 'ok')
+
+            const manualResult = await session.compactHistory('manual')
+            assert.strictEqual(manualResult.status, 'success')
+
+            assert.strictEqual(compactionCalls, 2)
+            assert.ok(compactedReasons.includes('auto'))
+            assert.ok(compactedReasons.includes('manual'))
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('compaction failure keeps history intact and falls back to prompt_limit', async () => {
+        const compactStatuses: string[] = []
+        let regularLLMCalls = 0
+
+        const session = await createAgentSession(
+            {
+                callLLM: async (messages, _onChunk, options) => {
+                    const isCompactionCall =
+                        messages[0]?.role === 'system' &&
+                        messages[0].content === CONTEXT_COMPACTION_SYSTEM_PROMPT &&
+                        Array.isArray(options?.tools) &&
+                        options.tools.length === 0
+                    if (isCompactionCall) {
+                        throw new Error('compaction failed')
+                    }
+                    regularLLMCalls += 1
+                    return endTurnResponse('unexpected')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+                hooks: {
+                    onContextCompacted: ({ status }) => {
+                        compactStatuses.push(status)
+                    },
+                },
+            },
+            {
+                contextWindow: 200,
+                autoCompactThresholdPercent: 50,
+            },
+        )
+
+        try {
+            const result = await session.runTurn(
+                'this input is intentionally long enough '.repeat(8),
+            )
+            assert.strictEqual(result.status, 'prompt_limit')
+            assert.ok(result.finalText.includes('Context tokens'))
+            assert.ok(compactStatuses.includes('failed'))
+            assert.strictEqual(regularLLMCalls, 0)
+            assert.strictEqual(
+                session.history.some(
+                    (message) =>
+                        message.role === 'user' &&
+                        message.content.startsWith(`${CONTEXT_SUMMARY_PREFIX}\n`),
+                ),
+                false,
+            )
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('manual compaction rebuilds history with user-only context and summary', async () => {
+        const assistantToolCall = {
+            id: 'call_function_l5suo7l5etii_1',
+            type: 'function' as const,
+            function: {
+                name: 'exec_command',
+                arguments: '{}',
+            },
+        }
+        let sawCompactionCall = false
+
+        const session = await createAgentSession(
+            {
+                callLLM: async (messages, _onChunk, options) => {
+                    const isCompactionCall =
+                        messages[0]?.role === 'system' &&
+                        messages[0].content === CONTEXT_COMPACTION_SYSTEM_PROMPT &&
+                        Array.isArray(options?.tools) &&
+                        options.tools.length === 0
+                    if (isCompactionCall) {
+                        sawCompactionCall = true
+                        return endTurnResponse('compacted summary')
+                    }
+
+                    assert.strictEqual(hasInvalidToolProtocol(messages), false)
+                    return endTurnResponse('ok')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            { contextWindow: 120_000 },
+        )
+
+        try {
+            session.history.push(
+                { role: 'user', content: 'u1' },
+                { role: 'assistant', content: '', tool_calls: [assistantToolCall] },
+                {
+                    role: 'tool',
+                    content: 'tool-result',
+                    tool_call_id: assistantToolCall.id,
+                    name: 'exec_command',
+                },
+                { role: 'assistant', content: 'a1' },
+                { role: 'user', content: 'u2' },
+                { role: 'assistant', content: 'a2' },
+                { role: 'user', content: 'u3' },
+                { role: 'assistant', content: 'a3' },
+                { role: 'user', content: 'u4' },
+                { role: 'assistant', content: 'a4' },
+                { role: 'user', content: 'u5' },
+                { role: 'assistant', content: 'a5' },
+                { role: 'user', content: 'u6' },
+                { role: 'assistant', content: 'a6' },
+            )
+
+            const compactResult = await session.compactHistory('manual')
+            assert.strictEqual(compactResult.status, 'success')
+            assert.strictEqual(sawCompactionCall, true)
+            assert.strictEqual(hasInvalidToolProtocol(session.history), false)
+            assert.ok(
+                session.history.some(
+                    (message) =>
+                        message.role === 'user' &&
+                        message.content.startsWith(`${CONTEXT_SUMMARY_PREFIX}\n`),
+                ),
+                'summary message should be preserved in compacted history',
+            )
+            assert.strictEqual(
+                session.history.some((message) => message.role === 'tool'),
+                false,
+                'compacted history should drop tool result messages',
+            )
+            assert.strictEqual(
+                session.history.some(
+                    (message) =>
+                        message.role === 'assistant' &&
+                        Array.isArray(message.tool_calls) &&
+                        message.tool_calls.length > 0,
+                ),
+                false,
+                'compacted history should drop assistant tool-call messages',
+            )
+
+            const turnResult = await session.runTurn('continue')
+            assert.strictEqual(turnResult.status, 'ok')
+            assert.strictEqual(turnResult.finalText, 'ok')
         } finally {
             await session.close()
         }

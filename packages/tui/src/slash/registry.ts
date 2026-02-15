@@ -17,6 +17,7 @@ export const SLASH_SPECS: SlashSpec[] = [
         name: SLASH_COMMANDS.TOOLS,
         description: 'Set tool permission mode (none/once/full)',
     },
+    { name: SLASH_COMMANDS.COMPACT, description: 'Compact conversation context now' },
     { name: SLASH_COMMANDS.MCP, description: 'Show configured MCP servers' },
     { name: SLASH_COMMANDS.INIT, description: 'Generate AGENTS.md with agent instructions' },
 ]
@@ -196,6 +197,9 @@ export function resolveSlashCommand(raw: string, context: SlashContext): SlashCo
                 mode: parsedMode,
             }
         }
+
+        case SLASH_COMMANDS.COMPACT:
+            return { kind: 'compact' }
 
         case SLASH_COMMANDS.MCP: {
             const names = Object.keys(context.mcpServers)

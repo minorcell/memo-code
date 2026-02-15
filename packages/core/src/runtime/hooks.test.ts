@@ -17,6 +17,8 @@ describe('buildHookRunners', () => {
 
         expect(runners).toEqual({
             onTurnStart: [],
+            onContextUsage: [],
+            onContextCompacted: [],
             onAction: [],
             onObservation: [],
             onFinal: [],
@@ -113,6 +115,8 @@ describe('runHook', () => {
     test('does nothing when no handlers registered', async () => {
         const runners = {
             onTurnStart: [],
+            onContextUsage: [],
+            onContextCompacted: [],
             onAction: [],
             onObservation: [],
             onFinal: [],
@@ -134,6 +138,8 @@ describe('runHook', () => {
         const handler = vi.fn()
         const runners = {
             onTurnStart: [handler],
+            onContextUsage: [],
+            onContextCompacted: [],
             onAction: [],
             onObservation: [],
             onFinal: [],
@@ -168,6 +174,8 @@ describe('runHook', () => {
         const runners = {
             onAction: [handler1, handler2, handler3],
             onTurnStart: [],
+            onContextUsage: [],
+            onContextCompacted: [],
             onObservation: [],
             onFinal: [],
             onApprovalRequest: [],
@@ -201,6 +209,8 @@ describe('runHook', () => {
         const runners = {
             onFinal: [syncHandler, asyncHandler],
             onTurnStart: [],
+            onContextUsage: [],
+            onContextCompacted: [],
             onAction: [],
             onObservation: [],
             onApprovalRequest: [],
@@ -231,6 +241,8 @@ describe('runHook', () => {
         const runners = {
             onObservation: [errorHandler, successHandler],
             onTurnStart: [],
+            onContextUsage: [],
+            onContextCompacted: [],
             onAction: [],
             onFinal: [],
             onApprovalRequest: [],

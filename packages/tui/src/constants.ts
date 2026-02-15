@@ -6,6 +6,7 @@ export const SLASH_COMMANDS = {
     REVIEW: 'review',
     MODELS: 'models',
     TOOLS: 'tools',
+    COMPACT: 'compact',
     MCP: 'mcp',
     INIT: 'init',
 } as const
