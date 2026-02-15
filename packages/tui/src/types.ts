@@ -17,6 +17,7 @@ export type ToolAction = {
 export type StepView = {
     index: number
     assistantText: string
+    contextPromptTokens?: number
     thinking?: string
     action?: ToolAction
     parallelActions?: ToolAction[]

@@ -5,6 +5,8 @@ import type {
     AgentMiddleware,
     AgentSessionDeps,
     ChatMessage,
+    ContextCompactedHookPayload,
+    ContextUsageHookPayload,
     FinalHookPayload,
     ObservationHookPayload,
     TurnStartHookPayload,
@@ -15,6 +17,8 @@ import type {
 
 export type HookName =
     | 'onTurnStart'
+    | 'onContextUsage'
+    | 'onContextCompacted'
     | 'onAction'
     | 'onObservation'
     | 'onFinal'
@@ -24,6 +28,8 @@ export type HookName =
 
 export type HookPayloadMap = {
     onTurnStart: TurnStartHookPayload
+    onContextUsage: ContextUsageHookPayload
+    onContextCompacted: ContextCompactedHookPayload
     onAction: ActionHookPayload
     onObservation: ObservationHookPayload
     onFinal: FinalHookPayload
@@ -39,6 +45,8 @@ export type HookRunnerMap = {
 function emptyHookMap(): HookRunnerMap {
     return {
         onTurnStart: [],
+        onContextUsage: [],
+        onContextCompacted: [],
         onAction: [],
         onObservation: [],
         onFinal: [],
@@ -51,6 +59,10 @@ function emptyHookMap(): HookRunnerMap {
 function registerMiddleware(target: HookRunnerMap, middleware?: AgentMiddleware) {
     if (!middleware) return
     if (middleware.onTurnStart) target.onTurnStart.push(middleware.onTurnStart)
+    if (middleware.onContextUsage) target.onContextUsage.push(middleware.onContextUsage)
+    if (middleware.onContextCompacted) {
+        target.onContextCompacted.push(middleware.onContextCompacted)
+    }
     if (middleware.onAction) target.onAction.push(middleware.onAction)
     if (middleware.onObservation) target.onObservation.push(middleware.onObservation)
     if (middleware.onFinal) target.onFinal.push(middleware.onFinal)

@@ -38,4 +38,28 @@ describe('chatTimelineReducer', () => {
         assert.strictEqual(state.systemMessages.length, 1)
         assert.strictEqual(state.systemMessages[0]?.sequence, 1)
     })
+
+    test('updates context prompt tokens at step granularity', () => {
+        let state = createInitialTimelineState()
+
+        state = chatTimelineReducer(state, {
+            type: 'turn_start',
+            turn: 1,
+            input: 'hello',
+            promptTokens: 10,
+        })
+
+        state = chatTimelineReducer(state, {
+            type: 'context_usage',
+            turn: 1,
+            step: 0,
+            promptTokens: 42,
+            phase: 'step_start',
+        })
+
+        const turn = state.turns[0]
+        assert.ok(turn)
+        assert.strictEqual(turn?.contextPromptTokens, 42)
+        assert.strictEqual(turn?.steps[0]?.contextPromptTokens, 42)
+    })
 })

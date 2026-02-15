@@ -30,12 +30,7 @@ import {
     createInitialTimelineState,
     type ChatTimelineAction,
 } from './state/chat_timeline'
-import {
-    calculateContextPercent,
-    formatTokenUsage,
-    inferParallelToolStatuses,
-    inferToolStatus,
-} from './utils'
+import { calculateContextPercent, inferParallelToolStatuses, inferToolStatus } from './utils'
 import { checkForUpdate, findLocalPackageInfoSync } from './version'
 import type { SessionHistoryEntry } from './controllers/session_history'
 import { loadTaskPrompt } from './task_prompt'
@@ -147,7 +142,7 @@ export function App({
     const [sessionOptionsState, setSessionOptionsState] = useState<AgentSessionOptions>({
         ...sessionOptions,
         providerName,
-        maxPromptTokens: resolveContextLimit({ name: providerName, model }),
+        contextWindow: resolveContextLimit({ name: providerName, model }),
         dangerous: defaultToolPermissionMode === TOOL_PERMISSION_MODES.FULL,
         toolPermissionMode: defaultToolPermissionMode,
     })
@@ -254,6 +249,49 @@ export function App({
                         promptTokens,
                     })
                 },
+                onContextUsage: ({ turn, step, promptTokens, phase }) => {
+                    setCurrentContextTokens(promptTokens)
+                    dispatch({
+                        type: 'context_usage',
+                        turn,
+                        step,
+                        promptTokens,
+                        phase,
+                    })
+                },
+                onContextCompacted: ({
+                    reason,
+                    status,
+                    beforeTokens,
+                    afterTokens,
+                    reductionPercent,
+                    errorMessage,
+                }) => {
+                    if (status === 'success') {
+                        setCurrentContextTokens(afterTokens)
+                    }
+                    const compactedBy = reason === 'manual' ? 'manual command' : 'auto trigger'
+                    if (status === 'success') {
+                        appendSystemMessage(
+                            'Context compacted',
+                            `Compacted by ${compactedBy}: ${beforeTokens} -> ${afterTokens} tokens (${reductionPercent.toFixed(2)}% reduced).`,
+                        )
+                        return
+                    }
+                    if (status === 'skipped') {
+                        appendSystemMessage(
+                            'Context compacted',
+                            `Skipped (${compactedBy}): nothing to compact.`,
+                            'warning',
+                        )
+                        return
+                    }
+                    appendSystemMessage(
+                        'Context compacted',
+                        `Failed (${compactedBy}): ${errorMessage ?? 'unknown error'}`,
+                        'warning',
+                    )
+                },
                 onAction: ({ turn, step, action, thinking, parallelActions }) => {
                     dispatch({
                         type: 'tool_action',
@@ -294,7 +332,7 @@ export function App({
                 },
             },
         }),
-        [dispatch, toolPermissionMode],
+        [appendSystemMessage, dispatch, toolPermissionMode],
     )
 
     useEffect(() => {
@@ -473,7 +511,7 @@ export function App({
                 ...prev,
                 sessionId: randomUUID(),
                 providerName: provider.name,
-                maxPromptTokens: nextContextLimit,
+                contextWindow: nextContextLimit,
             }))
 
             await persistCurrentProvider(provider.name)
@@ -621,6 +659,37 @@ export function App({
         session?.cancelCurrentTurn?.()
     }, [busy, session])
 
+    const runCompactCommand = useCallback(async () => {
+        if (busy) {
+            appendSystemMessage(
+                'Compact',
+                'Cancel current run before compacting context.',
+                'warning',
+            )
+            return
+        }
+        if (pendingApproval) {
+            appendSystemMessage(
+                'Compact',
+                'Resolve current approval request before compacting context.',
+                'warning',
+            )
+            return
+        }
+        if (!session) return
+
+        try {
+            const result = await session.compactHistory('manual')
+            setCurrentContextTokens(result.afterTokens)
+        } catch (err) {
+            appendSystemMessage(
+                'Compact',
+                `Failed to compact context: ${(err as Error).message}`,
+                'error',
+            )
+        }
+    }, [appendSystemMessage, busy, pendingApproval, session])
+
     const runInitCommand = useCallback(async () => {
         if (!session || busy) return
 
@@ -744,7 +813,8 @@ export function App({
                 ...prev,
                 sessionId: randomUUID(),
                 providerName: provider.name,
-                maxPromptTokens: nextContextLimit,
+                contextWindow: nextContextLimit,
+                autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
             }))
             setSetupPending(false)
             appendSystemMessage('Setup', `Config saved to ${loaded.configPath}`)
@@ -774,7 +844,6 @@ export function App({
         setPendingApproval(null)
     }, [])
 
-    const tokenLine = formatTokenUsage(timeline.turns[timeline.turns.length - 1]?.tokenUsage)
     const contextPercent = calculateContextPercent(currentContextTokens, contextLimit)
     const chatHeader = useMemo(
         () => ({
@@ -857,6 +926,9 @@ export function App({
                 onClear={handleClear}
                 onNewSession={handleNewSession}
                 onCancelRun={handleCancelRun}
+                onCompact={() => {
+                    void runCompactCommand()
+                }}
                 onHistorySelect={(entry) => {
                     void handleHistorySelect(entry)
                 }}
@@ -878,7 +950,6 @@ export function App({
                 busy={busy}
                 pendingApproval={Boolean(pendingApproval)}
                 contextPercent={contextPercent}
-                tokenLine={tokenLine}
             />
         </Box>
     )

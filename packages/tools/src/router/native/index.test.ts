@@ -19,8 +19,20 @@ describe('NativeToolRegistry', () => {
     test('registerMany adds multiple tools', () => {
         const registry = new NativeToolRegistry()
         registry.registerMany([
-            { name: 'tool1', description: '1', source: 'native', inputSchema: {}, execute: async () => ({ content: [] }) },
-            { name: 'tool2', description: '2', source: 'native', inputSchema: {}, execute: async () => ({ content: [] }) },
+            {
+                name: 'tool1',
+                description: '1',
+                source: 'native',
+                inputSchema: {},
+                execute: async () => ({ content: [] }),
+            },
+            {
+                name: 'tool2',
+                description: '2',
+                source: 'native',
+                inputSchema: {},
+                execute: async () => ({ content: [] }),
+            },
         ])
 
         expect(registry.has('tool1')).toBe(true)

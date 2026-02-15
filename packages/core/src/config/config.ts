@@ -56,6 +56,8 @@ export type MemoConfig = {
     mcp_oauth_credentials_store_mode?: McpOAuthCredentialsStoreMode
     /** Optional callback port for MCP OAuth browser login. */
     mcp_oauth_callback_port?: number
+    /** Automatic context compaction threshold percentage (1-100). */
+    auto_compact_threshold_percent?: number
     providers: ProviderConfig[]
 }
 
@@ -64,10 +66,12 @@ type ParsedMemoConfig = Omit<Partial<MemoConfig>, 'providers'> & { providers?: u
 const DEFAULT_MEMO_HOME = join(homedir(), '.memo')
 const DEFAULT_SESSIONS_DIR = 'sessions'
 const DEFAULT_CONTEXT_WINDOW = 120000
+const DEFAULT_AUTO_COMPACT_THRESHOLD_PERCENT = 80
 
 const DEFAULT_CONFIG: MemoConfig = {
     current_provider: 'deepseek',
     mcp_oauth_credentials_store_mode: 'auto',
+    auto_compact_threshold_percent: DEFAULT_AUTO_COMPACT_THRESHOLD_PERCENT,
     providers: [
         {
             name: 'deepseek',
@@ -77,6 +81,19 @@ const DEFAULT_CONFIG: MemoConfig = {
         },
     ],
     mcp_servers: {},
+}
+
+function normalizeAutoCompactThresholdPercent(value: unknown): number {
+    if (
+        typeof value === 'number' &&
+        Number.isInteger(value) &&
+        Number.isFinite(value) &&
+        value >= 1 &&
+        value <= 100
+    ) {
+        return value
+    }
+    return DEFAULT_AUTO_COMPACT_THRESHOLD_PERCENT
 }
 
 function normalizeModelProfileKey(key: string): string {
@@ -279,6 +296,11 @@ function serializeConfig(config: MemoConfig) {
     ) {
         mainLines.push(`mcp_oauth_callback_port = ${config.mcp_oauth_callback_port}`)
     }
+    mainLines.push(
+        `auto_compact_threshold_percent = ${normalizeAutoCompactThresholdPercent(
+            config.auto_compact_threshold_percent,
+        )}`,
+    )
     const mainConfig = mainLines.join('\n')
 
     return [mainConfig, providers, modelProfiles, mcpSection].filter(Boolean).join('\n\n')
@@ -322,11 +344,15 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
             parsed.mcp_oauth_callback_port <= 65535
                 ? parsed.mcp_oauth_callback_port
                 : undefined
+        const autoCompactThresholdPercent = normalizeAutoCompactThresholdPercent(
+            parsed.auto_compact_threshold_percent,
+        )
         const modelProfiles = normalizeModelProfiles(parsed.model_profiles)
         const merged: MemoConfig = {
             current_provider: parsed.current_provider ?? DEFAULT_CONFIG.current_provider,
             mcp_oauth_credentials_store_mode: oauthStoreMode,
             mcp_oauth_callback_port: oauthCallbackPort,
+            auto_compact_threshold_percent: autoCompactThresholdPercent,
             providers,
             model_profiles: modelProfiles,
             mcp_servers: parsed.mcp_servers ?? {},

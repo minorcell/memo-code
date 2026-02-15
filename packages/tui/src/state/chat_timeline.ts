@@ -1,4 +1,4 @@
-import type { TokenUsage, TurnStatus } from '@memo/core'
+import type { ContextUsagePhase, TokenUsage, TurnStatus } from '@memo/core'
 import type {
     StepView,
     SystemMessage,
@@ -19,6 +19,13 @@ export type ChatTimelineState = {
 export type ChatTimelineAction =
     | { type: 'append_system_message'; title: string; content: string; tone?: SystemMessageTone }
     | { type: 'turn_start'; turn: number; input: string; promptTokens?: number }
+    | {
+          type: 'context_usage'
+          turn: number
+          step: number
+          promptTokens: number
+          phase: ContextUsagePhase
+      }
     | { type: 'assistant_chunk'; turn: number; step: number; chunk: string }
     | {
           type: 'tool_action'
@@ -151,6 +158,28 @@ export function chatTimelineReducer(
                 durationMs: undefined,
                 contextPromptTokens: action.promptTokens ?? turnView.contextPromptTokens,
             }))
+            return {
+                ...state,
+                turns: updated.turns,
+                sequence: updated.sequence,
+            }
+        }
+
+        case 'context_usage': {
+            const updated = upsertTurn(state, action.turn, (turnView) => {
+                const steps = ensureStep(turnView.steps, action.step)
+                const currentStep = steps[action.step]
+                if (!currentStep) return turnView
+                steps[action.step] = {
+                    ...currentStep,
+                    contextPromptTokens: action.promptTokens,
+                }
+                return {
+                    ...turnView,
+                    contextPromptTokens: action.promptTokens,
+                    steps,
+                }
+            })
             return {
                 ...state,
                 turns: updated.turns,

@@ -58,6 +58,7 @@ type ComposerProps = {
     onClear: () => void
     onNewSession: () => void
     onCancelRun: () => void
+    onCompact: () => void
     onHistorySelect: (entry: SessionHistoryEntry) => void
     onModelSelect: (provider: ProviderConfig) => void
     onSetToolPermission: (mode: ToolPermissionMode) => void
@@ -316,6 +317,7 @@ export const Composer = memo(function Composer({
     onClear,
     onNewSession,
     onCancelRun,
+    onCompact,
     onHistorySelect,
     onModelSelect,
     onSetToolPermission,
@@ -810,6 +812,9 @@ export const Composer = memo(function Composer({
                         break
                     case 'set_tool_permission':
                         onSetToolPermission(result.mode)
+                        break
+                    case 'compact':
+                        onCompact()
                         break
                     case 'review_pr':
                         onReviewPullRequest(result.prNumber)

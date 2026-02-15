@@ -151,6 +151,7 @@ describe('mcp config serialization', () => {
         expect(text).toContain('active_mcp_servers = ["remote"]')
         expect(text).toContain('mcp_oauth_credentials_store_mode = "file"')
         expect(text).toContain('mcp_oauth_callback_port = 8765')
+        expect(text).toContain('auto_compact_threshold_percent = 80')
         expect(text).toContain('[model_profiles.gpt-5]')
         expect(text).toContain('supports_parallel_tool_calls = true')
         expect(text).toContain('context_window = 272000')
@@ -188,6 +189,25 @@ url = "https://example.com/mcp"
 
         const loaded = await loadMemoConfig()
         expect(loaded.config.active_mcp_servers).toEqual([])
+    })
+
+    test('writeMemoConfig persists custom auto_compact_threshold_percent', async () => {
+        const home = join(tempBase, 'memo-home-write-auto-compact-threshold')
+        process.env.MEMO_HOME = home
+        const configPath = join(home, 'config.toml')
+        await mkdir(home, { recursive: true })
+
+        await writeMemoConfig(configPath, {
+            current_provider: 'deepseek',
+            auto_compact_threshold_percent: 70,
+            providers: [
+                { name: 'deepseek', env_api_key: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
+            ],
+            mcp_servers: {},
+        })
+
+        const text = await readFile(configPath, 'utf-8')
+        expect(text).toContain('auto_compact_threshold_percent = 70')
     })
 
     test('loadMemoConfig parses streamable_http servers with headers', async () => {
@@ -276,6 +296,45 @@ model = "deepseek-chat"
 
         const loaded = await loadMemoConfig()
         expect(loaded.config.mcp_oauth_credentials_store_mode).toBe('auto')
+        expect(loaded.config.auto_compact_threshold_percent).toBe(80)
+    })
+
+    test('loadMemoConfig reads custom auto_compact_threshold_percent', async () => {
+        const home = join(tempBase, 'memo-home-custom-auto-compact-threshold')
+        process.env.MEMO_HOME = home
+        await mkdir(home, { recursive: true })
+        const configText = `
+current_provider = "deepseek"
+auto_compact_threshold_percent = 65
+
+[[providers.deepseek]]
+name = "deepseek"
+env_api_key = "DEEPSEEK_API_KEY"
+model = "deepseek-chat"
+`
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
+
+        const loaded = await loadMemoConfig()
+        expect(loaded.config.auto_compact_threshold_percent).toBe(65)
+    })
+
+    test('loadMemoConfig falls back to default when auto_compact_threshold_percent is invalid', async () => {
+        const home = join(tempBase, 'memo-home-invalid-auto-compact-threshold')
+        process.env.MEMO_HOME = home
+        await mkdir(home, { recursive: true })
+        const configText = `
+current_provider = "deepseek"
+auto_compact_threshold_percent = 150
+
+[[providers.deepseek]]
+name = "deepseek"
+env_api_key = "DEEPSEEK_API_KEY"
+model = "deepseek-chat"
+`
+        await writeFile(join(home, 'config.toml'), configText, 'utf-8')
+
+        const loaded = await loadMemoConfig()
+        expect(loaded.config.auto_compact_threshold_percent).toBe(80)
     })
 
     test('loadMemoConfig ignores legacy max_prompt_tokens', async () => {

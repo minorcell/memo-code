@@ -78,6 +78,20 @@ export type TokenUsage = {
     total: number
 }
 
+export type CompactReason = 'auto' | 'manual'
+export type CompactStatus = 'success' | 'failed' | 'skipped'
+
+export type CompactResult = {
+    reason: CompactReason
+    status: CompactStatus
+    beforeTokens: number
+    afterTokens: number
+    thresholdTokens: number
+    reductionPercent: number
+    summary?: string
+    errorMessage?: string
+}
+
 /** Unified tokenizer counter interface compatible with different model encodings. */
 export type TokenCounter = {
     /** Actual tokenizer/encoding name used. */
@@ -200,8 +214,10 @@ export type AgentSessionOptions = {
     tokenizerModel?: string
     /** Prompt warning threshold. */
     warnPromptTokens?: number
-    /** Prompt hard limit, rejects if exceeded. */
-    maxPromptTokens?: number
+    /** Context window hard limit, rejects when still exceeded after compaction. */
+    contextWindow?: number
+    /** Automatic compaction threshold percentage. */
+    autoCompactThresholdPercent?: number
     /** Active MCP server names for current session (undefined means all configured servers). */
     activeMcpServers?: string[]
     /** Generate a session title from the first user prompt (enabled by CLI). */
@@ -280,6 +296,33 @@ export type FinalHookPayload = {
     steps: AgentStepTrace[]
 }
 
+export type ContextUsagePhase = 'turn_start' | 'step_start' | 'post_compact'
+
+export type ContextUsageHookPayload = {
+    sessionId: string
+    turn: number
+    step: number
+    promptTokens: number
+    contextWindow: number
+    thresholdTokens: number
+    usagePercent: number
+    phase: ContextUsagePhase
+}
+
+export type ContextCompactedHookPayload = {
+    sessionId: string
+    turn: number
+    step: number
+    reason: CompactReason
+    status: CompactStatus
+    beforeTokens: number
+    afterTokens: number
+    thresholdTokens: number
+    reductionPercent: number
+    summary?: string
+    errorMessage?: string
+}
+
 export type ApprovalHookPayload = {
     sessionId: string
     turn: number
@@ -306,6 +349,8 @@ export type AgentHookHandler<Payload> = (payload: Payload) => Promise<void> | vo
 
 export type AgentHooks = {
     onTurnStart?: AgentHookHandler<TurnStartHookPayload>
+    onContextUsage?: AgentHookHandler<ContextUsageHookPayload>
+    onContextCompacted?: AgentHookHandler<ContextCompactedHookPayload>
     onAction?: AgentHookHandler<ActionHookPayload>
     onObservation?: AgentHookHandler<ObservationHookPayload>
     onFinal?: AgentHookHandler<FinalHookPayload>
@@ -336,6 +381,8 @@ export type AgentSession = {
     cancelCurrentTurn?: (reason?: string) => void
     /** 当前会话可用工具名列表（含 native + MCP）。 */
     listToolNames?: () => string[]
+    /** 手动触发历史压缩。 */
+    compactHistory: (reason?: CompactReason) => Promise<CompactResult>
     /** 结束 Session，释放资源。 */
     close: () => Promise<void>
 }
@@ -349,6 +396,8 @@ export type HistoryEventType =
     | 'assistant'
     | 'action'
     | 'observation'
+    | 'context_usage'
+    | 'context_compact'
     | 'final'
     | 'turn_end'
 

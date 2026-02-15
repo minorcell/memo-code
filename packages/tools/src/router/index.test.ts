@@ -143,7 +143,9 @@ describe('ToolRouter', () => {
 
     test('execute throws when tool not found', async () => {
         const router = new ToolRouter()
-        await expect(router.execute('nonexistent', {})).rejects.toThrow("Tool 'nonexistent' not found")
+        await expect(router.execute('nonexistent', {})).rejects.toThrow(
+            "Tool 'nonexistent' not found",
+        )
     })
 
     test('execute runs tool successfully', async () => {
@@ -153,7 +155,9 @@ describe('ToolRouter', () => {
             description: 'Echo input',
             source: 'native',
             inputSchema: { type: 'object' },
-            execute: async (input) => ({ content: [{ type: 'text', text: JSON.stringify(input) }] }),
+            execute: async (input) => ({
+                content: [{ type: 'text', text: JSON.stringify(input) }],
+            }),
         })
 
         const result = await router.execute('echo', { test: true })

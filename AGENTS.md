@@ -8,6 +8,7 @@
 - `docs/`：开发文档和设计方向；`public/`：TUI 静态资源。
 - 根脚本由 `package.json` 管理；需要 Node.js >=20 和 pnpm。安装 `rg` 以加快搜索速度。类型/路径别名在 `tsconfig.json` 中。
 - 运行时配置和日志默认存储在 `~/.memo/` 中，可以通过 `MEMO_HOME` 环境变量重定向。
+- 上下文窗口仅由 `model_profiles.*.context_window` 决定；自动压缩阈值由 `auto_compact_threshold_percent` 控制（默认 `80`）。
 
 ## 构建、测试与开发
 
