@@ -143,13 +143,6 @@ Result:
 - other providers using `gpt-5` -> `272000`
 - any model without `context_window` override -> `120000`
 
-### About `max_prompt_tokens`
-
-`max_prompt_tokens` is retained for backward compatibility in config files.
-
-- It is no longer the primary control for session context size.
-- Prefer `model_profiles.*.context_window` for new configuration.
-
 ## MCP Server Configuration
 
 ### Local Stdio MCP

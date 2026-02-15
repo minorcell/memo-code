@@ -142,13 +142,6 @@ context_window = 128000
 - 其他使用 `gpt-5` 的提供商 -> `272000`
 - 任何没有 `context_window` 覆盖的模型 -> `120000`
 
-### 关于 `max_prompt_tokens`
-
-`max_prompt_tokens` 在配置文件中保留用于向后兼容。
-
-- 它不再是会话上下文大小的主要控制。
-- 新配置优先使用 `model_profiles.*.context_window`。
-
 ## MCP 服务器配置
 
 ### 本地 Stdio MCP
