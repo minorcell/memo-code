@@ -628,6 +628,37 @@ describe('session hooks & middleware', () => {
         }
     })
 
+    test('falls back to generic final error when model returns no actionable content', async () => {
+        const outputs: LLMResponse[] = [
+            {
+                content: [],
+                stop_reason: 'stop_sequence',
+            },
+        ]
+        const session = await createAgentSession(
+            {
+                callLLM: async () => outputs.shift() ?? endTurnResponse('done'),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+                requestApproval: async () => 'once',
+            },
+            {},
+        )
+        try {
+            const result = await session.runTurn('empty response')
+            expect(result.status).toBe('error')
+            expect(result.finalText).toBe(
+                'Unable to produce a final answer. Please retry or adjust the request.',
+            )
+            expect(result.errorMessage).toBe(result.finalText)
+            const last = session.history[session.history.length - 1]
+            expect(last?.role).toBe('assistant')
+            expect(last?.content).toBe(result.finalText)
+        } finally {
+            await session.close()
+        }
+    })
+
     test('does not treat unknown tool json text as protocol violation', async () => {
         const outputs: LLMResponse[] = [endTurnResponse('{"tool":"unknown","input":{}}')]
         const session = await createAgentSession(
@@ -827,6 +858,39 @@ describe('session hooks & middleware', () => {
         }
     })
 
+    test('manual compaction skips when there is no non-system history', async () => {
+        let llmCalls = 0
+        const compactStatuses: string[] = []
+        const session = await createAgentSession(
+            {
+                callLLM: async () => {
+                    llmCalls += 1
+                    return endTurnResponse('should-not-run')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+                hooks: {
+                    onContextCompacted: ({ status }) => {
+                        compactStatuses.push(status)
+                    },
+                },
+            },
+            { contextWindow: 120_000 },
+        )
+
+        try {
+            const result = await session.compactHistory('manual')
+            assert.strictEqual(result.status, 'skipped')
+            assert.strictEqual(llmCalls, 0)
+            assert.ok(compactStatuses.includes('skipped'))
+            assert.strictEqual(session.history.length, 1)
+            assert.strictEqual(session.history[0]?.role, 'system')
+        } finally {
+            await session.close()
+        }
+    })
+
     test('manual compaction rebuilds history with user-only context and summary', async () => {
         const assistantToolCall = {
             id: 'call_function_l5suo7l5etii_1',
@@ -915,6 +979,292 @@ describe('session hooks & middleware', () => {
             const turnResult = await session.runTurn('continue')
             assert.strictEqual(turnResult.status, 'ok')
             assert.strictEqual(turnResult.finalText, 'ok')
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('manual compaction keeps recent user context within token budget', async () => {
+        const hugeUserMessage = 'a'.repeat(25_000)
+        const session = await createAgentSession(
+            {
+                callLLM: async (messages, _onChunk, options) => {
+                    const isCompactionCall =
+                        messages[0]?.role === 'system' &&
+                        messages[0].content === CONTEXT_COMPACTION_SYSTEM_PROMPT &&
+                        Array.isArray(options?.tools) &&
+                        options.tools.length === 0
+                    if (isCompactionCall) {
+                        return endTurnResponse('summary-budget')
+                    }
+                    return endTurnResponse('ok')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            { contextWindow: 120_000 },
+        )
+
+        try {
+            session.history.push({ role: 'user', content: 'older-user-message' })
+            session.history.push({ role: 'user', content: hugeUserMessage })
+
+            const compactResult = await session.compactHistory('manual')
+            assert.strictEqual(compactResult.status, 'success')
+            assert.strictEqual(session.history[0]?.role, 'system')
+            assert.strictEqual(session.history.length, 3)
+
+            const retainedUserMessage = session.history[1]
+            assert.strictEqual(retainedUserMessage?.role, 'user')
+            assert.strictEqual(retainedUserMessage?.content.length, 20_000)
+            assert.ok(retainedUserMessage?.content.startsWith('a'))
+
+            const summaryMessage = session.history[2]
+            assert.strictEqual(summaryMessage?.role, 'user')
+            assert.ok(summaryMessage?.content.startsWith(`${CONTEXT_SUMMARY_PREFIX}\n`))
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('manual compaction strips think tags and collapses extra blank lines in summary', async () => {
+        const session = await createAgentSession(
+            {
+                callLLM: async (messages, _onChunk, options) => {
+                    const isCompactionCall =
+                        messages[0]?.role === 'system' &&
+                        messages[0].content === CONTEXT_COMPACTION_SYSTEM_PROMPT &&
+                        Array.isArray(options?.tools) &&
+                        options.tools.length === 0
+                    if (isCompactionCall) {
+                        return endTurnResponse('<think>internal</think>\n\nsummary\n\n\nnext')
+                    }
+                    return endTurnResponse('ok')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            { contextWindow: 120_000 },
+        )
+
+        try {
+            session.history.push({ role: 'user', content: 'hello' })
+            const compactResult = await session.compactHistory('manual')
+            assert.strictEqual(compactResult.status, 'success')
+            assert.strictEqual(compactResult.summary?.includes('<think>'), false)
+            assert.strictEqual(compactResult.summary, 'summary\n\nnext')
+
+            const summaryMessage = session.history[session.history.length - 1]
+            assert.strictEqual(summaryMessage?.role, 'user')
+            assert.ok(summaryMessage?.content.endsWith('summary\n\nnext'))
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('manual compaction filters old summary messages from retained user context', async () => {
+        const oldSummary = `${CONTEXT_SUMMARY_PREFIX}\nold summary`
+        const session = await createAgentSession(
+            {
+                callLLM: async (messages, _onChunk, options) => {
+                    const isCompactionCall =
+                        messages[0]?.role === 'system' &&
+                        messages[0].content === CONTEXT_COMPACTION_SYSTEM_PROMPT &&
+                        Array.isArray(options?.tools) &&
+                        options.tools.length === 0
+                    if (isCompactionCall) {
+                        return endTurnResponse('new summary')
+                    }
+                    return endTurnResponse('ok')
+                },
+                loadPrompt: async () => 'sys',
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            { contextWindow: 120_000 },
+        )
+
+        try {
+            session.history.push({ role: 'user', content: oldSummary })
+            session.history.push({ role: 'user', content: 'latest user request' })
+
+            const result = await session.compactHistory('manual')
+            assert.strictEqual(result.status, 'success')
+
+            const summaryMessages = session.history.filter(
+                (message) =>
+                    message.role === 'user' &&
+                    message.content.startsWith(`${CONTEXT_SUMMARY_PREFIX}\n`),
+            )
+            assert.strictEqual(summaryMessages.length, 1)
+            assert.ok(summaryMessages[0]?.content.endsWith('new summary'))
+            assert.strictEqual(
+                session.history.some((message) => message.content === oldSummary),
+                false,
+            )
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('close swallows sink flush errors', async () => {
+        const errors: string[] = []
+        const originalError = console.error
+        console.error = (message?: unknown) => {
+            errors.push(String(message))
+        }
+
+        const session = await createAgentSession(
+            {
+                callLLM: async () => endTurnResponse('ok'),
+                historySinks: [
+                    {
+                        append: async () => {},
+                        flush: async () => {
+                            throw new Error('flush failed')
+                        },
+                    },
+                ],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            {},
+        )
+
+        try {
+            await session.close()
+            assert.ok(
+                errors.some((message) => message.includes('History flush failed: flush failed')),
+            )
+        } finally {
+            console.error = originalError
+        }
+    })
+
+    test('close prefers sink.close over sink.flush', async () => {
+        let closeCalls = 0
+        let flushCalls = 0
+        const session = await createAgentSession(
+            {
+                callLLM: async () => endTurnResponse('ok'),
+                historySinks: [
+                    {
+                        append: async () => {},
+                        close: async () => {
+                            closeCalls += 1
+                        },
+                        flush: async () => {
+                            flushCalls += 1
+                        },
+                    },
+                ],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            {},
+        )
+
+        await session.close()
+        assert.strictEqual(closeCalls, 1)
+        assert.strictEqual(flushCalls, 0)
+    })
+
+    test('close calls sink.flush when sink.close is absent', async () => {
+        let flushCalls = 0
+        const session = await createAgentSession(
+            {
+                callLLM: async () => endTurnResponse('ok'),
+                historySinks: [
+                    {
+                        append: async () => {},
+                        flush: async () => {
+                            flushCalls += 1
+                        },
+                    },
+                ],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            {},
+        )
+
+        await session.close()
+        assert.strictEqual(flushCalls, 1)
+    })
+
+    test('listToolNames returns registered tools', async () => {
+        const session = await createAgentSession(
+            {
+                tools: { echo: echoTool, read_note: readNoteTool },
+                callLLM: async () => endTurnResponse('ok'),
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            {},
+        )
+        try {
+            const names = session.listToolNames().sort()
+            assert.ok(names.includes('echo'))
+            assert.ok(names.includes('read_note'))
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('cancelCurrentTurn is a no-op when turn is idle', async () => {
+        const session = await createAgentSession(
+            {
+                callLLM: async () => endTurnResponse('ok'),
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            {},
+        )
+        try {
+            session.cancelCurrentTurn()
+            assert.strictEqual(session.history.length, 1)
+        } finally {
+            await session.close()
+        }
+    })
+
+    test('cancelCurrentTurn aborts an in-flight llm request', async () => {
+        const session = await createAgentSession(
+            {
+                callLLM: async (_messages, _onChunk, options) =>
+                    new Promise((_, reject) => {
+                        const abortError = new Error('aborted')
+                        abortError.name = 'AbortError'
+
+                        const signal = options?.signal
+                        if (!signal) {
+                            reject(new Error('missing abort signal'))
+                            return
+                        }
+                        if (signal.aborted) {
+                            reject(abortError)
+                            return
+                        }
+                        signal.addEventListener(
+                            'abort',
+                            () => {
+                                reject(abortError)
+                            },
+                            { once: true },
+                        )
+                    }),
+                historySinks: [],
+                tokenCounter: createLengthTokenCounter(),
+            },
+            {},
+        )
+
+        try {
+            const turnPromise = session.runTurn('cancel me')
+            await new Promise((resolve) => setTimeout(resolve, 10))
+            session.cancelCurrentTurn()
+            const result = await turnPromise
+            assert.strictEqual(result.status, 'cancelled')
+            assert.strictEqual(result.errorMessage, 'Turn cancelled')
         } finally {
             await session.close()
         }

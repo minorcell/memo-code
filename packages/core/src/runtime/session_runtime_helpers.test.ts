@@ -2,9 +2,16 @@ import { describe, expect, test, vi } from 'vitest'
 import type { HistorySink } from '@memo/core/types'
 import {
     accumulateUsage,
+    completeToolResultsForProtocol,
     emitEventToSinks,
     emptyUsage,
+    fallbackSessionTitleFromPrompt,
+    isAbortError,
+    normalizeSessionTitle,
+    parseTextToolCall,
     stableStringify,
+    toToolHistoryMessage,
+    truncateSessionTitle,
 } from '@memo/core/runtime/session_runtime_helpers'
 
 describe('accumulateUsage', () => {
@@ -75,5 +82,129 @@ describe('stableStringify', () => {
         const serialized = stableStringify(parent)
         expect(serialized).toContain('"child":{"name":"child","parent":"[Circular]"}')
         expect(serialized).toContain('"name":"parent"')
+    })
+})
+
+describe('parseTextToolCall', () => {
+    const tools = {
+        read_file: {} as never,
+        exec_command: {} as never,
+    }
+
+    test('parses plain json tool call', () => {
+        const parsed = parseTextToolCall('{"tool":"read_file","input":{"path":"a.txt"}}', tools)
+        expect(parsed).toEqual({
+            tool: 'read_file',
+            input: { path: 'a.txt' },
+        })
+    })
+
+    test('parses fenced json tool call', () => {
+        const parsed = parseTextToolCall(
+            '```json\n{"tool":"exec_command","input":{"cmd":"ls"}}\n```',
+            tools,
+        )
+        expect(parsed).toEqual({
+            tool: 'exec_command',
+            input: { cmd: 'ls' },
+        })
+    })
+
+    test('returns null for unknown or invalid tool payload', () => {
+        expect(parseTextToolCall('{"tool":"unknown","input":{}}', tools)).toBeNull()
+        expect(parseTextToolCall('{"tool":"read_file"', tools)).toBeNull()
+        expect(parseTextToolCall('not-json', tools)).toBeNull()
+        expect(parseTextToolCall('   ', tools)).toBeNull()
+    })
+})
+
+describe('session title helpers', () => {
+    test('truncateSessionTitle appends ellipsis when exceeding max', () => {
+        const truncated = truncateSessionTitle('x'.repeat(80))
+        expect(truncated.endsWith('...')).toBe(true)
+        expect(truncated.length).toBe(60)
+    })
+
+    test('normalizeSessionTitle strips quotes and whitespace', () => {
+        expect(normalizeSessionTitle('  "  Hello\nWorld  "  ')).toBe('Hello World')
+        expect(normalizeSessionTitle('   ')).toBe('')
+    })
+
+    test('fallbackSessionTitleFromPrompt handles empty/cjk/word prompts', () => {
+        expect(fallbackSessionTitleFromPrompt('   ')).toBe('New Session')
+        expect(fallbackSessionTitleFromPrompt('这是一个非常非常长的中文标题用于测试截断行为')).toBe(
+            '这是一个非常非常长的中文标题用于测试截断...',
+        )
+        expect(
+            fallbackSessionTitleFromPrompt('build a rest api using express and sqlite quickly'),
+        ).toBe('build a rest api using express and sqlite')
+    })
+})
+
+describe('tool result helpers', () => {
+    test('toToolHistoryMessage maps tool action result into tool chat message', () => {
+        const message = toToolHistoryMessage({
+            actionId: 'call-1',
+            tool: 'read_file',
+            status: 'success',
+            observation: 'content',
+            success: true,
+            durationMs: 12,
+        })
+        expect(message).toEqual({
+            role: 'tool',
+            content: 'content',
+            tool_call_id: 'call-1',
+            name: 'read_file',
+        })
+    })
+
+    test('completeToolResultsForProtocol fills missing results', () => {
+        const requested = [
+            { id: 'call-1', name: 'read_file' },
+            { id: 'call-2', name: 'exec_command' },
+        ]
+        const actual = [
+            {
+                actionId: 'call-1',
+                tool: 'read_file',
+                status: 'success' as const,
+                observation: 'ok',
+                success: true,
+                durationMs: 5,
+            },
+        ]
+
+        const failureFilled = completeToolResultsForProtocol(requested, actual, false)
+        expect(failureFilled).toHaveLength(2)
+        expect(failureFilled[0]).toMatchObject({ actionId: 'call-1', status: 'success' })
+        expect(failureFilled[1]).toMatchObject({
+            actionId: 'call-2',
+            status: 'execution_failed',
+            errorType: 'execution_failed',
+            rejected: undefined,
+        })
+        expect(failureFilled[1]?.observation).toContain('Tool result missing for exec_command')
+
+        const rejectionFilled = completeToolResultsForProtocol(requested, actual, true)
+        expect(rejectionFilled[1]).toMatchObject({
+            actionId: 'call-2',
+            status: 'approval_denied',
+            errorType: 'approval_denied',
+            rejected: true,
+        })
+        expect(rejectionFilled[1]?.observation).toContain(
+            'Skipped tool execution after previous rejection',
+        )
+    })
+})
+
+describe('isAbortError', () => {
+    test('detects abort error by name', () => {
+        const abortError = new Error('cancelled')
+        abortError.name = 'AbortError'
+        expect(isAbortError(abortError)).toBe(true)
+        expect(isAbortError(new Error('other'))).toBe(false)
+        expect(isAbortError('AbortError')).toBe(false)
     })
 })
