@@ -83,13 +83,15 @@ Fix:
 
 ## `memo mcp login/logout` Fails
 
-Current behavior:
+Check:
 
-- OAuth login/logout flow is not implemented yet
+1. target server is `streamable_http` (stdio servers do not support OAuth login).
+2. remote URL is reachable from current network.
+3. callback port is available (set `mcp_oauth_callback_port` in `config.toml` if needed).
 
-Fix:
+Fallback:
 
-- use `--bearer-token-env-var` and exported env token for remote HTTP MCP
+- use `--bearer-token-env-var` for token-based auth.
 
 ## Subagent Issues
 
@@ -136,13 +138,14 @@ Fix:
 2. split work into smaller calls
 3. increase `MEMO_TOOL_RESULT_MAX_CHARS` only if necessary
 
-## `--once` Flag Error
+## `--prev` Finds No Session
 
 Symptom:
 
-- `--once has been removed`
+- `No previous session found for current directory.`
 
 Fix:
 
-- use `memo` for interactive mode
-- use stdin piping for one-shot plain mode
+1. run a normal session first in the same directory.
+2. confirm `~/.memo/sessions/` contains history files for that project path.
+3. rerun `memo --prev`.

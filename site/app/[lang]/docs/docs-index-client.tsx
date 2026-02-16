@@ -130,7 +130,7 @@ export function DocsIndexClient({ pages, lang, messages }: DocsIndexClientProps)
                             {t('docs.needHelp.troubleshooting')}
                         </Link>
                         <a
-                            href="https://github.com/minorcell/memo-cli/issues"
+                            href="https://github.com/minorcell/memo-code/issues"
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"

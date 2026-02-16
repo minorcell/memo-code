@@ -11,7 +11,7 @@ category: 'Getting Started'
 
 ## 前置条件
 
-- Node.js `>= 18`
+- Node.js `>= 20`
 - 至少一个兼容的 API 密钥（例如 `DEEPSEEK_API_KEY` 或 `OPENAI_API_KEY`）
 
 ## 安装
@@ -67,6 +67,11 @@ echo "Summarize this repository structure" | memo
 
 在脚本和 CI 中使用纯文本模式。对于交互式审批和更丰富的工作流，请使用 TUI 模式。
 
+## 单次执行与会话续接
+
+- 单次执行：`memo --once "your prompt"`（或 `memo -once "your prompt"`）。
+- 续接当前目录最近会话：`memo --prev`（或 `memo -prev`）。
+
 ## 危险模式
 
 跳过审批提示：
@@ -78,6 +83,19 @@ memo -d
 ```
 
 仅在受信任的仓库和受控环境中使用此模式。
+
+## Web 控制台
+
+启动本地 Web 服务与 UI：
+
+```bash
+memo web --host 127.0.0.1 --port 5494 --open
+```
+
+- npm 分发包已包含 web 静态资源。
+- 如果从源码仓库运行，请先执行 `pnpm run build`。
+- 登录凭据来自 `~/.memo/server.yaml`（`auth.username` / `auth.password`）。
+- UI 提供聊天时间线、项目/会话管理、MCP 管理和 Skills 管理。
 
 ## 下一步
 

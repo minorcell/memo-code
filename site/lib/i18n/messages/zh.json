@@ -1,8 +1,8 @@
 {
     "metadata": {
-        "title": "Memo CLI - 终端 AI 编程助手",
+        "title": "Memo Code - 终端 AI 编程助手",
         "description": "Memo 是一个轻量级开源编程助手，直接在终端中运行。通过自然语言获得 AI 辅助，更快地编写代码。",
-        "template": "%s | Memo CLI"
+        "template": "%s | Memo Code"
     },
     "nav": {
         "docs": "文档",
@@ -26,32 +26,32 @@
                     "title": "终端原生",
                     "description": "在你常用的终端环境中工作，直接集成到你的终端工作流中。"
                 },
-                "fastFeedback": {
-                    "title": "快速反馈",
-                    "description": "为快速迭代优化，从阅读代码到应用变更一气呵成。"
+                "webConsole": {
+                    "title": "Web 控制台",
+                    "description": "在浏览器中管理多 workspace 项目与并发实时会话。"
                 },
                 "builtInTools": {
-                    "title": "内置工具",
+                    "title": "内置丰富工具",
                     "description": "文件 I/O、grep、命令执行和代码补丁开箱即用。"
                 },
-                "approvalControls": {
-                    "title": "审批控制",
-                    "description": "危险操作可以在执行前要求确认。"
+                "security": {
+                    "title": "安全",
+                    "description": "工具审批与受控执行让高风险操作保持显式且可控。"
                 },
                 "mcpReady": {
-                    "title": "MCP 就绪",
+                    "title": "MCP",
                     "description": "通过模型上下文协议连接外部能力。"
                 },
-                "multiAgent": {
-                    "title": "多代理模式",
-                    "description": "当工作需要分散处理时，将子任务委派给子代理。"
+                "skills": {
+                    "title": "Skills",
+                    "description": "使用基于 Markdown 的 skills，并在 CLI 与 Web 中控制激活状态。"
                 }
             }
         },
         "architecture": {
             "badge": "架构",
             "title": "系统架构设计",
-            "subtitle": "Memo CLI 内部的清晰分层架构图，保持与当前 Linear 风格视觉语言一致。"
+            "subtitle": "Memo CLI 内部的清晰分层架构图"
         },
         "quickstart": {
             "badge": "快速开始",
@@ -64,7 +64,7 @@
                 },
                 "configure": {
                     "title": "配置",
-                    "description": "使用 OpenAI 兼容或 DeepSeek 提供商。"
+                    "description": "使用兼容 OpenAI API 格式的提供商。"
                 },
                 "launch": {
                     "title": "启动",
@@ -82,7 +82,7 @@
             "npmInstall": "npm 安装"
         },
         "footer": {
-            "copyright": "© 2025 Memo CLI · MIT 许可证"
+            "copyright": "© 2025 Memo Code · MIT 许可证"
         }
     },
     "docs": {

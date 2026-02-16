@@ -51,11 +51,17 @@ memo mcp help
 ### 登录/注销命令
 
 ```bash
-memo mcp login <name>
+memo mcp login <name> [--scopes read,write]
 memo mcp logout <name>
 ```
 
-这些命令目前尚未实现 OAuth 流程。对于远程认证，优先使用 bearer-token 环境变量。
+`streamable_http` 服务器支持 OAuth 登录/注销。
+`memo mcp list` 同时会输出每个服务器的 `auth_status`：
+
+- `unsupported`
+- `not_logged_in`
+- `bearer_token`
+- `oauth`
 
 ## 手动 `config.toml` 示例
 
@@ -90,6 +96,14 @@ bearer_token_env_var = "MCP_TOKEN"
 ```
 
 它显示为当前会话配置的 MCP 服务器。
+
+## 在 Web UI 中管理 MCP
+
+在 `memo web` 模式下，可从侧边栏进入 `MCP Servers` 页面进行：
+
+- 创建 / 编辑 / 删除 server
+- 对支持 OAuth 的远程 server 登录 / 登出
+- 切换默认激活状态
 
 ## 配置更改何时生效
 

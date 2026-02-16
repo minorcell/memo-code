@@ -22,7 +22,7 @@
 
 <img src="public/demo.png" width="100%" alt="Memo Code demo">
 
-Built with Node.js + TypeScript. DeepSeek is the default provider, and OpenAI-compatible APIs are supported.
+Built with Node.js + TypeScript. Memo works with OpenAI-compatible APIs.
 
 Memo Code is an open-source coding agent that lives in your terminal, understands repository context, and helps you move faster with natural-language commands.
 
@@ -40,10 +40,13 @@ yarn global add @memo-code/memo
 bun add -g @memo-code/memo
 ```
 
+Note: npm distribution is prebuilt and already includes required runtime/web assets.  
+`pnpm run build` is only needed when you run Memo from source checkout in this repository.
+
 ### 2. Configure API Key
 
 ```bash
-export DEEPSEEK_API_KEY=your_key  # or OPENAI_API_KEY
+export OPENAI_API_KEY=your_key
 ```
 
 ### 3. Start
@@ -61,10 +64,26 @@ memo
 - Continue latest local session: `memo --prev` or `memo -prev` (load latest session context for current directory).
 - Dangerous mode: `memo --dangerous` or `memo -d` (skip tool approvals; use carefully).
 - Version: `memo --version` or `memo -v`.
-- Start web server (MVP): `memo web --host 127.0.0.1 --port 5494 --open` (requires built web UI assets).
+- Start web server: `memo web --host 127.0.0.1 --port 5494 --open` (npm package already includes web assets; source checkout needs `pnpm run build`).
 - Startup project guidance: if `AGENTS.md` exists in the startup root, Memo appends it to the system prompt automatically.
 - Skills: Memo auto-discovers `SKILL.md` files and appends an available-skills section into the system prompt.
 - MCP activation selection: when MCP servers are configured, startup shows a multi-select to activate servers for this run.
+- Web app supports multi-workspace project management and concurrent live sessions (up to 20 per server process).
+
+## Web Console
+
+```bash
+memo web --host 127.0.0.1 --port 5494 --open
+```
+
+- npm distribution already bundles web server + web UI assets.
+- if running from source checkout, build once with `pnpm run build`.
+- Web auth config is stored in `~/.memo/server.yaml` by default (`MEMO_SERVER_CONFIG` can override path).
+- On first startup, Memo creates this file with generated auth secrets and a random password.
+- Login page uses `server.yaml` credentials (`auth.username` / `auth.password`).
+- Sidebar includes dedicated entries for `MCP Servers` and `Skills`:
+    - MCP: create/edit/remove/login/logout and active toggles.
+    - Skills: create/delete, detail preview, and active toggles.
 
 ## Configuration
 
@@ -73,14 +92,14 @@ Location: `~/.memo/config.toml` (can be changed via `MEMO_HOME`).
 ### Provider Configuration
 
 ```toml
-current_provider = "deepseek"
+current_provider = "openai_compatible"
 auto_compact_threshold_percent = 80
 
-[[providers.deepseek]]
-name = "deepseek"
-env_api_key = "DEEPSEEK_API_KEY"
-model = "deepseek-chat"
-base_url = "https://api.deepseek.com"
+[[providers.openai_compatible]]
+name = "openai_compatible"
+env_api_key = "OPENAI_API_KEY"
+model = "gpt-4.1-mini"
+base_url = "https://api.openai.com/v1"
 ```
 
 You can configure multiple providers and switch with `current_provider`.
@@ -185,6 +204,16 @@ Memo reads `name` and `description` from frontmatter and injects each skill as m
 
 In prompts, users can explicitly mention a skill with `$skill-name` (for example, `$doc-writing`).
 
+Optional: persist default active skills in `config.toml`:
+
+```toml
+# Unset: all discovered skills are active by default.
+# []: disable all skills by default.
+active_skills = [
+  "/absolute/path/to/.codex/skills/doc-writing/SKILL.md"
+]
+```
+
 ## Built-in Tools
 
 - `exec_command` / `write_stdin`: execute shell commands (default shell family)
@@ -259,7 +288,7 @@ npm run format:check  # check format (CI)
 ## Project Structure
 
 ```text
-memo-cli/
+memo-code/
 ├── packages/
 │   ├── core/       # core logic: Session, tool routing, config
 │   ├── tools/      # built-in tool implementations
@@ -271,7 +300,7 @@ memo-cli/
 ## CLI Shortcuts and Commands
 
 - `/help`: show help and shortcut guide.
-- `/models`: list available Provider/Model entries and switch with Enter; also supports direct selection like `/models deepseek`.
+- `/models`: list available Provider/Model entries and switch with Enter; also supports direct selection like `/models openai_compatible`.
 - `/review <prNumber>`: run GitHub PR review and publish review comments (uses active GitHub MCP server first, then falls back to `gh` CLI).
 - `/compact`: manually compact current session context.
 - `/mcp`: show configured MCP servers in current session.
@@ -293,7 +322,8 @@ memo-cli/
 
 ## Related Docs
 
-- [User Guide](./site/content/docs/README.md) - User-facing docs by module
+- [User Guide (EN)](./site/content/docs/en/README.mdx) - User-facing docs by module
+- [用户指南 (ZH)](./site/content/docs/zh/README.mdx) - 中文文档入口
 - [Core Architecture](./docs/core.md) - Core implementation details
 - [CLI Adaptation History](./docs/cli-update.md) - Historical migration notes (Tool Use API)
 - [Contributing](./CONTRIBUTING.md) - Contribution guide
