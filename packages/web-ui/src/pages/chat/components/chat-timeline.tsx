@@ -53,11 +53,36 @@ export function ChatTimeline({
                         const normalizedError = turn.errorMessage?.trim() ?? ''
                         const shouldShowError =
                             Boolean(normalizedError) && normalizedError !== normalizedAssistant
-                        const stepThinkingTexts = (turn.steps ?? [])
-                            .map((step) =>
-                                step.thinking ? stripThinkingBlocks(step.thinking) : '',
-                            )
-                            .filter((text) => Boolean(text.trim()))
+                        const stepViews = (turn.steps ?? [])
+                            .map((step) => {
+                                const thinkingText = step.thinking
+                                    ? stripThinkingBlocks(step.thinking).trim()
+                                    : ''
+                                const assistantStepText = step.assistantText
+                                    ? stripThinkingBlocks(step.assistantText).trim()
+                                    : ''
+                                const hasToolAction = Boolean(
+                                    (step.parallelActions && step.parallelActions.length > 1) ||
+                                        step.action,
+                                )
+                                const showAssistantStep = Boolean(assistantStepText) && !hasToolAction
+                                const hasRenderableContent =
+                                    Boolean(thinkingText) || hasToolAction || showAssistantStep
+                                return {
+                                    step,
+                                    thinkingText,
+                                    assistantStepText,
+                                    hasToolAction,
+                                    showAssistantStep,
+                                    hasRenderableContent,
+                                }
+                            })
+                            .filter((item) => item.hasRenderableContent)
+                        const hasStepAssistantText = stepViews.some((item) => item.showAssistantStep)
+                        const shouldShowGlobalAssistant =
+                            Boolean(normalizedAssistant) &&
+                            !hasStepAssistantText &&
+                            (turn.status !== 'running' || stepViews.length === 0)
                         return (
                             <div key={turn.turn} className="mb-6">
                                 <div className="mb-4 flex justify-end">
@@ -67,25 +92,33 @@ export function ChatTimeline({
                                 </div>
                                 <div className="flex-1 space-y-2">
                                     <div className="space-y-2">
-                                        {stepThinkingTexts.map((text, index) => (
-                                            <p
-                                                key={`${turn.turn}-thinking-${index}`}
-                                                className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground"
+                                        {stepViews.map((item) => (
+                                            <div
+                                                key={`${turn.turn}-step-${item.step.step}`}
+                                                className="space-y-2"
                                             >
-                                                {text}
-                                            </p>
-                                        ))}
-                                        {(turn.steps ?? []).map((step) => (
-                                            <ToolStepCard
-                                                key={`${turn.turn}-step-${step.step}`}
-                                                step={step}
-                                                cwd={sessionCwd}
-                                            />
+                                                {item.thinkingText ? (
+                                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                                        {item.thinkingText}
+                                                    </p>
+                                                ) : null}
+                                                {item.hasToolAction ? (
+                                                    <ToolStepCard step={item.step} cwd={sessionCwd} />
+                                                ) : null}
+                                                {item.showAssistantStep ? (
+                                                    <div className="text-sm leading-relaxed">
+                                                        <MarkdownMessage
+                                                            content={item.assistantStepText}
+                                                            isStreaming={turn.status === 'running'}
+                                                        />
+                                                    </div>
+                                                ) : null}
+                                            </div>
                                         ))}
                                     </div>
 
                                     <div className="text-sm leading-relaxed">
-                                        {assistantContent ? (
+                                        {shouldShowGlobalAssistant ? (
                                             <MarkdownMessage
                                                 content={assistantContent}
                                                 isStreaming={turn.status === 'running'}
