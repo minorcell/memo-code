@@ -64,6 +64,18 @@ type GitIgnoreMatcher = {
 
 const directoryCache = new Map<string, DirectoryCache>()
 const gitIgnoreMatcherCache = new Map<string, Promise<GitIgnoreMatcher>>()
+const ignoreRootCache = new Map<string, string>()
+const MAX_IGNORE_ROOT_CACHE = 256
+
+function rememberIgnoreRoot(path: string, root: string): void {
+    if (ignoreRootCache.size >= MAX_IGNORE_ROOT_CACHE && !ignoreRootCache.has(path)) {
+        const oldest = ignoreRootCache.keys().next().value
+        if (typeof oldest === 'string') {
+            ignoreRootCache.delete(oldest)
+        }
+    }
+    ignoreRootCache.set(path, root)
+}
 
 export function normalizePath(input: string): string {
     return input.split(sep).join('/')
@@ -126,7 +138,11 @@ function toPosixPath(inputPath: string): string {
 }
 
 function findIgnoreRoot(startPath: string): string {
-    let dir = resolve(startPath)
+    const resolvedStart = resolve(startPath)
+    const cached = ignoreRootCache.get(resolvedStart)
+    if (cached) return cached
+
+    let dir = resolvedStart
     try {
         if (statSync(dir).isFile()) {
             dir = dirname(dir)
@@ -135,21 +151,31 @@ function findIgnoreRoot(startPath: string): string {
         dir = process.cwd()
     }
     const initial = dir
+    const visited: string[] = []
 
     while (true) {
+        visited.push(dir)
         if (existsSync(join(dir, '.gitignore')) || existsSync(join(dir, '.git'))) {
+            for (const item of visited) {
+                rememberIgnoreRoot(item, dir)
+            }
+            rememberIgnoreRoot(resolvedStart, dir)
             return dir
         }
         const parent = dirname(dir)
-        if (parent === dir) return initial
+        if (parent === dir) {
+            for (const item of visited) {
+                rememberIgnoreRoot(item, initial)
+            }
+            rememberIgnoreRoot(resolvedStart, initial)
+            return initial
+        }
         dir = parent
     }
 }
 
 async function loadGitignore(root: string): Promise<string[]> {
     const gitignorePath = join(root, '.gitignore')
-    if (!existsSync(gitignorePath)) return []
-
     try {
         const raw = await readFile(gitignorePath, 'utf8')
         return raw
@@ -369,9 +395,17 @@ export async function getFileSuggestions(req: FileSuggestionRequest): Promise<Fi
 export function invalidateFileSuggestionCache(cwd?: string): void {
     if (cwd) {
         directoryCache.delete(cwd)
-        gitIgnoreMatcherCache.delete(findIgnoreRoot(cwd))
+        const root = findIgnoreRoot(cwd)
+        gitIgnoreMatcherCache.delete(root)
+        const resolvedCwd = resolve(cwd)
+        for (const [path, cachedRoot] of ignoreRootCache.entries()) {
+            if (path === resolvedCwd || cachedRoot === root) {
+                ignoreRootCache.delete(path)
+            }
+        }
         return
     }
     directoryCache.clear()
     gitIgnoreMatcherCache.clear()
+    ignoreRootCache.clear()
 }
