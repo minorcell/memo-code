@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { toast } from 'sonner'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { MemoLogo } from '@/components/layout/memo-logo'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -26,6 +26,12 @@ export function LoginPage() {
 
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
+
+    useEffect(() => {
+        if (!error) return
+        toast.error(error)
+        clearError()
+    }, [error, clearError])
 
     if (isAuthenticated) {
         const state = location.state as RedirectState | null
@@ -85,12 +91,6 @@ export function LoginPage() {
                                     placeholder="Enter your password"
                                 />
                             </div>
-
-                            {error ? (
-                                <Alert variant="destructive">
-                                    <AlertDescription>{error}</AlertDescription>
-                                </Alert>
-                            ) : null}
 
                             <Button
                                 type="submit"
