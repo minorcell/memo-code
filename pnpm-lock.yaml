@@ -81,6 +81,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^2.1.9
         version: 2.1.9(vitest@2.1.9(@types/node@22.19.7)(lightningcss@1.30.2)(msw@2.12.10(@types/node@22.19.7)(typescript@5.9.3))(terser@5.46.0))
+      esbuild:
+        specifier: ^0.27.2
+        version: 0.27.2
       prettier:
         specifier: ^3.3.3
         version: 3.8.1
