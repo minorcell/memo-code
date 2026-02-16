@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { defineMcpTool } from '@memo/tools/tools/types'
 import { textResult } from '@memo/tools/tools/mcp'
+import { getWebfetchPreviewChars } from '@memo/tools/runtime/tool_output_limits'
 
 const WEBFETCH_INPUT_SCHEMA = z
     .object({
@@ -12,7 +13,6 @@ type WebFetchInput = z.infer<typeof WEBFETCH_INPUT_SCHEMA>
 
 const WEBFETCH_TIMEOUT_MS = 10_000
 const MAX_BODY_BYTES = 512_000
-const MAX_BODY_PREVIEW = 4_000
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])
 const HTML_BREAK_TAG =
     /<\/\s*(p|div|section|article|header|footer|aside|main|h[1-6]|li|tr|table|blockquote)\s*>/gi
@@ -146,13 +146,14 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
 
             const plainText = looksLikeHtml ? htmlToPlainText(bodyText) : bodyText.trim()
             const normalizedText = sanitizePreview(plainText)
+            const previewLimit = getWebfetchPreviewChars()
 
             const preview =
-                normalizedText.length > MAX_BODY_PREVIEW
-                    ? `${normalizedText.slice(0, MAX_BODY_PREVIEW)}...`
+                normalizedText.length > previewLimit
+                    ? `${normalizedText.slice(0, previewLimit)}...`
                     : normalizedText
             const truncatedNote =
-                normalizedText.length > MAX_BODY_PREVIEW ? ' text_truncated=true' : ''
+                normalizedText.length > previewLimit ? ' text_truncated=true' : ''
             const formatNote = looksLikeHtml ? ' source=html_stripped' : ''
 
             return textResult(
