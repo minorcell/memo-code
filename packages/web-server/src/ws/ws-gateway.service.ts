@@ -170,6 +170,21 @@ function rawByteLength(raw: RawData): number {
   return raw.byteLength;
 }
 
+function rawToUtf8(raw: RawData): string {
+  if (typeof raw === 'string') {
+    return raw;
+  }
+  if (raw instanceof ArrayBuffer) {
+    return Buffer.from(raw).toString('utf8');
+  }
+  if (Array.isArray(raw)) {
+    return Buffer.concat(raw.map((chunk) => Buffer.from(chunk))).toString(
+      'utf8',
+    );
+  }
+  return raw.toString('utf8');
+}
+
 @Injectable()
 export class WsGatewayService implements OnModuleDestroy {
   private readonly logger = new Logger(WsGatewayService.name);
@@ -293,9 +308,16 @@ export class WsGatewayService implements OnModuleDestroy {
     }
 
     const now = Date.now();
-    connection.requestWindow = connection.requestWindow.filter(
-      (item) => now - item < 60_000,
-    );
+    let removeCount = 0;
+    while (
+      removeCount < connection.requestWindow.length &&
+      now - connection.requestWindow[removeCount]! >= 60_000
+    ) {
+      removeCount += 1;
+    }
+    if (removeCount > 0) {
+      connection.requestWindow.splice(0, removeCount);
+    }
     connection.requestWindow.push(now);
     if (connection.requestWindow.length > MAX_REQUESTS_PER_MINUTE) {
       this.sendRpcError(
@@ -311,7 +333,7 @@ export class WsGatewayService implements OnModuleDestroy {
 
     let parsed: RpcRequestFrame;
     try {
-      const payload = JSON.parse(String(raw)) as unknown;
+      const payload = JSON.parse(rawToUtf8(raw)) as unknown;
       parsed = asRpcRequest(payload);
     } catch (error) {
       const wsError =
@@ -586,7 +608,7 @@ export class WsGatewayService implements OnModuleDestroy {
       ok: true,
       data,
     };
-    connection.socket.send(JSON.stringify(response));
+    this.sendSerialized(connection, JSON.stringify(response));
   }
 
   private sendRpcError(
@@ -604,7 +626,7 @@ export class WsGatewayService implements OnModuleDestroy {
         ...(error.details === undefined ? {} : { details: error.details }),
       },
     };
-    connection.socket.send(JSON.stringify(response));
+    this.sendSerialized(connection, JSON.stringify(response));
   }
 
   private sendEvent(
@@ -613,12 +635,30 @@ export class WsGatewayService implements OnModuleDestroy {
     data: unknown,
   ): void {
     const eventFrame = this.eventBus.create(topic, data);
-    connection.socket.send(JSON.stringify(eventFrame));
+    this.sendSerialized(connection, JSON.stringify(eventFrame));
   }
 
   private broadcastEventToAll(topic: string, data: unknown): void {
+    if (this.connections.size === 0) return;
+    const eventFrame = this.eventBus.create(topic, data);
+    const encoded = JSON.stringify(eventFrame);
     for (const connection of this.connections.values()) {
-      this.sendEvent(connection, topic, data);
+      this.sendSerialized(connection, encoded);
+    }
+  }
+
+  private sendSerialized(connection: ConnectionState, encoded: string): void {
+    if (connection.socket.readyState !== connection.socket.OPEN) {
+      return;
+    }
+    try {
+      connection.socket.send(encoded);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `ws send failed connection=${connection.id}: ${message}`,
+      );
+      this.cleanupConnection(connection.id);
     }
   }
 
