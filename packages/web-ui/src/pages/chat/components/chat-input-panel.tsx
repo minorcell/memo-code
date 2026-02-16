@@ -182,7 +182,7 @@ export function ChatInputPanel({
     }
 
     return (
-        <div className="mx-auto mb-3 w-[calc(100%-2rem)] max-w-3xl">
+        <div className="mx-auto mb-3 w-[calc(100%-2rem)] max-w-[50.4rem]">
             {pendingApproval ? (
                 <div className="mb-2 rounded-lg border border-border/70 px-3 py-2">
                     <p className="text-xs font-medium text-foreground">
