@@ -4,7 +4,10 @@ import { existsSync, statSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import ignore, { type Ignore } from 'ignore'
 import { getRuntimeCwd } from '@memo/tools/runtime/context'
-import { getMaxToolResultChars, getMaxToolResultLines } from '@memo/tools/runtime/tool_output_limits'
+import {
+    getMaxToolResultChars,
+    getMaxToolResultLines,
+} from '@memo/tools/runtime/tool_output_limits'
 
 /**
  * 生成标准化的绝对路径，避免因工作目录差异导致的路径错误。

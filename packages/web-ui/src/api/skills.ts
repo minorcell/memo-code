@@ -39,3 +39,7 @@ export function updateSkill(
 export function removeSkill(id: string) {
     return wsRequest<{ deleted: true }>('skills.remove', { id })
 }
+
+export function setActiveSkillIds(ids: string[]) {
+    return wsRequest<{ active: string[] }>('skills.active.set', { ids })
+}

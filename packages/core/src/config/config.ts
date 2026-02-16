@@ -52,6 +52,8 @@ export type MemoConfig = {
     mcp_servers?: Record<string, MCPServerConfig>
     /** Persisted default active MCP servers for interactive sessions. */
     active_mcp_servers?: string[]
+    /** Persisted default active skills (absolute SKILL.md paths). Undefined means all discovered skills. */
+    active_skills?: string[]
     /** MCP OAuth credential store policy. */
     mcp_oauth_credentials_store_mode?: McpOAuthCredentialsStoreMode
     /** Optional callback port for MCP OAuth browser login. */
@@ -155,6 +157,15 @@ function normalizeProviders(input: unknown): ProviderConfig[] {
         }
     }
     return providers
+}
+
+function normalizeActiveSkills(input: unknown): string[] | undefined {
+    if (!Array.isArray(input)) return undefined
+    const items = input
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    return Array.from(new Set(items))
 }
 
 function normalizeModelProfiles(input: unknown): Record<string, ModelProfileOverride> | undefined {
@@ -284,6 +295,9 @@ function serializeConfig(config: MemoConfig) {
     if (Array.isArray(config.active_mcp_servers)) {
         mainLines.push(`active_mcp_servers = ${JSON.stringify(config.active_mcp_servers)}`)
     }
+    if (Array.isArray(config.active_skills)) {
+        mainLines.push(`active_skills = ${JSON.stringify(config.active_skills)}`)
+    }
     const oauthStoreMode = config.mcp_oauth_credentials_store_mode
     if (oauthStoreMode === 'auto' || oauthStoreMode === 'keyring' || oauthStoreMode === 'file') {
         mainLines.push(`mcp_oauth_credentials_store_mode = ${JSON.stringify(oauthStoreMode)}`)
@@ -331,6 +345,7 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
                   (name): name is string => typeof name === 'string' && name.trim().length > 0,
               )
             : undefined
+        const activeSkills = normalizeActiveSkills(parsed.active_skills)
         const oauthStoreMode =
             parsed.mcp_oauth_credentials_store_mode === 'auto' ||
             parsed.mcp_oauth_credentials_store_mode === 'keyring' ||
@@ -357,6 +372,7 @@ export async function loadMemoConfig(): Promise<LoadedConfig> {
             model_profiles: modelProfiles,
             mcp_servers: parsed.mcp_servers ?? {},
             active_mcp_servers: activeMcpServers,
+            active_skills: activeSkills,
         }
         const needsSetup = !merged.providers.length
         return { config: needsSetup ? DEFAULT_CONFIG : merged, home, configPath, needsSetup }

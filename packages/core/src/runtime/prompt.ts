@@ -1,7 +1,7 @@
 /** @file System prompt loading: reads built-in Markdown template by default. */
 import os from 'node:os'
 import { readFile } from 'node:fs/promises'
-import { join, dirname } from 'node:path'
+import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadSkills, renderSkillsSection } from '@memo/core/runtime/skills'
 
@@ -28,8 +28,25 @@ type LoadSystemPromptOptions = {
     homeDir?: string
     /** Optional memo home override, defaults to MEMO_HOME or ~/.memo. */
     memoHome?: string
+    /** Explicit active skill path list; undefined means all discovered skills are active. */
+    activeSkillPaths?: string[]
     /** Disable skills injection into system prompt when false. */
     includeSkills?: boolean
+}
+
+function normalizePath(path: string): string {
+    return resolve(path)
+}
+
+function filterActiveSkills(
+    skills: Awaited<ReturnType<typeof loadSkills>>,
+    activeSkillPaths: string[] | undefined,
+) {
+    if (!Array.isArray(activeSkillPaths)) {
+        return skills
+    }
+    const active = new Set(activeSkillPaths.map((item) => normalizePath(item)))
+    return skills.filter((skill) => active.has(normalizePath(skill.path)))
 }
 
 async function readProjectAgentsMd(
@@ -92,12 +109,13 @@ export async function loadSystemPrompt(options: LoadSystemPromptOptions = {}): P
     }
 
     if (options.includeSkills !== false) {
-        const skills = await loadSkills({
+        const allSkills = await loadSkills({
             cwd: startupRoot,
             skillRoots: options.skillRoots,
             homeDir: options.homeDir,
             memoHome: options.memoHome,
         })
+        const skills = filterActiveSkills(allSkills, options.activeSkillPaths)
         const skillsSection = renderSkillsSection(skills)
         if (skillsSection) {
             composedPrompt = appendSkillsPrompt(composedPrompt, skillsSection)

@@ -21,6 +21,7 @@ type SkillsStore = {
         content?: string
     }) => Promise<void>
     remove: (id: string) => Promise<void>
+    toggleActive: (id: string, active: boolean) => Promise<boolean>
     clearError: () => void
 }
 
@@ -73,6 +74,28 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
             await get().load()
         } catch (error) {
             set({ error: getErrorMessage(error, 'Failed to delete skill') })
+        }
+    },
+
+    async toggleActive(id, active) {
+        const current = get()
+        const ids = active
+            ? Array.from(
+                  new Set([
+                      ...current.items.filter((item) => item.active).map((item) => item.id),
+                      id,
+                  ]),
+              )
+            : current.items.filter((item) => item.active && item.id !== id).map((item) => item.id)
+
+        set({ error: null })
+        try {
+            await skillsApi.setActiveSkillIds(ids)
+            await get().load()
+            return true
+        } catch (error) {
+            set({ error: getErrorMessage(error, 'Failed to update active skills') })
+            return false
         }
     },
 

@@ -9,6 +9,7 @@ import {
   getSkill,
   listSkills,
   removeSkill,
+  setActiveSkills,
   SkillsAdminError,
   updateSkill,
 } from '@memo-code/core';
@@ -73,6 +74,11 @@ export class SkillsService {
   async remove(id: string) {
     const workspaceCwds = await this.listWorkspaceCwds();
     return this.wrap(() => removeSkill(id, { workspaceCwds }));
+  }
+
+  async setActive(ids: string[]) {
+    const workspaceCwds = await this.listWorkspaceCwds();
+    return this.wrap(() => setActiveSkills(ids, { workspaceCwds }));
   }
 
   private async listWorkspaceCwds(): Promise<string[]> {

@@ -361,12 +361,12 @@ export function SettingsMcp() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={openCreateEditor}>
+                    <Button variant="ghost" size="sm" onClick={openCreateEditor}>
                         <Plus className="size-4" />
                         Add server
                     </Button>
                     <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => void load()}
                         disabled={loading}
@@ -394,7 +394,7 @@ export function SettingsMcp() {
                 </h2>
 
                 {items.length === 0 && !loading ? (
-                    <Card>
+                    <Card className="border-0 bg-muted/20 shadow-none">
                         <CardContent className="py-8 text-center text-sm text-muted-foreground">
                             <Bot className="mx-auto mb-2 size-6 opacity-60" />
                             No MCP servers configured.
@@ -408,7 +408,7 @@ export function SettingsMcp() {
                     const canAuth = isHttp
 
                     return (
-                        <Card key={item.name}>
+                        <Card key={item.name} className="border-0 bg-card/70 shadow-none">
                             <CardContent className="py-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
@@ -416,7 +416,7 @@ export function SettingsMcp() {
                                             <h3 className="truncate text-sm font-medium">
                                                 {item.name}
                                             </h3>
-                                            <Badge variant="outline">
+                                            <Badge variant="secondary">
                                                 {isHttp ? 'streamable_http' : 'stdio'}
                                             </Badge>
                                             <Badge
@@ -428,7 +428,7 @@ export function SettingsMcp() {
                                             >
                                                 {item.active ? 'Active' : 'Inactive'}
                                             </Badge>
-                                            <Badge variant="outline" className="gap-1">
+                                            <Badge variant="secondary" className="gap-1">
                                                 <ShieldCheck className="size-3.5" />
                                                 {authStatusText(item.authStatus)}
                                             </Badge>
@@ -456,7 +456,7 @@ export function SettingsMcp() {
                                     </div>
 
                                     <div className="flex shrink-0 items-center gap-2">
-                                        <div className="flex items-center gap-2 rounded-md border px-2 py-1">
+                                        <div className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1">
                                             <span className="text-xs text-muted-foreground">
                                                 Active
                                             </span>
@@ -470,7 +470,7 @@ export function SettingsMcp() {
 
                                         {canAuth && item.authStatus === 'not_logged_in' ? (
                                             <Button
-                                                variant="outline"
+                                                variant="ghost"
                                                 size="sm"
                                                 onClick={() => void loginServer(item.name)}
                                             >
@@ -481,7 +481,7 @@ export function SettingsMcp() {
                                         (item.authStatus === 'oauth' ||
                                             item.authStatus === 'bearer_token') ? (
                                             <Button
-                                                variant="outline"
+                                                variant="ghost"
                                                 size="sm"
                                                 onClick={() => void logoutServer(item.name)}
                                             >
@@ -490,7 +490,7 @@ export function SettingsMcp() {
                                         ) : null}
 
                                         <Button
-                                            variant="outline"
+                                            variant="ghost"
                                             size="sm"
                                             onClick={() => openEditEditor(item)}
                                         >
@@ -524,7 +524,10 @@ export function SettingsMcp() {
                     }}
                 >
                     <div
-                        className={cn('w-full max-w-2xl p-5', SETTINGS_MODAL_CLASS)}
+                        className={cn(
+                            'w-full max-w-2xl border-0 p-5 shadow-2xl',
+                            SETTINGS_MODAL_CLASS,
+                        )}
                         onClick={(event) => {
                             event.stopPropagation()
                         }}
@@ -715,7 +718,10 @@ export function SettingsMcp() {
                     }}
                 >
                     <div
-                        className={cn('w-full max-w-md p-5', SETTINGS_MODAL_CLASS)}
+                        className={cn(
+                            'w-full max-w-md border-0 p-5 shadow-2xl',
+                            SETTINGS_MODAL_CLASS,
+                        )}
                         onClick={(event) => {
                             event.stopPropagation()
                         }}

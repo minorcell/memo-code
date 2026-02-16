@@ -232,6 +232,7 @@ export type SkillRecord = {
     description: string
     scope: 'project' | 'global'
     path: string
+    active: boolean
 }
 
 export type McpServerRecord = {

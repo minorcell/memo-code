@@ -160,6 +160,7 @@ export async function withDefaultDeps(
             : await defaultLoadPrompt({
                   cwd: options.cwd,
                   memoHome: loaded.home,
+                  activeSkillPaths: config.active_skills,
               })
 
         // Inject tool descriptions into prompt (for non-Tool Use API mode)

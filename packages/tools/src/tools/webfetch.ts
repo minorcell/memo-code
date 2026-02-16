@@ -152,8 +152,7 @@ export const webfetchTool = defineMcpTool<WebFetchInput>({
                 normalizedText.length > previewLimit
                     ? `${normalizedText.slice(0, previewLimit)}...`
                     : normalizedText
-            const truncatedNote =
-                normalizedText.length > previewLimit ? ' text_truncated=true' : ''
+            const truncatedNote = normalizedText.length > previewLimit ? ' text_truncated=true' : ''
             const formatNote = looksLikeHtml ? ' source=html_stripped' : ''
 
             return textResult(

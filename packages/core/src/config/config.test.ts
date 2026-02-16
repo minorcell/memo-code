@@ -117,6 +117,7 @@ describe('mcp config serialization', () => {
         await writeMemoConfig(configPath, {
             current_provider: 'deepseek',
             active_mcp_servers: ['remote'],
+            active_skills: ['/tmp/.memo/skills/doc-writing/SKILL.md'],
             mcp_oauth_credentials_store_mode: 'file',
             mcp_oauth_callback_port: 8765,
             model_profiles: {
@@ -149,6 +150,7 @@ describe('mcp config serialization', () => {
         const text = await readFile(configPath, 'utf-8')
         expect(text).toContain('[[providers.deepseek]]')
         expect(text).toContain('active_mcp_servers = ["remote"]')
+        expect(text).toContain('active_skills = ["/tmp/.memo/skills/doc-writing/SKILL.md"]')
         expect(text).toContain('mcp_oauth_credentials_store_mode = "file"')
         expect(text).toContain('mcp_oauth_callback_port = 8765')
         expect(text).toContain('auto_compact_threshold_percent = 80')
@@ -217,6 +219,7 @@ url = "https://example.com/mcp"
         const configText = `
 current_provider = "deepseek"
 active_mcp_servers = ["remote2"]
+active_skills = ["/tmp/.memo/skills/doc-writing/SKILL.md"]
 mcp_oauth_credentials_store_mode = "keyring"
 mcp_oauth_callback_port = 12345
 
@@ -243,6 +246,7 @@ url = "https://example.com/mcp-2"
         const loaded = await loadMemoConfig()
         const servers = loaded.config.mcp_servers ?? {}
         expect(loaded.config.active_mcp_servers).toEqual(['remote2'])
+        expect(loaded.config.active_skills).toEqual(['/tmp/.memo/skills/doc-writing/SKILL.md'])
         expect(loaded.config.mcp_oauth_credentials_store_mode).toBe('keyring')
         expect(loaded.config.mcp_oauth_callback_port).toBe(12345)
         expect(loaded.config.model_profiles?.['gpt-5']).toEqual({

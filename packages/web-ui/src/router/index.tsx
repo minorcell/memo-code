@@ -35,6 +35,10 @@ export const appRouter = createBrowserRouter([
                 element: <ChatPage />,
             },
             {
+                path: 'mcp',
+                element: <SettingsMcp />,
+            },
+            {
                 path: 'skills',
                 element: <SkillsPage />,
             },
@@ -49,10 +53,6 @@ export const appRouter = createBrowserRouter([
                     {
                         path: 'general',
                         element: <SettingsGeneral />,
-                    },
-                    {
-                        path: 'mcp',
-                        element: <SettingsMcp />,
                     },
                     {
                         path: 'account',

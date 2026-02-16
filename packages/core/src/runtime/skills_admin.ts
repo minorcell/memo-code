@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
+import { loadMemoConfig, writeMemoConfig, type MemoConfig } from '../config/config.js'
 import { normalizeWorkspacePath } from './workspace.js'
 import type { SkillRecord } from '../web/types.js'
 
@@ -56,6 +57,54 @@ function decodePath(id: string): string {
     } catch {
         throw new SkillsAdminError('BAD_REQUEST', 'invalid skill id')
     }
+}
+
+function normalizeSkillPath(path: string): string {
+    return normalizeWorkspacePath(resolve(path))
+}
+
+function normalizeActiveSkillPaths(input: unknown): string[] {
+    if (!Array.isArray(input)) return []
+    const normalized: string[] = []
+    const seen = new Set<string>()
+    for (const item of input) {
+        if (typeof item !== 'string' || !item.trim()) continue
+        const path = normalizeSkillPath(item)
+        if (seen.has(path)) continue
+        seen.add(path)
+        normalized.push(path)
+    }
+    return normalized
+}
+
+async function loadActiveSkillSelection(): Promise<{
+    configPath: string
+    config: MemoConfig
+    explicit: boolean
+    activePaths: string[]
+}> {
+    const loaded = await loadMemoConfig()
+    return {
+        configPath: loaded.configPath,
+        config: loaded.config,
+        explicit: Array.isArray(loaded.config.active_skills),
+        activePaths: normalizeActiveSkillPaths(loaded.config.active_skills),
+    }
+}
+
+async function removeActiveSkillPath(path: string): Promise<void> {
+    const selection = await loadActiveSkillSelection()
+    if (!selection.explicit) return
+
+    const target = normalizeSkillPath(path)
+    const next = selection.activePaths.filter((item) => item !== target)
+    if (next.length === selection.activePaths.length) return
+
+    const nextConfig: MemoConfig = {
+        ...selection.config,
+        active_skills: next,
+    }
+    await writeMemoConfig(selection.configPath, nextConfig)
 }
 
 function memoHome(): string {
@@ -205,6 +254,8 @@ export async function listSkills(options: ListSkillsOptions): Promise<{ items: S
         throw new SkillsAdminError('BAD_REQUEST', 'workspaceId is required when scope=project')
     }
 
+    const activeSelection = await loadActiveSkillSelection()
+    const activeSet = activeSelection.explicit ? new Set(activeSelection.activePaths) : null
     const items: SkillRecord[] = []
 
     for (const scope of scopes) {
@@ -225,6 +276,7 @@ export async function listSkills(options: ListSkillsOptions): Promise<{ items: S
                 description,
                 scope,
                 path: filePath,
+                active: activeSet ? activeSet.has(normalizeSkillPath(filePath)) : true,
             })
         }
     }
@@ -296,6 +348,11 @@ export async function createSkill(
         typeof input.content === 'string' ? input.content : undefined,
     )
     await writeFile(skillPath, content, 'utf8')
+    const activeSelection = await loadActiveSkillSelection()
+    const normalizedSkillPath = normalizeSkillPath(skillPath)
+    const isActive = activeSelection.explicit
+        ? new Set(activeSelection.activePaths).has(normalizedSkillPath)
+        : true
 
     return {
         created: true,
@@ -305,6 +362,7 @@ export async function createSkill(
             description,
             scope,
             path: skillPath,
+            active: isActive,
         },
     }
 }
@@ -351,5 +409,51 @@ export async function removeSkill(
     }
 
     await rm(dirname(path), { recursive: true, force: true })
+    await removeActiveSkillPath(path)
     return { deleted: true }
+}
+
+export async function setActiveSkills(
+    ids: string[],
+    options?: SkillLookupOptions,
+): Promise<{ active: string[] }> {
+    const activePaths: string[] = []
+    const seen = new Set<string>()
+
+    for (const id of ids) {
+        if (typeof id !== 'string' || !id.trim()) continue
+
+        let decoded: string
+        try {
+            decoded = decodePath(id)
+        } catch {
+            continue
+        }
+
+        const path = normalizeSkillPath(decoded)
+        if (seen.has(path)) continue
+        if (basename(path) !== 'SKILL.md') continue
+        try {
+            await ensureAllowedSkillPath(path, options)
+        } catch {
+            continue
+        }
+        if (!(await fileExists(path))) {
+            continue
+        }
+
+        seen.add(path)
+        activePaths.push(path)
+    }
+
+    const loaded = await loadMemoConfig()
+    const nextConfig: MemoConfig = {
+        ...loaded.config,
+        active_skills: activePaths,
+    }
+    await writeMemoConfig(loaded.configPath, nextConfig)
+
+    return {
+        active: activePaths.map((path) => encodePath(path)),
+    }
 }

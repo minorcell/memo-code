@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bot, Settings, User, X } from 'lucide-react'
+import { Settings, User, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { SETTINGS_CONTAINER_CLASS } from '@/pages/settings/styles'
@@ -13,7 +13,6 @@ type SettingsNavItem = {
 
 const settingsNavItems: SettingsNavItem[] = [
     { to: '/settings/general', label: 'General', icon: <Settings className="size-4" /> },
-    { to: '/settings/mcp', label: 'MCP Servers', icon: <Bot className="size-4" /> },
     { to: '/settings/account', label: 'Account', icon: <User className="size-4" /> },
 ]
 

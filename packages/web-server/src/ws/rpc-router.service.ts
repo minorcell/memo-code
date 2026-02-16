@@ -266,6 +266,17 @@ export class RpcRouterService {
       return this.skillsService.remove(requireString(input, 'id'));
     }
 
+    if (method === 'skills.active.set') {
+      if (!Array.isArray(input.ids)) {
+        throw new WsRpcError('BAD_REQUEST', 'ids must be string[]');
+      }
+      const ids = input.ids
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      return this.skillsService.setActive(ids);
+    }
+
     if (method === 'workspace.list') {
       return this.workspacesService.list();
     }

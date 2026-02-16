@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
+    Bot,
     ChevronLeft,
     ChevronRight,
     House,
@@ -11,6 +12,7 @@ import {
     Settings,
     Trash2,
     Undo2,
+    Zap,
 } from 'lucide-react'
 import { sessionsApi, workspacesApi } from '@/api'
 import { Button } from '@/components/ui/button'
@@ -245,6 +247,36 @@ export function Sidebar({
                     >
                         <FolderPlus className="size-3.5" />
                     </Button>
+                    <NavLink
+                        to="/mcp"
+                        end
+                        className={({ isActive }) =>
+                            cn(
+                                'mx-1.5 mb-1 flex size-8 items-center justify-center rounded-md transition-colors',
+                                isActive
+                                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                    : 'hover:bg-sidebar-accent',
+                            )
+                        }
+                        title="MCP Servers"
+                    >
+                        <Bot className="size-3.5" />
+                    </NavLink>
+                    <NavLink
+                        to="/skills"
+                        end
+                        className={({ isActive }) =>
+                            cn(
+                                'mx-1.5 mb-1 flex size-8 items-center justify-center rounded-md transition-colors',
+                                isActive
+                                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                    : 'hover:bg-sidebar-accent',
+                            )
+                        }
+                        title="Skills"
+                    >
+                        <Zap className="size-3.5" />
+                    </NavLink>
                 </div>
 
                 <div className="py-1">
@@ -290,6 +322,39 @@ export function Sidebar({
                 >
                     <ChevronLeft className="size-3.5" />
                 </Button>
+            </div>
+
+            <div className="px-2 pb-1">
+                <NavLink
+                    to="/mcp"
+                    end
+                    className={({ isActive }) =>
+                        cn(
+                            'mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                            isActive
+                                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                : 'hover:bg-sidebar-accent',
+                        )
+                    }
+                >
+                    <Bot className="size-3.5" />
+                    MCP Servers
+                </NavLink>
+                <NavLink
+                    to="/skills"
+                    end
+                    className={({ isActive }) =>
+                        cn(
+                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                            isActive
+                                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                : 'hover:bg-sidebar-accent',
+                        )
+                    }
+                >
+                    <Zap className="size-3.5" />
+                    Skills
+                </NavLink>
             </div>
 
             <div className="flex-1 overflow-auto">
