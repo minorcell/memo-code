@@ -139,15 +139,7 @@ export function ChatPage() {
     }
 
     async function handleApprovalDecision(decision: ApprovalDecision) {
-        const ok = await approvePendingApproval(decision)
-        if (!ok) return
-        const text =
-            decision === 'session'
-                ? 'Approved for this session.'
-                : decision === 'once'
-                  ? 'Approved once.'
-                  : 'Denied.'
-        toast.success(text)
+        await approvePendingApproval(decision)
     }
 
     return (
