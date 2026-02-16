@@ -23,6 +23,7 @@ export function ChatPage() {
     const [providers, setProviders] = useState<ChatProviderRecord[]>([])
     const [loadingProviders, setLoadingProviders] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const lastSystemMessageCountRef = useRef(0)
     const layout = useOutletContext<LayoutContext>()
 
     const liveSession = useChatStore((state) => state.liveSession)
@@ -46,13 +47,26 @@ export function ChatPage() {
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [turns, systemMessages])
+    }, [turns])
 
     useEffect(() => {
         if (!error) return
         toast.error(error)
         clearError()
     }, [error, clearError])
+
+    useEffect(() => {
+        if (systemMessages.length === 0) {
+            lastSystemMessageCountRef.current = 0
+            return
+        }
+
+        const start = Math.max(0, lastSystemMessageCountRef.current)
+        for (const msg of systemMessages.slice(start)) {
+            toast(msg)
+        }
+        lastSystemMessageCountRef.current = systemMessages.length
+    }, [systemMessages])
 
     useEffect(() => {
         if (!selectedSessionId) return
@@ -151,7 +165,6 @@ export function ChatPage() {
                 onQuickSelectWorkspace={handleQuickSelectWorkspace}
                 turns={turns}
                 sessionCwd={liveSession?.cwd ?? ''}
-                systemMessages={systemMessages}
                 messagesEndRef={messagesEndRef}
             />
             <ChatInputPanel

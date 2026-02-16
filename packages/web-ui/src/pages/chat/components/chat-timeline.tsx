@@ -13,7 +13,6 @@ type ChatTimelineProps = {
     onQuickSelectWorkspace: (workspaceId: string) => Promise<void> | void
     turns: ChatTurn[]
     sessionCwd: string
-    systemMessages: string[]
     messagesEndRef: RefObject<HTMLDivElement | null>
 }
 
@@ -24,7 +23,6 @@ export function ChatTimeline({
     onQuickSelectWorkspace,
     turns,
     sessionCwd,
-    systemMessages,
     messagesEndRef,
 }: ChatTimelineProps) {
     if (!hasActiveSession) {
@@ -109,22 +107,6 @@ export function ChatTimeline({
                             </div>
                         )
                     })}
-
-                    {systemMessages.length > 0 && (
-                        <div className="my-4 rounded-lg border border-dashed p-4">
-                            <h4 className="mb-2 text-xs font-medium text-muted-foreground">
-                                System
-                            </h4>
-                            {systemMessages.map((msg, index) => (
-                                <p
-                                    key={`${msg}-${index}`}
-                                    className="text-sm text-muted-foreground"
-                                >
-                                    {msg}
-                                </p>
-                            ))}
-                        </div>
-                    )}
 
                     <div ref={messagesEndRef} />
                 </div>
