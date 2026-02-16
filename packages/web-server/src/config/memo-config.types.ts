@@ -1,29 +1,15 @@
-export type MemoProviderConfig = {
-  name: string;
-  env_api_key: string;
-  model: string;
-  base_url?: string;
-};
+import type {
+  MCPServerConfig as MemoMcpServerConfig,
+  MemoConfig,
+  ProviderConfig as MemoProviderConfig,
+} from '@memo-code/core';
 
-export type MemoMcpServerConfig =
-  | {
-      type?: 'stdio';
-      command: string;
-      args?: string[];
-      env?: Record<string, string>;
-      stderr?: 'inherit' | 'pipe' | 'ignore';
-    }
-  | {
-      type?: 'streamable_http';
-      url: string;
-      headers?: Record<string, string>;
-      http_headers?: Record<string, string>;
-      bearer_token_env_var?: string;
-    };
+export type { MemoMcpServerConfig, MemoProviderConfig };
 
-export type MemoRuntimeConfig = {
-  current_provider: string;
-  providers: MemoProviderConfig[];
+export type MemoRuntimeConfig = Pick<
+  MemoConfig,
+  'current_provider' | 'providers'
+> & {
   mcp_servers: Record<string, MemoMcpServerConfig>;
   active_mcp_servers: string[];
 };

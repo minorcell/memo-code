@@ -63,9 +63,10 @@ export function ChatTimeline({
                                     : ''
                                 const hasToolAction = Boolean(
                                     (step.parallelActions && step.parallelActions.length > 1) ||
-                                        step.action,
+                                    step.action,
                                 )
-                                const showAssistantStep = Boolean(assistantStepText) && !hasToolAction
+                                const showAssistantStep =
+                                    Boolean(assistantStepText) && !hasToolAction
                                 const hasRenderableContent =
                                     Boolean(thinkingText) || hasToolAction || showAssistantStep
                                 return {
@@ -78,7 +79,9 @@ export function ChatTimeline({
                                 }
                             })
                             .filter((item) => item.hasRenderableContent)
-                        const hasStepAssistantText = stepViews.some((item) => item.showAssistantStep)
+                        const hasStepAssistantText = stepViews.some(
+                            (item) => item.showAssistantStep,
+                        )
                         const shouldShowGlobalAssistant =
                             Boolean(normalizedAssistant) &&
                             !hasStepAssistantText &&
@@ -103,7 +106,10 @@ export function ChatTimeline({
                                                     </p>
                                                 ) : null}
                                                 {item.hasToolAction ? (
-                                                    <ToolStepCard step={item.step} cwd={sessionCwd} />
+                                                    <ToolStepCard
+                                                        step={item.step}
+                                                        cwd={sessionCwd}
+                                                    />
                                                 ) : null}
                                                 {item.showAssistantStep ? (
                                                     <div className="text-sm leading-relaxed">
