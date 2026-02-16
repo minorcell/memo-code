@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { ArrowUp, Square } from 'lucide-react'
 import { chatApi } from '@/api'
 import {
@@ -54,6 +60,14 @@ function formatSuggestionValue(item: FileSuggestion): string {
     return item.isDir ? `${item.path}/` : item.path
 }
 
+function isImeComposing(
+    event: ReactKeyboardEvent<HTMLTextAreaElement>,
+    composing: boolean,
+): boolean {
+    const native = event.nativeEvent
+    return composing || native.isComposing || native.key === 'Process' || native.keyCode === 229
+}
+
 type ChatInputPanelProps = {
     input: string
     onInputChange: (value: string) => void
@@ -94,6 +108,7 @@ export function ChatInputPanel({
     const requestIdRef = useRef(0)
     const requestTimerRef = useRef<number | null>(null)
     const keyNavTsRef = useRef(0)
+    const imeComposingRef = useRef(false)
 
     const [fileSuggestions, setFileSuggestions] = useState<FileSuggestion[]>([])
     const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0)
@@ -266,7 +281,17 @@ export function ChatInputPanel({
                 <Textarea
                     value={input}
                     onChange={(event) => onInputChange(event.target.value)}
+                    onCompositionStart={() => {
+                        imeComposingRef.current = true
+                    }}
+                    onCompositionEnd={() => {
+                        imeComposingRef.current = false
+                    }}
                     onKeyDown={(event) => {
+                        if (isImeComposing(event, imeComposingRef.current)) {
+                            return
+                        }
+
                         if (hasFileSuggestions) {
                             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                                 event.preventDefault()
