@@ -92,6 +92,21 @@ function readString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function readAuthString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return readString(value);
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+  return null;
+}
+
 function normalizePositiveInt(value: unknown, fallback: number): number {
   if (typeof value === 'number' && Number.isInteger(value) && value > 0)
     return value;
@@ -312,20 +327,22 @@ export class ServerConfigService {
   } {
     let rewriteRequired = false;
 
-    const username = readString(parsed.auth?.username) ?? 'memo';
-    if (!readString(parsed.auth?.username)) rewriteRequired = true;
+    const username = readAuthString(parsed.auth?.username) ?? 'memo';
+    if (!readAuthString(parsed.auth?.username)) rewriteRequired = true;
 
     // Existing config should not generate a new random password on each start.
-    const password = readString(parsed.auth?.password) ?? 'memo';
-    if (!readString(parsed.auth?.password)) rewriteRequired = true;
+    // YAML may parse unquoted scalars (for example: password: 123456) as numbers.
+    const password = readAuthString(parsed.auth?.password) ?? 'memo';
+    if (!readAuthString(parsed.auth?.password)) rewriteRequired = true;
 
     const accessTokenSecret =
-      readString(parsed.auth?.accessTokenSecret) ?? randomSecret(32);
-    if (!readString(parsed.auth?.accessTokenSecret)) rewriteRequired = true;
+      readAuthString(parsed.auth?.accessTokenSecret) ?? randomSecret(32);
+    if (!readAuthString(parsed.auth?.accessTokenSecret)) rewriteRequired = true;
 
     const refreshTokenSecret =
-      readString(parsed.auth?.refreshTokenSecret) ?? randomSecret(48);
-    if (!readString(parsed.auth?.refreshTokenSecret)) rewriteRequired = true;
+      readAuthString(parsed.auth?.refreshTokenSecret) ?? randomSecret(48);
+    if (!readAuthString(parsed.auth?.refreshTokenSecret))
+      rewriteRequired = true;
 
     const accessTokenTtlSeconds = normalizePositiveInt(
       parsed.auth?.accessTokenTtlSeconds,
