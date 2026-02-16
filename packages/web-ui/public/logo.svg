@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- 外圈 -->
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#1a1a1a" stroke-width="4"/>
+  
+  <!-- 终端提示符 > -->
+  <polyline points="35,30 65,50 35,70" fill="none" stroke="#1a1a1a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- 小圆点，代表 AI -->
+  <circle cx="72" cy="50" r="5" fill="#1a1a1a"/>
+</svg>

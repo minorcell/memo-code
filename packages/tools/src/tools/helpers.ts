@@ -3,6 +3,11 @@ import { homedir } from 'node:os'
 import { existsSync, statSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import ignore, { type Ignore } from 'ignore'
+import { getRuntimeCwd } from '@memo/tools/runtime/context'
+import {
+    getMaxToolResultChars,
+    getMaxToolResultLines,
+} from '@memo/tools/runtime/tool_output_limits'
 
 /**
  * 生成标准化的绝对路径，避免因工作目录差异导致的路径错误。
@@ -37,7 +42,7 @@ function parseWritableRootsFromEnv() {
 
 export function getWritableRoots() {
     const roots = new Set<string>()
-    roots.add(canonicalizePath(process.cwd()))
+    roots.add(canonicalizePath(getRuntimeCwd()))
     const memoHome = process.env.MEMO_HOME?.trim() || join(homedir(), '.memo')
     roots.add(canonicalizePath(memoHome))
     for (const item of parseWritableRootsFromEnv()) {
@@ -79,8 +84,6 @@ export const DEFAULT_IGNORE_PATTERNS = [
     'vendor/',
 ]
 
-const MAX_RESULT_LINES = 100
-const MAX_RESULT_CHARS = 10000
 const OVERFLOW_HINT =
     '<system_hint>当前查找结果过多，请细化查找范围（缩小目录、增加更具体的 pattern/glob 或关键词）。</system_hint>'
 
@@ -103,7 +106,7 @@ function findIgnoreRoot(startPath: string): string {
         }
     } catch {
         // ignore invalid paths; fall back to cwd
-        dir = process.cwd()
+        dir = getRuntimeCwd()
     }
     const initial = dir
 
@@ -155,14 +158,16 @@ export async function getIgnoreMatcher(startPath: string): Promise<IgnoreMatcher
 }
 
 export function appendLongResultHint(text: string, lineCount: number): string {
+    const maxLines = getMaxToolResultLines()
+    const maxChars = getMaxToolResultChars()
     const lines = text.split(/\r?\n/)
     const totalLines = Math.max(lineCount, lines.length)
-    let limited = lines.slice(0, MAX_RESULT_LINES).join('\n')
-    if (limited.length > MAX_RESULT_CHARS) {
-        limited = limited.slice(0, MAX_RESULT_CHARS)
+    let limited = lines.slice(0, maxLines).join('\n')
+    if (limited.length > maxChars) {
+        limited = limited.slice(0, maxChars)
     }
 
-    if (totalLines > MAX_RESULT_LINES || text.length > MAX_RESULT_CHARS) {
+    if (totalLines > maxLines || text.length > maxChars) {
         return `${limited}\n\n${OVERFLOW_HINT}`
     }
     return limited

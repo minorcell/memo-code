@@ -83,13 +83,15 @@ category: 'Operations'
 
 ## `memo mcp login/logout` 失败
 
-当前行为：
+检查项：
 
-- OAuth 登录/注销流程尚未实现
+1. 目标 server 必须是 `streamable_http`（stdio server 不支持 OAuth 登录）。
+2. 远程 URL 在当前网络下可达。
+3. 回调端口可用（必要时在 `config.toml` 设置 `mcp_oauth_callback_port`）。
 
-修复：
+回退方案：
 
-- 对远程 HTTP MCP 使用 `--bearer-token-env-var` 和导出的环境令牌
+- 使用 `--bearer-token-env-var` 的令牌认证方式。
 
 ## 子代理问题
 
@@ -136,13 +138,14 @@ category: 'Operations'
 2. 将工作拆分为更小的调用
 3. 仅在必要时增加 `MEMO_TOOL_RESULT_MAX_CHARS`
 
-## `--once` 标志错误
+## `--prev` 找不到会话
 
 症状：
 
-- `--once has been removed`
+- `No previous session found for current directory.`
 
 修复：
 
-- 交互模式使用 `memo`
-- 一次性纯文本模式使用 stdin 管道
+1. 先在同一目录运行一次普通会话。
+2. 确认 `~/.memo/sessions/` 下已生成该项目路径对应的历史文件。
+3. 再次执行 `memo --prev`。

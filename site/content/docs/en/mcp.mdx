@@ -51,11 +51,17 @@ memo mcp help
 ### Login / Logout Commands
 
 ```bash
-memo mcp login <name>
+memo mcp login <name> [--scopes read,write]
 memo mcp logout <name>
 ```
 
-These commands are currently not implemented for OAuth flow. Prefer bearer-token env variables for remote auth.
+OAuth login/logout is available for `streamable_http` servers.
+`memo mcp list` also reports `auth_status` for each server:
+
+- `unsupported`
+- `not_logged_in`
+- `bearer_token`
+- `oauth`
 
 ## Manual `config.toml` Examples
 
@@ -90,6 +96,14 @@ Use slash command:
 ```
 
 It shows MCP servers configured for the current session.
+
+## View and Manage MCP in Web UI
+
+In web mode (`memo web`), open the `MCP Servers` page from the sidebar to:
+
+- create / edit / remove servers
+- login / logout for OAuth-enabled remote servers
+- toggle default active servers
 
 ## When Config Changes Take Effect
 

@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { SiteHeader } from '@/components/site-header'
 import { MemoHeroRemotion } from '@/components/memo-hero-remotion'
 import { MemoArchitectureDiagram } from '@/components/memo-architecture-remotion'
-import { ArrowRight, Terminal, Cpu, Shield, GitBranch, Layers, Gauge } from 'lucide-react'
+import { ArrowRight, Terminal, Cpu, Shield, GitBranch, Layers, Zap } from 'lucide-react'
 import Link from 'next/link'
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
@@ -36,19 +36,14 @@ export function HomeClient({
             descKey: 'home.features.items.terminalNative.description',
         },
         {
-            icon: Gauge,
-            titleKey: 'home.features.items.fastFeedback.title',
-            descKey: 'home.features.items.fastFeedback.description',
-        },
-        {
-            icon: Cpu,
-            titleKey: 'home.features.items.builtInTools.title',
-            descKey: 'home.features.items.builtInTools.description',
+            icon: Layers,
+            titleKey: 'home.features.items.webConsole.title',
+            descKey: 'home.features.items.webConsole.description',
         },
         {
             icon: Shield,
-            titleKey: 'home.features.items.approvalControls.title',
-            descKey: 'home.features.items.approvalControls.description',
+            titleKey: 'home.features.items.security.title',
+            descKey: 'home.features.items.security.description',
         },
         {
             icon: GitBranch,
@@ -56,9 +51,14 @@ export function HomeClient({
             descKey: 'home.features.items.mcpReady.description',
         },
         {
-            icon: Layers,
-            titleKey: 'home.features.items.multiAgent.title',
-            descKey: 'home.features.items.multiAgent.description',
+            icon: Zap,
+            titleKey: 'home.features.items.skills.title',
+            descKey: 'home.features.items.skills.description',
+        },
+        {
+            icon: Cpu,
+            titleKey: 'home.features.items.builtInTools.title',
+            descKey: 'home.features.items.builtInTools.description',
         },
     ]
 
@@ -107,7 +107,7 @@ export function HomeClient({
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Link>
                             <a
-                                href="https://github.com/minorcell/memo-cli"
+                                href="https://github.com/minorcell/memo-code"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="btn-secondary min-w-[160px]"
@@ -255,7 +255,7 @@ export function HomeClient({
                                 className="rounded-md"
                             />
                             <span className="text-sm font-semibold text-[var(--text-primary)]">
-                                Memo CLI
+                                Memo Code
                             </span>
                         </div>
                         <div className="flex gap-6 text-sm text-[var(--text-secondary)]">
@@ -272,7 +272,7 @@ export function HomeClient({
                                 {t('nav.blog')}
                             </Link>
                             <a
-                                href="https://github.com/minorcell/memo-cli"
+                                href="https://github.com/minorcell/memo-code"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="transition-colors hover:text-[var(--text-primary)]"

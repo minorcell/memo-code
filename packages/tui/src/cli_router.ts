@@ -1,4 +1,4 @@
-const SUBCOMMANDS = ['mcp'] as const
+const SUBCOMMANDS = ['mcp', 'web'] as const
 
 type SubcommandName = (typeof SUBCOMMANDS)[number]
 

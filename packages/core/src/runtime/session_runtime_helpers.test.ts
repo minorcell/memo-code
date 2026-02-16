@@ -130,6 +130,14 @@ describe('session title helpers', () => {
         expect(normalizeSessionTitle('   ')).toBe('')
     })
 
+    test('normalizeSessionTitle removes think tags and title prefixes', () => {
+        expect(
+            normalizeSessionTitle(
+                '<think>internal</think> Title: "Build REST API migration plan" <thinking>secret</thinking>',
+            ),
+        ).toBe('Build REST API migration plan')
+    })
+
     test('fallbackSessionTitleFromPrompt handles empty/cjk/word prompts', () => {
         expect(fallbackSessionTitleFromPrompt('   ')).toBe('New Session')
         expect(fallbackSessionTitleFromPrompt('这是一个非常非常长的中文标题用于测试截断行为')).toBe(
@@ -200,10 +208,12 @@ describe('tool result helpers', () => {
 })
 
 describe('isAbortError', () => {
-    test('detects abort error by name', () => {
+    test('detects abort error by name and message', () => {
         const abortError = new Error('cancelled')
         abortError.name = 'AbortError'
+        const abortedMessageError = new Error('Request was aborted.')
         expect(isAbortError(abortError)).toBe(true)
+        expect(isAbortError(abortedMessageError)).toBe(true)
         expect(isAbortError(new Error('other'))).toBe(false)
         expect(isAbortError('AbortError')).toBe(false)
     })

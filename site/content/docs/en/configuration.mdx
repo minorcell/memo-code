@@ -20,6 +20,11 @@ If `MEMO_HOME` is set:
 
 - config path becomes `$MEMO_HOME/config.toml`
 
+For web auth config:
+
+- default path is `~/.memo/server.yaml`
+- set `MEMO_SERVER_CONFIG` to use a custom path
+
 ## How Config Is Applied
 
 Memo runtime uses config in this order:
@@ -186,7 +191,12 @@ Also available:
 memo mcp help
 ```
 
-`memo mcp login/logout` commands exist but OAuth login/logout is not implemented yet.
+OAuth login/logout is supported for `streamable_http` MCP servers:
+
+```bash
+memo mcp login <name> [--scopes read,write]
+memo mcp logout <name>
+```
 
 ## Runtime Environment Variables
 
@@ -227,6 +237,20 @@ Memo reads `name` + `description` frontmatter and exposes each discovered skill 
 - `- <name>: <description> (file: <absolute-path-to-SKILL.md>)`
 
 Users can explicitly invoke by mentioning `$skill-name` in the prompt (example: `$doc-writing`).
+
+### Default Active Skills
+
+You can persist a default skill activation set:
+
+```toml
+# unset: all discovered skills are active
+# []: no skills active by default
+active_skills = [
+  "/absolute/path/to/.codex/skills/doc-writing/SKILL.md"
+]
+```
+
+`active_skills` stores absolute `SKILL.md` file paths.
 
 ### Advanced tool/runtime switches
 

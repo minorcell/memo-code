@@ -1,5 +1,5 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { HistoryIndex, type SessionListItem } from '@memo/core'
+import { basename, resolve } from 'node:path'
 
 export type SessionHistoryEntry = {
     id: string
@@ -9,136 +9,36 @@ export type SessionHistoryEntry = {
     sessionFile: string
 }
 
-type SessionFileCandidate = {
-    path: string
-    mtimeMs: number
-}
+const historyIndexCache = new Map<string, HistoryIndex>()
 
 function normalizeCwd(input: string): string {
     const normalized = resolve(input)
     return process.platform === 'win32' ? normalized.toLowerCase() : normalized
 }
 
-function matchSessionCwd(cwd: string, sessionCwd: string | null): boolean {
-    if (!sessionCwd) return false
-    return normalizeCwd(cwd) === normalizeCwd(sessionCwd)
+function sessionFileId(filePath: string): string {
+    return resolve(filePath)
 }
 
-function formatSessionFileName(filePath: string): string {
-    return basename(filePath).replace(/\.jsonl$/i, '')
+function getHistoryIndex(sessionsDir: string): HistoryIndex {
+    const normalizedDir = resolve(sessionsDir)
+    const existing = historyIndexCache.get(normalizedDir)
+    if (existing) return existing
+
+    const index = new HistoryIndex({ sessionsDir: normalizedDir })
+    historyIndexCache.set(normalizedDir, index)
+    return index
 }
 
-function extractSessionSummary(raw: string): {
-    firstPrompt: string | null
-    sessionTitle: string | null
-    sessionCwd: string | null
-} {
-    let firstPrompt: string | null = null
-    let sessionTitle: string | null = null
-    let sessionCwd: string | null = null
-
-    for (const line of raw.split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-
-        let event: any
-        try {
-            event = JSON.parse(trimmed)
-        } catch {
-            continue
-        }
-
-        if (!event || typeof event !== 'object') continue
-
-        if (event.type === 'session_start' && !sessionCwd) {
-            const cwd = event.meta?.cwd
-            if (typeof cwd === 'string' && cwd.trim()) {
-                sessionCwd = cwd
-            }
-            continue
-        }
-
-        if (event.type === 'turn_start' && !firstPrompt) {
-            const content = typeof event.content === 'string' ? event.content.trim() : ''
-            if (content) firstPrompt = content
-        }
-
-        if (event.type === 'session_title' && !sessionTitle) {
-            const content = typeof event.content === 'string' ? event.content.trim() : ''
-            if (content) sessionTitle = content
-        }
-    }
-
-    return { firstPrompt, sessionTitle, sessionCwd }
+function parseTimestamp(value: string): number {
+    const parsed = Date.parse(value)
+    return Number.isFinite(parsed) ? parsed : 0
 }
 
-async function buildHistoryEntryFromFile(
-    filePath: string,
-    cwd: string,
-    mtimeMs: number,
-): Promise<SessionHistoryEntry | null> {
-    try {
-        const raw = await readFile(filePath, 'utf8')
-        const { firstPrompt, sessionTitle, sessionCwd } = extractSessionSummary(raw)
-        if (!matchSessionCwd(cwd, sessionCwd)) {
-            return null
-        }
-
-        const displayTitle =
-            sessionTitle?.trim() || firstPrompt?.trim() || formatSessionFileName(filePath)
-
-        return {
-            id: filePath,
-            cwd,
-            input: displayTitle,
-            ts: mtimeMs,
-            sessionFile: filePath,
-        }
-    } catch {
-        return null
-    }
-}
-
-async function collectSessionCandidates(sessionsDir: string): Promise<SessionFileCandidate[]> {
-    const candidates: SessionFileCandidate[] = []
-
-    const walk = async (dirPath: string): Promise<void> => {
-        let entries: import('node:fs').Dirent[]
-        try {
-            entries = await readdir(dirPath, { withFileTypes: true })
-        } catch {
-            return
-        }
-
-        await Promise.all(
-            entries.map(async (entry) => {
-                const fullPath = join(dirPath, entry.name)
-
-                if (entry.isSymbolicLink()) {
-                    return
-                }
-
-                if (entry.isDirectory()) {
-                    await walk(fullPath)
-                    return
-                }
-
-                if (!entry.isFile() || !entry.name.endsWith('.jsonl')) {
-                    return
-                }
-
-                try {
-                    const fileStat = await stat(fullPath)
-                    candidates.push({ path: fullPath, mtimeMs: fileStat.mtimeMs })
-                } catch {
-                    // Ignore transient stat/read errors.
-                }
-            }),
-        )
-    }
-
-    await walk(sessionsDir)
-    return candidates
+function resolveEntryTitle(summary: SessionListItem): string {
+    const title = summary.title?.trim()
+    if (title) return title
+    return basename(summary.filePath).replace(/\.jsonl$/i, '')
 }
 
 export async function loadSessionHistoryEntries(options: {
@@ -148,35 +48,43 @@ export async function loadSessionHistoryEntries(options: {
     activeSessionFile?: string
     limit?: number
 }): Promise<SessionHistoryEntry[]> {
-    const normalizedActive = options.activeSessionFile ? resolve(options.activeSessionFile) : null
-
-    const candidates = await collectSessionCandidates(options.sessionsDir)
-    const filteredCandidates = candidates
-        .filter((candidate) => !normalizedActive || resolve(candidate.path) !== normalizedActive)
-        .filter(
-            (candidate, index, list) =>
-                list.findIndex((other) => resolve(other.path) === resolve(candidate.path)) ===
-                index,
-        )
-        .sort((a, b) => b.mtimeMs - a.mtimeMs)
-
-    const keyword = options.keyword?.trim().toLowerCase()
     const limit = options.limit ?? 10
+    if (limit <= 0) return []
 
+    const index = getHistoryIndex(options.sessionsDir)
+    const summaries = await index.getAllSummaries()
+    const normalizedCwd = normalizeCwd(options.cwd)
+    const normalizedActive = options.activeSessionFile
+        ? sessionFileId(options.activeSessionFile)
+        : null
+    const keyword = options.keyword?.trim().toLowerCase()
+
+    const seen = new Set<string>()
     const entries: SessionHistoryEntry[] = []
 
-    for (const candidate of filteredCandidates) {
+    const sorted = [...summaries].sort((left, right) =>
+        right.date.updatedAt.localeCompare(left.date.updatedAt),
+    )
+
+    for (const summary of sorted) {
         if (entries.length >= limit) break
-        const entry = await buildHistoryEntryFromFile(
-            candidate.path,
-            options.cwd,
-            candidate.mtimeMs,
-        )
-        if (!entry) continue
-        if (keyword && !entry.input.toLowerCase().includes(keyword)) {
-            continue
-        }
-        entries.push(entry)
+        if (normalizeCwd(summary.cwd) !== normalizedCwd) continue
+
+        const sessionFile = sessionFileId(summary.filePath)
+        if (normalizedActive && sessionFile === normalizedActive) continue
+        if (seen.has(sessionFile)) continue
+
+        const input = resolveEntryTitle(summary)
+        if (keyword && !input.toLowerCase().includes(keyword)) continue
+
+        seen.add(sessionFile)
+        entries.push({
+            id: sessionFile,
+            cwd: options.cwd,
+            input,
+            ts: parseTimestamp(summary.date.updatedAt),
+            sessionFile,
+        })
     }
 
     return entries

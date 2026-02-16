@@ -18,7 +18,7 @@
 
 <img src="public/demo.png" width="100%" alt="Memo Code 演示图">
 
-基于 Node.js + TypeScript，默认对接 DeepSeek，兼容 OpenAI API。
+基于 Node.js + TypeScript，兼容 OpenAI API 格式。
 
 Memo Code 是一个开源的终端编码代理，能够理解项目上下文，并通过自然语言协助你更快完成编码、排障和日常开发任务。
 
@@ -36,17 +36,20 @@ yarn global add @memo-code/memo
 bun add -g @memo-code/memo
 ```
 
+说明：npm 分发包是预构建产物，已包含运行所需的 CLI/Web 资源。  
+只有在直接运行本仓库源码时，才需要执行 `pnpm run build`。
+
 ### 2. 配置 API Key
 
 ```bash
-export DEEPSEEK_API_KEY=your_key  # 或 OPENAI_API_KEY
+export OPENAI_API_KEY=your_key
 ```
 
 ### 3. 启动使用
 
 ```bash
 memo
-# 首次运行会引导配置 provider/model，并（保存到 ~/.memo/config.toml）
+# 首次运行会引导配置 provider/model，并保存到 ~/.memo/config.toml
 ```
 
 ## 使用方式
@@ -57,10 +60,26 @@ memo
 - 继续最近会话：`memo --prev` 或 `memo -prev`（加载当前目录最近会话上下文）。
 - 危险模式：`memo --dangerous` 或 `memo -d`（跳过工具审批，谨慎使用）。
 - 查看版本：`memo --version` 或 `memo -v`。
+- 启动 Web 服务：`memo web --host 127.0.0.1 --port 5494 --open`（npm 分发包已包含 web 资源；源码运行需先 `pnpm run build`）。
 - 启动目录约定：若启动根目录存在 `AGENTS.md`，Memo 会自动将其拼接进系统提示词。
 - Skills：Memo 会自动发现 `SKILL.md` 并把可用 skills 列表拼接进系统提示词。
 - MCP 启动选择：当配置了 MCP server 时，启动会弹出多选以决定本次会话激活哪些 server。
-- 会话标题：Memo 会基于首条用户输入生成简短标题，并在历史/恢复列表中展示。
+- Web app 支持多 workspace 项目管理，并可并发运行多个会话（单个 server 进程上限 20）。
+
+## Web 控制台
+
+```bash
+memo web --host 127.0.0.1 --port 5494 --open
+```
+
+- npm 分发包已内置 web server 与 web UI 资源。
+- 若从源码仓库运行，请先执行一次 `pnpm run build`。
+- Web 认证配置默认存储在 `~/.memo/server.yaml`（可通过 `MEMO_SERVER_CONFIG` 覆盖路径）。
+- 首次启动会自动生成该文件，包含认证密钥和随机初始密码。
+- 登录页使用 `server.yaml` 中的 `auth.username` / `auth.password`。
+- 侧边栏包含独立的 `MCP Servers` 与 `Skills` 入口：
+    - MCP：创建/编辑/删除/登录/登出与激活开关。
+    - Skills：创建/删除、详情预览与激活开关。
 
 ## 配置文件
 
@@ -69,13 +88,13 @@ memo
 ### Provider 配置
 
 ```toml
-current_provider = "deepseek"
+current_provider = "openai_compatible"
 
-[[providers.deepseek]]
-name = "deepseek"
-env_api_key = "DEEPSEEK_API_KEY"
-model = "deepseek-chat"
-base_url = "https://api.deepseek.com"
+[[providers.openai_compatible]]
+name = "openai_compatible"
+env_api_key = "OPENAI_API_KEY"
+model = "gpt-4.1-mini"
+base_url = "https://api.openai.com/v1"
 ```
 
 支持配置多个 Provider，通过 `current_provider` 切换。
@@ -156,6 +175,16 @@ Memo 会读取 frontmatter 的 `name` 和 `description`，并以元数据形式�
 
 在对话里可通过 `$skill-name` 显式提及某个 skill（例如 `$doc-writing`）。
 
+可选：在 `config.toml` 中持久化默认激活 skills：
+
+```toml
+# 未设置：默认激活所有已发现 skills
+# []：默认不激活任何 skill
+active_skills = [
+  "/absolute/path/to/.codex/skills/doc-writing/SKILL.md"
+]
+```
+
 ## 内置工具
 
 - `exec_command` / `write_stdin`：执行命令（默认执行工具族）
@@ -207,7 +236,7 @@ pnpm start
 ### 构建
 
 ```bash
-pnpm run build  # 生成 dist/index.js
+pnpm run build  # 构建 web-server/web-ui 产物并生成 dist/index.js
 ```
 
 ### 测试
@@ -230,7 +259,7 @@ npm run format:check  # 检查格式（CI）
 ## 项目结构
 
 ```
-memo-cli/
+memo-code/
 ├── packages/
 │   ├── core/       # 核心逻辑：Session、工具路由、配置
 │   ├── tools/      # 内置工具实现
@@ -242,7 +271,7 @@ memo-cli/
 ## CLI 快捷键与命令
 
 - `/help`：显示帮助与快捷键说明。
-- `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models deepseek` 精确选择。
+- `/models`：列出现有 Provider/Model，回车切换；支持直接 `/models openai_compatible` 精确选择。
 - `/context`：弹出 80k/120k/150k/200k 选项并立即设置上限。
 - `/review <prNumber>`：执行 GitHub PR 审查并直接发布评论（优先使用已激活的 GitHub MCP，失败时回退 `gh` CLI）。
 - `/mcp`：查看当前会话加载的 MCP 服务器配置。
@@ -263,7 +292,8 @@ memo-cli/
 
 ## 相关文档
 
-- [用户指南](./site/content/docs/README.md) - 面向使用者的分模块说明
+- [User Guide (EN)](./site/content/docs/en/README.mdx) - 英文文档入口
+- [用户指南 (ZH)](./site/content/docs/zh/README.mdx) - 中文文档入口
 - [Core 架构](./docs/core.md) - 核心实现详解
 - [CLI 适配更新](./docs/cli-update.md) - Tool Use API 迁移说明
 - [开发指南](./CONTRIBUTING.md) - 贡献指南

@@ -146,18 +146,25 @@ describe('helpers.appendLongResultHint', () => {
     })
 
     test('adds overflow hint when line count exceeds limit', () => {
-        const lines = Array.from({ length: 120 }, (_, i) => `line-${i + 1}`).join('\n')
-        const output = appendLongResultHint(lines, 120)
+        const lines = Array.from({ length: 400 }, (_, i) => `line-${i + 1}`).join('\n')
+        const output = appendLongResultHint(lines, 400)
         assert.ok(output.includes('请细化查找范围'))
         assert.ok(output.includes('line-1'))
-        assert.ok(!output.includes('line-120'))
+        assert.ok(!output.includes('line-400'))
     })
 
     test('truncates by character limit and appends overflow hint', () => {
-        const longText = 'x'.repeat(12050)
-        const output = appendLongResultHint(longText, 1)
-        const [body] = output.split('\n\n<system_hint>')
-        assert.ok(output.includes('请细化查找范围'))
-        assert.ok(body.length <= 10000)
+        const prevLimit = process.env.MEMO_TOOL_RESULT_MAX_CHARS
+        process.env.MEMO_TOOL_RESULT_MAX_CHARS = '1024'
+        try {
+            const longText = 'x'.repeat(12_050)
+            const output = appendLongResultHint(longText, 1)
+            const [body] = output.split('\n\n<system_hint>')
+            assert.ok(output.includes('请细化查找范围'))
+            assert.ok(body.length <= 1024)
+        } finally {
+            if (prevLimit === undefined) delete process.env.MEMO_TOOL_RESULT_MAX_CHARS
+            else process.env.MEMO_TOOL_RESULT_MAX_CHARS = prevLimit
+        }
     })
 })

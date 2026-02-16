@@ -117,7 +117,6 @@ async function runPlainMode(parsed: ParsedArgs) {
         contextWindow,
         autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
         activeMcpServers: loaded.config.active_mcp_servers,
-        generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
     }
     const sessionsDir = getSessionsDir(loaded, sessionOptions)
@@ -201,7 +200,6 @@ async function runInteractiveTui(parsed: ParsedArgs) {
         contextWindow,
         autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
         activeMcpServers: loaded.config.active_mcp_servers,
-        generateSessionTitle: true,
         dangerous: parsed.options.dangerous,
     }
     const sessionsDir = getSessionsDir(loaded, sessionOptions)
@@ -249,6 +247,11 @@ async function main() {
     if (route.kind === 'subcommand') {
         if (route.name === 'mcp') {
             await runMcpCommand(route.args)
+            return
+        }
+        if (route.name === 'web') {
+            const { runWebCommand } = await import('./web/run_web_command')
+            await runWebCommand(route.args)
             return
         }
     }

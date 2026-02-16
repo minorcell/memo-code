@@ -11,7 +11,7 @@ Set up Memo in a few minutes: install, configure an API key, and run your first 
 
 ## Prerequisites
 
-- Node.js `>= 18`
+- Node.js `>= 20`
 - At least one compatible API key (for example `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`)
 
 ## Install
@@ -67,6 +67,11 @@ echo "Summarize this repository structure" | memo
 
 Use plain mode for scripts and CI. For interactive approvals and richer workflow, use TUI mode.
 
+## One-shot and Resume Flags
+
+- One-shot run: `memo --once "your prompt"` (or `memo -once "your prompt"`).
+- Continue latest local session: `memo --prev` (or `memo -prev`).
+
 ## Dangerous Mode
 
 Skip approval prompts:
@@ -78,6 +83,19 @@ memo -d
 ```
 
 Only use this in trusted repositories and controlled environments.
+
+## Web Console
+
+Start local web server + UI:
+
+```bash
+memo web --host 127.0.0.1 --port 5494 --open
+```
+
+- npm distribution already includes web assets.
+- If running from source checkout, run `pnpm run build` first.
+- Login credentials come from `~/.memo/server.yaml` (`auth.username` / `auth.password`).
+- The UI includes chat timeline, project/session management, MCP management, and skills management.
 
 ## Next Steps
 

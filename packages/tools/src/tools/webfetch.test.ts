@@ -49,6 +49,30 @@ describe('webfetch tool', () => {
         )
     })
 
+    test('marks truncated preview when text exceeds shared limit', async () => {
+        const prevLimit = process.env.MEMO_TOOL_RESULT_MAX_CHARS
+        process.env.MEMO_TOOL_RESULT_MAX_CHARS = '200'
+        try {
+            await withMockFetch(
+                async () =>
+                    new Response(`title:${'a'.repeat(400)}`, {
+                        status: 200,
+                        headers: { 'content-type': 'text/plain; charset=utf-8' },
+                    }),
+                async () => {
+                    const res = await webfetchTool.execute({ url: 'https://example.com' })
+                    const text = textPayload(res)
+                    assert.strictEqual(res.isError, false)
+                    assert.ok(text.includes('text_truncated=true'))
+                    assert.ok(text.includes('text_chars=406'))
+                },
+            )
+        } finally {
+            if (prevLimit === undefined) delete process.env.MEMO_TOOL_RESULT_MAX_CHARS
+            else process.env.MEMO_TOOL_RESULT_MAX_CHARS = prevLimit
+        }
+    })
+
     test('rejects unsupported protocol', async () => {
         const res = await webfetchTool.execute({ url: 'file:///etc/hosts' })
         const text = textPayload(res)

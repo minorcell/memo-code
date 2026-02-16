@@ -1,53 +1,146 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 const DESIGN_WIDTH = 1440
-const DESIGN_HEIGHT = 880
+const DESIGN_HEIGHT = 940
 
-const LAYOUT = {
-    leftX: 56,
-    leftY: 132,
-    leftW: 860,
-    leftH: 690,
-    rightX: 1130,
-    rightY: 132,
-    rightW: 254,
-    rightH: 690,
+const MAIN_X = 172
+const MAIN_W = 1076
+const LABEL_X = 28
+const LABEL_W = 132
+
+const RIGHT_AUDIT_X = 1262
+const RIGHT_COL_W = 74
+const RIGHT_AUTH_X = 1346
+
+const COLORS = {
+    frameBg: '#0b0b0b',
+    frameBgAlt: '#070707',
+    panel: 'rgba(16,16,16,0.88)',
+    panelAlt: 'rgba(20,20,20,0.9)',
+    card: 'rgba(255,255,255,0.04)',
+    cardHighlight: 'rgba(255,255,255,0.1)',
+    border: 'rgba(255,255,255,0.2)',
+    borderStrong: 'rgba(255,255,255,0.28)',
+    text: '#f2f2f2',
+    textMuted: '#a5a5a5',
+    line: 'rgba(212,212,212,0.68)',
 }
 
-const MIDDLE_DIVIDER_X = Math.round((LAYOUT.leftX + LAYOUT.leftW + LAYOUT.rightX) / 2)
-
-const BRIDGE = {
-    x: MIDDLE_DIVIDER_X - 52,
-    y: 450,
-    w: 104,
-    h: 190,
+type LayerProps = {
+    y: number
+    h: number
+    label: string
+    labelBg: string
+    rowBg: string
+    children: ReactNode
 }
 
-const FLOW_LINES = {
-    topY: 406,
-    bottomY: 632,
-    leftAnchorX: BRIDGE.x - 10,
-    rightAnchorX: LAYOUT.rightX - 36,
+type MiniCardProps = {
+    title: string
+    sub?: string
+    highlight?: boolean
 }
 
-const architectureGroups = [
-    {
-        title: 'CLI Layer',
-        items: ['Input Prompt', 'Slash Commands', 'Turn Renderer', 'Session Header'],
-    },
-    {
-        title: 'Core Layer',
-        items: ['Session Runtime', 'Prompt Builder', 'History & Memory', 'Provider Config'],
-    },
-    {
-        title: 'Tools Layer',
-        items: ['Tool Router', 'Native Tools', 'MCP Tools', 'Approval Guard'],
-    },
-]
+function MiniCard({ title, sub, highlight = false }: MiniCardProps) {
+    return (
+        <div
+            style={{
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 8,
+                background: highlight ? COLORS.cardHighlight : COLORS.card,
+                color: COLORS.text,
+                fontFamily: 'Inter, system-ui, sans-serif',
+                minHeight: 46,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                padding: '4px 8px',
+                lineHeight: 1.2,
+                minWidth: 0,
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), 0 6px 18px rgba(0,0,0,0.32)',
+            }}
+        >
+            <div
+                style={{
+                    fontSize: 17,
+                    fontWeight: 600,
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word',
+                }}
+            >
+                {title}
+            </div>
+            {sub ? (
+                <div
+                    style={{
+                        marginTop: 3,
+                        fontSize: 12,
+                        color: COLORS.textMuted,
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                    }}
+                >
+                    {sub}
+                </div>
+            ) : null}
+        </div>
+    )
+}
 
-const providers = ['OpenAI', 'DeepSeek', 'Azure OpenAI', 'Ollama', 'More...']
+function Layer({ y, h, label, labelBg, rowBg, children }: LayerProps) {
+    return (
+        <>
+            <div
+                style={{
+                    position: 'absolute',
+                    left: LABEL_X,
+                    top: y,
+                    width: LABEL_W,
+                    height: h,
+                    clipPath: 'polygon(13% 0, 100% 0, 100% 100%, 13% 100%, 0 50%)',
+                    background: labelBg,
+                    border: `1px solid ${COLORS.borderStrong}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: COLORS.text,
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                    fontSize: 32,
+                    fontWeight: 600,
+                    lineHeight: 1.15,
+                    textAlign: 'center',
+                    padding: '0 10px',
+                    zIndex: 2,
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 20px rgba(0,0,0,0.34)',
+                }}
+            >
+                {label}
+            </div>
+
+            <div
+                style={{
+                    position: 'absolute',
+                    left: MAIN_X,
+                    top: y,
+                    width: MAIN_W,
+                    height: h,
+                    borderRadius: 8,
+                    border: `1px solid ${COLORS.borderStrong}`,
+                    background: rowBg,
+                    padding: 14,
+                    zIndex: 2,
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 28px rgba(0,0,0,0.38)',
+                }}
+            >
+                {children}
+            </div>
+        </>
+    )
+}
 
 export function MemoArchitectureDiagram() {
     const containerRef = useRef<HTMLDivElement>(null)
@@ -75,11 +168,6 @@ export function MemoArchitectureDiagram() {
         return () => observer.disconnect()
     }, [])
 
-    const topArrowStartX = FLOW_LINES.leftAnchorX
-    const topArrowEndX = FLOW_LINES.rightAnchorX
-    const bottomArrowStartX = FLOW_LINES.rightAnchorX
-    const bottomArrowEndX = FLOW_LINES.leftAnchorX
-
     return (
         <div
             ref={containerRef}
@@ -87,11 +175,10 @@ export function MemoArchitectureDiagram() {
                 position: 'relative',
                 width: '100%',
                 aspectRatio: `${DESIGN_WIDTH} / ${DESIGN_HEIGHT}`,
-                borderRadius: 20,
+                borderRadius: 12,
                 overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.08)',
-                background:
-                    'radial-gradient(100% 70% at 50% -10%, rgba(255,255,255,0.08), rgba(255,255,255,0) 60%), linear-gradient(180deg, #0a0b0d 0%, #09090b 100%)',
+                border: `1px solid ${COLORS.border}`,
+                background: `radial-gradient(120% 75% at 50% -15%, rgba(255,255,255,0.09), rgba(255,255,255,0) 56%), linear-gradient(180deg, ${COLORS.frameBg} 0%, ${COLORS.frameBgAlt} 100%)`,
             }}
         >
             <div
@@ -105,196 +192,403 @@ export function MemoArchitectureDiagram() {
                     transformOrigin: 'top left',
                 }}
             >
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: 56,
-                        top: 42,
-                        right: 56,
-                        fontFamily: 'Inter, system-ui, sans-serif',
-                    }}
+                <svg
+                    width={DESIGN_WIDTH}
+                    height={DESIGN_HEIGHT}
+                    viewBox={`0 0 ${DESIGN_WIDTH} ${DESIGN_HEIGHT}`}
+                    style={{ position: 'absolute', left: 0, top: 0, zIndex: 1 }}
+                >
+                    <defs>
+                        <marker
+                            id="memo-arch-arrow"
+                            markerWidth="8"
+                            markerHeight="8"
+                            refX="7"
+                            refY="4"
+                            orient="auto"
+                        >
+                            <path d="M0,0 L8,4 L0,8 Z" fill={COLORS.line} />
+                        </marker>
+                    </defs>
+
+                    <path
+                        d="M 350 114 C 520 150, 610 176, 710 250"
+                        stroke={COLORS.line}
+                        strokeWidth="2"
+                        fill="none"
+                        markerEnd="url(#memo-arch-arrow)"
+                    />
+                    <text
+                        x="510"
+                        y="126"
+                        fill={COLORS.textMuted}
+                        fontSize="12"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        tui to core (direct)
+                    </text>
+
+                    <path
+                        d="M 710 114 L 710 170"
+                        stroke={COLORS.line}
+                        strokeWidth="2"
+                        fill="none"
+                        markerEnd="url(#memo-arch-arrow)"
+                    />
+                    <text
+                        x="724"
+                        y="144"
+                        fill={COLORS.textMuted}
+                        fontSize="12"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        web to server
+                    </text>
+
+                    <path
+                        d="M 710 232 L 710 250"
+                        stroke={COLORS.line}
+                        strokeWidth="2"
+                        fill="none"
+                        markerEnd="url(#memo-arch-arrow)"
+                    />
+                    <text
+                        x="724"
+                        y="243"
+                        fill={COLORS.textMuted}
+                        fontSize="12"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        server to core
+                    </text>
+
+                    <path
+                        d="M 710 434 L 710 446"
+                        stroke={COLORS.line}
+                        strokeWidth="2"
+                        fill="none"
+                        markerEnd="url(#memo-arch-arrow)"
+                    />
+                    <text
+                        x="724"
+                        y="440"
+                        fill={COLORS.textMuted}
+                        fontSize="12"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        core to tools
+                    </text>
+
+                    <path
+                        d="M 890 434 L 890 710"
+                        stroke={COLORS.line}
+                        strokeWidth="2"
+                        fill="none"
+                        markerEnd="url(#memo-arch-arrow)"
+                    />
+                    <text
+                        x="902"
+                        y="570"
+                        fill={COLORS.textMuted}
+                        fontSize="12"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        all model calls in core
+                    </text>
+                </svg>
+
+                <Layer
+                    y={70}
+                    h={92}
+                    label="Clients"
+                    labelBg="linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))"
+                    rowBg={COLORS.panel}
                 >
                     <div
                         style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            borderRadius: 999,
-                            padding: '4px 10px',
-                            color: '#a1a1aa',
-                            background: 'rgba(17,17,19,0.9)',
-                            fontSize: 12,
-                            fontWeight: 600,
-                            letterSpacing: 0.2,
+                            height: '100%',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                            gap: 12,
                         }}
                     >
-                        SYSTEM ARCHITECTURE
+                        <MiniCard title="TUI Client" sub="memo / slash commands" />
+                        <MiniCard title="Web Client" sub="chat + workspace UI" />
+                        <MiniCard title="Other Entrypoints" sub="scripts / CI / API" highlight />
                     </div>
-                </div>
+                </Layer>
 
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: LAYOUT.leftX,
-                        top: LAYOUT.leftY,
-                        width: LAYOUT.leftW,
-                        height: LAYOUT.leftH,
-                        border: '1px dashed rgba(255,255,255,0.35)',
-                        borderRadius: 18,
-                        padding: '20px 20px 16px',
-                        background: 'rgba(17,17,19,0.42)',
-                    }}
+                <Layer
+                    y={170}
+                    h={72}
+                    label="Gateway"
+                    labelBg="linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))"
+                    rowBg={COLORS.panelAlt}
                 >
                     <div
                         style={{
-                            color: '#f4f4f5',
-                            fontFamily: 'Inter, system-ui, sans-serif',
-                            fontWeight: 700,
-                            fontSize: 34,
-                            letterSpacing: -0.5,
-                            marginBottom: 16,
+                            height: '100%',
+                            display: 'grid',
+                            gridTemplateColumns: '1.05fr 0.95fr',
+                            gap: 20,
                         }}
                     >
-                        Memo CLI
+                        <MiniCard title="Web Server API Gateway" sub="REST + WebSocket RPC" />
+                        <MiniCard
+                            title="Session Stream / Router"
+                            sub="web requests -> core runtime"
+                        />
                     </div>
+                </Layer>
 
-                    {architectureGroups.map((group) => (
+                <Layer
+                    y={250}
+                    h={188}
+                    label="Core"
+                    labelBg="linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))"
+                    rowBg={COLORS.panel}
+                >
+                    <div
+                        style={{
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                        }}
+                    >
                         <div
-                            key={group.title}
                             style={{
-                                border: '1px dashed rgba(255,255,255,0.24)',
-                                borderRadius: 14,
-                                padding: '14px 14px 12px',
-                                marginBottom: 14,
-                                background: 'rgba(10,11,14,0.4)',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                                gap: 12,
                             }}
                         >
-                            <div
-                                style={{
-                                    color: '#e4e4e7',
-                                    fontFamily: 'Inter, system-ui, sans-serif',
-                                    fontWeight: 620,
-                                    fontSize: 22,
-                                    letterSpacing: -0.3,
-                                }}
-                            >
-                                {group.title}
-                            </div>
-
-                            <div
-                                style={{
-                                    marginTop: 10,
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
-                                    gap: 10,
-                                }}
-                            >
-                                {group.items.map((item) => (
-                                    <div
-                                        key={item}
-                                        style={{
-                                            height: 48,
-                                            borderRadius: 10,
-                                            border: '1px solid rgba(255,255,255,0.09)',
-                                            background: 'rgba(24,24,27,0.9)',
-                                            color: '#d4d4d8',
-                                            fontFamily: 'Inter, system-ui, sans-serif',
-                                            fontSize: 16,
-                                            fontWeight: 560,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                        }}
-                                    >
-                                        {item}
-                                    </div>
-                                ))}
-                            </div>
+                            <MiniCard
+                                title="Session State Machine"
+                                sub="turn lifecycle + history"
+                            />
+                            <MiniCard
+                                title="Prompt & Context Builder"
+                                sub="skills + memory + agents"
+                            />
+                            <MiniCard
+                                title="Workspace Runtime"
+                                sub="project/session orchestration"
+                            />
                         </div>
-                    ))}
-                </div>
+                        <MiniCard
+                            title="Core is Memo's heart: orchestrates tools and ALL LLM calls"
+                            sub="providers are OpenAI-compatible; model invocation happens only here"
+                            highlight
+                        />
+                    </div>
+                </Layer>
+
+                <Layer
+                    y={446}
+                    h={162}
+                    label="Tools"
+                    labelBg="linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))"
+                    rowBg={COLORS.panelAlt}
+                >
+                    <div
+                        style={{
+                            height: '100%',
+                            display: 'grid',
+                            gridTemplateColumns: '1.45fr 0.55fr',
+                            gap: 14,
+                        }}
+                    >
+                        <div
+                            style={{
+                                border: `1px solid ${COLORS.border}`,
+                                borderRadius: 8,
+                                background: 'rgba(255,255,255,0.03)',
+                                padding: 10,
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                                gap: 10,
+                            }}
+                        >
+                            <MiniCard
+                                title="Built-in Tools"
+                                sub="exec/read/list/grep/webfetch/apply_patch"
+                            />
+                            <MiniCard title="MCP Tools" sub="stdio + streamable_http adapters" />
+                            <MiniCard title="Tool Router" sub="dispatch and result shaping" />
+                            <MiniCard title="Approval Guard" sub="once / session / deny" />
+                            <MiniCard title="Sandbox Policy" sub="permission and writable roots" />
+                            <MiniCard
+                                title="Parallel Dispatch"
+                                sub="concurrent tool calls"
+                                highlight
+                            />
+                        </div>
+                        <div
+                            style={{
+                                border: `1px solid ${COLORS.border}`,
+                                borderRadius: 8,
+                                background: 'rgba(255,255,255,0.03)',
+                                padding: 10,
+                                display: 'grid',
+                                gridTemplateRows: '1fr 1fr',
+                                gap: 10,
+                            }}
+                        >
+                            <MiniCard title="Skills" sub="markdown SKILL.md runtime injection" />
+                            <MiniCard title="MCP Config" sub="active servers + auth status" />
+                        </div>
+                    </div>
+                </Layer>
+
+                <Layer
+                    y={616}
+                    h={86}
+                    label="Data"
+                    labelBg="linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))"
+                    rowBg={COLORS.panel}
+                >
+                    <div
+                        style={{
+                            height: '100%',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                            gap: 12,
+                        }}
+                    >
+                        <MiniCard title="~/.memo/config.toml" />
+                        <MiniCard title="~/.memo/server.yaml" />
+                        <MiniCard title="~/.memo/sessions/*.jsonl" />
+                        <MiniCard title="Project/User SKILL.md" />
+                    </div>
+                </Layer>
+
+                <Layer
+                    y={710}
+                    h={126}
+                    label="Models"
+                    labelBg="linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))"
+                    rowBg={COLORS.panelAlt}
+                >
+                    <div
+                        style={{
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 10,
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                                gap: 12,
+                            }}
+                        >
+                            <MiniCard title="OpenAI-compatible endpoint" />
+                            <MiniCard title="OpenAI / Azure / DeepSeek" />
+                            <MiniCard title="Ollama / custom gateway" />
+                        </div>
+                        <div
+                            style={{
+                                textAlign: 'center',
+                                fontFamily: 'Inter, system-ui, sans-serif',
+                                fontSize: 13,
+                                color: COLORS.textMuted,
+                                fontWeight: 600,
+                            }}
+                        >
+                            Core owns every model request and response normalization.
+                        </div>
+                    </div>
+                </Layer>
+
+                <Layer
+                    y={844}
+                    h={70}
+                    label="Runtime"
+                    labelBg="linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))"
+                    rowBg={COLORS.panel}
+                >
+                    <div
+                        style={{
+                            height: '100%',
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: 20,
+                            padding: '0 160px',
+                        }}
+                    >
+                        <MiniCard title="Node.js Process" />
+                        <MiniCard title="Local Filesystem + Env" />
+                    </div>
+                </Layer>
 
                 <div
                     style={{
                         position: 'absolute',
-                        left: MIDDLE_DIVIDER_X,
-                        top: LAYOUT.leftY,
-                        height: LAYOUT.leftH,
-                        borderLeft: '1px dashed rgba(161,161,170,0.55)',
-                    }}
-                />
-
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: BRIDGE.x,
-                        top: BRIDGE.y,
-                        width: BRIDGE.w,
-                        height: BRIDGE.h,
-                        borderRadius: 12,
-                        border: '1px dashed rgba(212,212,216,0.35)',
-                        background: 'rgba(24,24,27,0.92)',
-                        color: '#d4d4d8',
-                        fontFamily: '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
-                        fontSize: 16,
-                        fontWeight: 600,
+                        left: RIGHT_AUDIT_X,
+                        top: 70,
+                        width: RIGHT_COL_W,
+                        height: 844,
+                        borderRadius: 8,
+                        border: `1px solid ${COLORS.borderStrong}`,
+                        background:
+                            'linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04))',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        writingMode: 'vertical-rl',
-                        letterSpacing: 0.5,
-                    }}
-                >
-                    Provider Bridge
-                </div>
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: LAYOUT.rightX,
-                        top: LAYOUT.rightY,
-                        width: LAYOUT.rightW,
-                        height: LAYOUT.rightH,
-                        border: '1px dashed rgba(255,255,255,0.35)',
-                        borderRadius: 18,
-                        background: 'rgba(17,17,19,0.5)',
-                        padding: '16px 14px',
+                        zIndex: 2,
+                        boxShadow:
+                            'inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 26px rgba(0,0,0,0.35)',
                     }}
                 >
                     <div
                         style={{
-                            color: '#e4e4e7',
+                            writingMode: 'vertical-rl',
+                            textOrientation: 'upright',
                             fontFamily: 'Inter, system-ui, sans-serif',
-                            fontWeight: 620,
-                            fontSize: 28,
-                            letterSpacing: -0.4,
-                            marginBottom: 12,
-                            textAlign: 'center',
+                            fontSize: 30,
+                            letterSpacing: 2,
+                            color: COLORS.text,
+                            fontWeight: 600,
                         }}
                     >
-                        Providers
+                        Logs
                     </div>
+                </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {providers.map((provider) => (
-                            <div
-                                key={provider}
-                                style={{
-                                    height: 98,
-                                    borderRadius: 12,
-                                    border: '1px solid rgba(255,255,255,0.08)',
-                                    background: 'rgba(24,24,27,0.92)',
-                                    color: '#d4d4d8',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontFamily: 'Inter, system-ui, sans-serif',
-                                    fontWeight: 600,
-                                    fontSize: 22,
-                                }}
-                            >
-                                {provider}
-                            </div>
-                        ))}
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: RIGHT_AUTH_X,
+                        top: 70,
+                        width: RIGHT_COL_W,
+                        height: 844,
+                        borderRadius: 8,
+                        border: `1px solid ${COLORS.borderStrong}`,
+                        background:
+                            'linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2,
+                        boxShadow:
+                            'inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 26px rgba(0,0,0,0.35)',
+                    }}
+                >
+                    <div
+                        style={{
+                            writingMode: 'vertical-rl',
+                            textOrientation: 'upright',
+                            fontFamily: 'Inter, system-ui, sans-serif',
+                            fontSize: 30,
+                            letterSpacing: 2,
+                            color: COLORS.text,
+                            fontWeight: 600,
+                        }}
+                    >
+                        Auth
                     </div>
                 </div>
             </div>

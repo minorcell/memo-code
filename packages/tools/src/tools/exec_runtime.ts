@@ -6,6 +6,7 @@ import {
     splitStdinLines,
     trimPendingStdinBuffer,
 } from '@memo/tools/tools/command_guard'
+import { getRuntimeCwd } from '@memo/tools/runtime/context'
 
 const DEFAULT_EXEC_YIELD_TIME_MS = 10_000
 const DEFAULT_WRITE_YIELD_TIME_MS = 250
@@ -137,44 +138,52 @@ function clampYield(input: number | undefined, fallback: number): number {
 
 async function waitForWindow(session: SessionState, yieldMs: number): Promise<void> {
     if (yieldMs <= 0 || session.exited) return
-    await Promise.race([
-        new Promise<void>((resolve) => {
-            const timer = setTimeout(() => {
-                cleanup()
-                resolve()
-            }, yieldMs)
-            const onExit = () => {
-                clearTimeout(timer)
-                cleanup()
-                resolve()
-            }
-            const cleanup = () => {
-                session.eventBus.off('exit', onExit)
-            }
-            session.eventBus.on('exit', onExit)
-        }),
-    ])
+    await new Promise<void>((resolve) => {
+        let settled = false
+        const finalize = () => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            cleanup()
+            resolve()
+        }
+        const onExit = () => {
+            finalize()
+        }
+        const cleanup = () => {
+            session.eventBus.off('exit', onExit)
+        }
+        const timer = setTimeout(() => {
+            finalize()
+        }, yieldMs)
+        timer.unref?.()
+        session.eventBus.on('exit', onExit)
+    })
 }
 
 async function waitForExit(session: SessionState, timeoutMs: number): Promise<void> {
     if (session.exited || timeoutMs <= 0) return
-    await Promise.race([
-        new Promise<void>((resolve) => {
-            const timer = setTimeout(() => {
-                cleanup()
-                resolve()
-            }, timeoutMs)
-            const onExit = () => {
-                clearTimeout(timer)
-                cleanup()
-                resolve()
-            }
-            const cleanup = () => {
-                session.eventBus.off('exit', onExit)
-            }
-            session.eventBus.on('exit', onExit)
-        }),
-    ])
+    await new Promise<void>((resolve) => {
+        let settled = false
+        const finalize = () => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            cleanup()
+            resolve()
+        }
+        const onExit = () => {
+            finalize()
+        }
+        const cleanup = () => {
+            session.eventBus.off('exit', onExit)
+        }
+        const timer = setTimeout(() => {
+            finalize()
+        }, timeoutMs)
+        timer.unref?.()
+        session.eventBus.on('exit', onExit)
+    })
 }
 
 class UnifiedExecManager {
@@ -203,10 +212,18 @@ class UnifiedExecManager {
 
     private async terminateForTimeout(session: SessionState) {
         if (session.exited) return
-        session.proc.kill('SIGTERM')
+        try {
+            session.proc.kill('SIGTERM')
+        } catch {
+            // Ignore process kill races.
+        }
         await waitForExit(session, 200)
         if (!session.exited) {
-            session.proc.kill('SIGKILL')
+            try {
+                session.proc.kill('SIGKILL')
+            } catch {
+                // Ignore process kill races.
+            }
             await waitForExit(session, 200)
         }
     }
@@ -238,9 +255,10 @@ class UnifiedExecManager {
             login: request.login !== false,
         })
 
+        const runtimeCwd = getRuntimeCwd()
         const cwd = request.workdir?.trim()
-            ? resolve(process.cwd(), request.workdir.trim())
-            : process.cwd()
+            ? resolve(runtimeCwd, request.workdir.trim())
+            : runtimeCwd
 
         const proc = spawn(shellInvocation.file, shellInvocation.args, {
             cwd,
@@ -330,7 +348,14 @@ class UnifiedExecManager {
             }
 
             session.pendingStdinInput = trimPendingStdinBuffer(remainder)
-            session.proc.stdin?.write(request.chars)
+            try {
+                const stdin = session.proc.stdin
+                if (stdin && !stdin.destroyed && !stdin.writableEnded) {
+                    stdin.write(request.chars)
+                }
+            } catch {
+                // Ignore late stdin writes on short-lived commands.
+            }
         }
 
         const yieldMs = clampYield(request.yield_time_ms, DEFAULT_WRITE_YIELD_TIME_MS)

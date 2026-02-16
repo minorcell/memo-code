@@ -1270,14 +1270,11 @@ describe('session hooks & middleware', () => {
         }
     })
 
-    test('generates and persists session title on first user prompt', async () => {
+    test('sets and persists session title from first user prompt', async () => {
         const events: HistoryEvent[] = []
         const generatedTitles: string[] = []
         const calls: Array<{ options: unknown }> = []
-        const outputs: LLMResponse[] = [
-            endTurnResponse('Express.js REST API'),
-            endTurnResponse('done'),
-        ]
+        const outputs: LLMResponse[] = [endTurnResponse('done')]
 
         const session = await createAgentSession(
             {
@@ -1299,38 +1296,27 @@ describe('session hooks & middleware', () => {
                     },
                 },
             },
-            { generateSessionTitle: true },
+            {},
         )
         try {
             const result = await session.runTurn('Help me create a REST API with Express.js')
             assert.strictEqual(result.finalText, 'done')
-            assert.strictEqual(session.title, 'Express.js REST API')
+            assert.strictEqual(session.title, 'Help me create a REST API with Express.js')
 
             const titleEvent = events.find((event) => event.type === 'session_title')
             assert.ok(titleEvent, 'session_title event should exist')
-            assert.strictEqual(titleEvent?.content, 'Express.js REST API')
-            assert.strictEqual(titleEvent?.meta?.source, 'llm')
-            assert.deepStrictEqual(generatedTitles, ['Express.js REST API'])
-
-            const firstCallOptions = calls[0]?.options as { tools?: unknown[] } | undefined
-            assert.ok(firstCallOptions, 'first call options should exist')
-            assert.ok(
-                Array.isArray(firstCallOptions?.tools),
-                'title call should override tools list',
-            )
-            assert.strictEqual(firstCallOptions?.tools?.length, 0)
+            assert.strictEqual(titleEvent?.content, 'Help me create a REST API with Express.js')
+            assert.strictEqual(titleEvent?.meta?.source, 'first_prompt')
+            assert.deepStrictEqual(generatedTitles, ['Help me create a REST API with Express.js'])
+            assert.strictEqual(calls.length, 1, 'should not issue extra LLM call for title')
         } finally {
             await session.close()
         }
     })
 
-    test('falls back to prompt-derived title when title generation fails', async () => {
+    test('emits session title only once across multiple turns', async () => {
         const events: HistoryEvent[] = []
-        const outputs: LLMResponse[] = [
-            { content: [], stop_reason: 'end_turn' },
-            endTurnResponse('done'),
-            endTurnResponse('done-again'),
-        ]
+        const outputs: LLMResponse[] = [endTurnResponse('done'), endTurnResponse('done-again')]
 
         const session = await createAgentSession(
             {
@@ -1344,7 +1330,7 @@ describe('session hooks & middleware', () => {
                 ],
                 tokenCounter: createTokenCounter('cl100k_base'),
             },
-            { generateSessionTitle: true },
+            {},
         )
         try {
             const first = await session.runTurn('Build migration plan for v2 release')
@@ -1356,7 +1342,7 @@ describe('session hooks & middleware', () => {
 
             const titleEvents = events.filter((event) => event.type === 'session_title')
             assert.strictEqual(titleEvents.length, 1, 'session_title should be emitted once')
-            assert.strictEqual(titleEvents[0]?.meta?.source, 'fallback')
+            assert.strictEqual(titleEvents[0]?.meta?.source, 'first_prompt')
         } finally {
             await session.close()
         }

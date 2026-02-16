@@ -1,5 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
 import { createApprovalManager } from '@memo/tools/approval'
+import { getMaxToolResultChars } from '@memo/tools/runtime/tool_output_limits'
 import type {
     ToolAction,
     ToolActionResult,
@@ -12,18 +13,7 @@ import type {
     OrchestratorTool,
 } from './types'
 
-const DEFAULT_MAX_TOOL_RESULT_CHARS = 12_000
 const MAX_TOOL_INPUT_STRING_CHARS = 100_000
-
-function getMaxToolResultChars() {
-    const raw = process.env.MEMO_TOOL_RESULT_MAX_CHARS?.trim()
-    if (!raw) return DEFAULT_MAX_TOOL_RESULT_CHARS
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-        return DEFAULT_MAX_TOOL_RESULT_CHARS
-    }
-    return Math.floor(parsed)
-}
 
 function escapeXmlAttr(value: string) {
     return value

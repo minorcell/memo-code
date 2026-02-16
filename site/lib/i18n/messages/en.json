@@ -1,8 +1,8 @@
 {
     "metadata": {
-        "title": "Memo CLI - AI Coding Agent for Terminal",
+        "title": "Memo Code - AI Coding Agent for Terminal",
         "description": "Memo is a lightweight, open-source coding agent that runs in your terminal. Code faster with AI assistance through natural language.",
-        "template": "%s | Memo CLI"
+        "template": "%s | Memo Code"
     },
     "nav": {
         "docs": "Documentation",
@@ -26,32 +26,32 @@
                     "title": "Terminal-native",
                     "description": "Works where you already ship: directly inside your terminal workflow."
                 },
-                "fastFeedback": {
-                    "title": "Fast feedback",
-                    "description": "Optimized for quick iteration, from reading code to applying changes."
+                "webConsole": {
+                    "title": "Web console",
+                    "description": "Manage multi-workspace projects and concurrent live sessions from the browser."
                 },
                 "builtInTools": {
-                    "title": "Built-in tools",
+                    "title": "Rich built-in tools",
                     "description": "File I/O, grep, commands, and patching are available out of the box."
                 },
-                "approvalControls": {
-                    "title": "Approval controls",
-                    "description": "Dangerous operations can require confirmation before execution."
+                "security": {
+                    "title": "Security",
+                    "description": "Tool approvals and guarded execution keep risky actions explicit."
                 },
                 "mcpReady": {
-                    "title": "MCP ready",
+                    "title": "MCP",
                     "description": "Connect external capabilities through the Model Context Protocol."
                 },
-                "multiAgent": {
-                    "title": "Multi-agent mode",
-                    "description": "Delegate subtasks to subagents when work needs to fan out."
+                "skills": {
+                    "title": "Skills",
+                    "description": "Use markdown-based skills with activation control in both CLI and Web."
                 }
             }
         },
         "architecture": {
             "badge": "Architecture",
             "title": "System architecture design",
-            "subtitle": "A clean layered map of Memo CLI internals, kept consistent with the current Linear-style visual language."
+            "subtitle": "A clean layered map of Memo CLI internals."
         },
         "quickstart": {
             "badge": "Quick Start",
@@ -64,7 +64,7 @@
                 },
                 "configure": {
                     "title": "Configure",
-                    "description": "Use OpenAI-compatible or DeepSeek providers."
+                    "description": "Use any provider compatible with the OpenAI API format."
                 },
                 "launch": {
                     "title": "Launch",
@@ -82,7 +82,7 @@
             "npmInstall": "npm install"
         },
         "footer": {
-            "copyright": "© 2025 Memo CLI · MIT License"
+            "copyright": "© 2025 Memo Code · MIT License"
         }
     },
     "docs": {

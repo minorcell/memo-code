@@ -1,5 +1,10 @@
-import type { ChatMessage } from '@memo/core'
-import type { StepView, TurnView } from '../types'
+import {
+    parseHistoryLogToSessionDetail,
+    type ChatMessage,
+    type SessionTurnDetail,
+    type SessionTurnStep,
+} from '@memo/core'
+import { TOOL_STATUS, type StepView, type TurnView } from '../types'
 
 export type ParsedHistoryLog = {
     summary: string
@@ -8,112 +13,70 @@ export type ParsedHistoryLog = {
     maxSequence: number
 }
 
+function toAssistantText(turn: SessionTurnDetail): string {
+    const finalText = turn.finalText?.trim()
+    if (finalText) return finalText
+    return turn.steps
+        .map((step) => step.assistantText ?? '')
+        .join('')
+        .trim()
+}
+
+function normalizeTurnStatus(value: unknown): TurnView['status'] | undefined {
+    return value === 'ok' || value === 'error' || value === 'cancelled' ? value : undefined
+}
+
+function toToolStatus(step: SessionTurnStep): StepView['toolStatus'] {
+    if (!step.resultStatus) return undefined
+    return step.resultStatus === 'success' ? TOOL_STATUS.SUCCESS : TOOL_STATUS.ERROR
+}
+
+function toTurnView(turn: SessionTurnDetail, sequence: number, turnIndex: number): TurnView {
+    return {
+        index: -(turnIndex + 1),
+        userInput: turn.input ?? '',
+        steps: (turn.steps ?? []).map((step) => ({
+            index: step.step,
+            assistantText: step.assistantText ?? '',
+            thinking: step.thinking,
+            action: step.action,
+            parallelActions: step.parallelActions,
+            observation: step.observation,
+            toolStatus: toToolStatus(step),
+        })),
+        status: normalizeTurnStatus(turn.status),
+        errorMessage: turn.errorMessage,
+        tokenUsage: turn.tokenUsage,
+        finalText: toAssistantText(turn),
+        sequence,
+    }
+}
+
 export function parseHistoryLog(raw: string): ParsedHistoryLog {
+    const detail = parseHistoryLogToSessionDetail(raw, 'history.log')
+    const orderedTurns = [...detail.turns].sort((left, right) => left.turn - right.turn)
+
     const messages: ChatMessage[] = []
-    const turns: TurnView[] = []
-    const summaryParts: string[] = []
-
-    const lines = raw
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-
-    let currentTurn: TurnView | null = null
-    let turnCount = 0
-    let sequence = 0
-
-    for (const line of lines) {
-        let event: any
-        try {
-            event = JSON.parse(line)
-        } catch {
-            continue
+    for (const turn of orderedTurns) {
+        const input = (turn.input ?? '').trim()
+        if (input) {
+            messages.push({ role: 'user', content: input })
         }
 
-        if (!event || typeof event !== 'object') continue
-
-        if (event.type === 'turn_start') {
-            const userInput = typeof event.content === 'string' ? event.content : ''
-            const index = -(turnCount + 1)
-            currentTurn = {
-                index,
-                userInput,
-                steps: [],
-                status: 'ok',
-                sequence: (sequence += 1),
-            }
-            turns.push(currentTurn)
-            if (userInput) {
-                messages.push({ role: 'user', content: userInput })
-                summaryParts.push(`User: ${userInput}`)
-            }
-            turnCount += 1
-            continue
-        }
-
-        if (event.type === 'assistant') {
-            const assistantText = typeof event.content === 'string' ? event.content : ''
-            if (assistantText) {
-                messages.push({ role: 'assistant', content: assistantText })
-                summaryParts.push(`Assistant: ${assistantText}`)
-                if (currentTurn) {
-                    const step: StepView = {
-                        index: currentTurn.steps.length,
-                        assistantText,
-                    }
-                    currentTurn.steps = [...currentTurn.steps, step]
-                    currentTurn.finalText = assistantText
-                }
-            }
-            continue
-        }
-
-        if (event.type === 'action' && currentTurn) {
-            const meta = event.meta
-            if (meta && typeof meta === 'object') {
-                const tool = typeof meta.tool === 'string' ? meta.tool : ''
-                const input = meta.input
-                const thinking = typeof meta.thinking === 'string' ? meta.thinking : ''
-                const toolBlocks = Array.isArray((meta as any).toolBlocks)
-                    ? ((meta as any).toolBlocks as Array<{ name?: unknown; input?: unknown }>)
-                    : []
-
-                const parallelActions = toolBlocks
-                    .map((block) => {
-                        const name = typeof block?.name === 'string' ? block.name : ''
-                        if (!name) return null
-                        return { tool: name, input: block?.input }
-                    })
-                    .filter(Boolean) as Array<{ tool: string; input: unknown }>
-
-                const lastStep = currentTurn.steps[currentTurn.steps.length - 1]
-                if (lastStep) {
-                    if (parallelActions.length > 1) {
-                        lastStep.action = parallelActions[0]
-                        lastStep.parallelActions = parallelActions
-                    } else if (tool) {
-                        lastStep.action = { tool, input }
-                    }
-                    if (thinking) {
-                        lastStep.thinking = thinking
-                    }
-                }
-            }
-            continue
-        }
-
-        if (event.type === 'observation' && currentTurn) {
-            const observation = typeof event.content === 'string' ? event.content : ''
-            const lastStep = currentTurn.steps[currentTurn.steps.length - 1]
-            if (lastStep) {
-                lastStep.observation = observation
-            }
-            continue
+        const assistant = toAssistantText(turn)
+        if (assistant) {
+            messages.push({ role: 'assistant', content: assistant })
         }
     }
 
+    let sequence = 0
+    const turns = orderedTurns.map((turn, index) => {
+        sequence += 1
+        return toTurnView(turn, sequence, index)
+    })
+
     return {
-        summary: summaryParts.join('\n'),
+        summary: detail.summary,
         messages,
         turns,
         maxSequence: sequence,

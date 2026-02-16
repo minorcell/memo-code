@@ -168,6 +168,67 @@ description: ${marker}
         }
     })
 
+    test('injects only active skills when activeSkillPaths is provided', async () => {
+        const projectRoot = await makeTempDir('memo-core-skills-active-filter')
+        const skillsRoot = join(projectRoot, '.codex', 'skills')
+        const enabledDir = join(skillsRoot, 'enabled-skill')
+        const disabledDir = join(skillsRoot, 'disabled-skill')
+        const enabledPath = join(enabledDir, 'SKILL.md')
+        const disabledPath = join(disabledDir, 'SKILL.md')
+        await mkdir(enabledDir, { recursive: true })
+        await mkdir(disabledDir, { recursive: true })
+
+        await writeFile(
+            enabledPath,
+            `---
+name: enabled-skill
+description: enabled marker
+---
+# enabled
+`,
+            'utf-8',
+        )
+        await writeFile(
+            disabledPath,
+            `---
+name: disabled-skill
+description: disabled marker
+---
+# disabled
+`,
+            'utf-8',
+        )
+
+        const session = await createAgentSession(
+            {
+                callLLM: async () => ({
+                    content: [{ type: 'text', text: 'ok' }],
+                    stop_reason: 'end_turn',
+                }),
+                loadPrompt: () =>
+                    loadSystemPrompt({
+                        cwd: projectRoot,
+                        skillRoots: [skillsRoot],
+                        homeDir: projectRoot,
+                        memoHome: join(projectRoot, '.memo'),
+                        activeSkillPaths: [enabledPath],
+                    }),
+                historySinks: [],
+                tokenCounter: createTokenCounter('cl100k_base'),
+            },
+            { mode: 'interactive' },
+        )
+
+        try {
+            const systemPrompt = session.history[0]?.content ?? ''
+            assert.ok(systemPrompt.includes('enabled-skill'))
+            assert.ok(!systemPrompt.includes('disabled-skill'))
+        } finally {
+            await session.close()
+            await removeDir(projectRoot)
+        }
+    })
+
     test('ignores invalid skills without required frontmatter fields', async () => {
         const projectRoot = await makeTempDir('memo-core-skills-invalid')
         const skillsRoot = join(projectRoot, '.codex', 'skills')
