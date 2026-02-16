@@ -24,7 +24,7 @@ export function LoginPage() {
     const login = useAuthStore((state) => state.login)
     const clearError = useAuthStore((state) => state.clearError)
 
-    const [username, setUsername] = useState('memo')
+    const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
 
     if (isAuthenticated) {
