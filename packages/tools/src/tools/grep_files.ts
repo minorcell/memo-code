@@ -33,6 +33,8 @@ function runRg(params: {
             '--sortr=modified',
             '--regexp',
             params.pattern,
+            '--max-count',
+            '1',
             '--no-messages',
         ]
         if (params.include?.trim()) {
@@ -53,19 +55,62 @@ function runRg(params: {
         proc.stdout?.on('data', (chunk) => stdoutChunks.push(chunk))
         proc.stderr?.on('data', (chunk) => stderrChunks.push(chunk))
 
+        let timedOut = false
+        let killTimer: ReturnType<typeof setTimeout> | null = null
+        let settled = false
+
+        const cleanupTimers = () => {
+            clearTimeout(timer)
+            if (killTimer) {
+                clearTimeout(killTimer)
+                killTimer = null
+            }
+        }
+
+        const rejectOnce = (error: Error) => {
+            if (settled) return
+            settled = true
+            cleanupTimers()
+            reject(error)
+        }
+
+        const resolveOnce = (value: { exitCode: number; stdout: string; stderr: string }) => {
+            if (settled) return
+            settled = true
+            cleanupTimers()
+            resolve(value)
+        }
+
         const timer = setTimeout(() => {
-            proc.kill('SIGTERM')
-            reject(new Error('rg timed out after 30 seconds'))
+            timedOut = true
+            try {
+                proc.kill('SIGTERM')
+            } catch {
+                // Ignore kill races.
+            }
+            killTimer = setTimeout(() => {
+                if (proc.exitCode === null) {
+                    try {
+                        proc.kill('SIGKILL')
+                    } catch {
+                        // Ignore kill races.
+                    }
+                }
+            }, 500)
+            killTimer.unref?.()
         }, COMMAND_TIMEOUT_MS)
+        timer.unref?.()
 
         proc.on('error', (err) => {
-            clearTimeout(timer)
-            reject(err)
+            rejectOnce(err as Error)
         })
 
         proc.on('close', (code) => {
-            clearTimeout(timer)
-            resolve({
+            if (timedOut) {
+                rejectOnce(new Error('rg timed out after 30 seconds'))
+                return
+            }
+            resolveOnce({
                 exitCode: typeof code === 'number' ? code : -1,
                 stdout: stdoutChunks.join(''),
                 stderr: stderrChunks.join(''),
