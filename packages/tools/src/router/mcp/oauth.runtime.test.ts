@@ -43,12 +43,16 @@ function spawnChild({
     error?: Error
 } = {}) {
     const child = {
-        on: vi.fn((event: string, handler: (err: Error) => void) => {
+        on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
             if (error && event === 'error') {
                 handler(error)
             }
+            if (!error && event === 'spawn') {
+                handler()
+            }
             return child
         }),
+        off: vi.fn(() => child),
         unref: vi.fn(),
     }
     return child

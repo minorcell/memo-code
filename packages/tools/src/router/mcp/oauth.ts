@@ -296,9 +296,27 @@ export async function openExternalUrl(url: string): Promise<void> {
             detached: true,
             stdio: 'ignore',
         })
-        child.on('error', reject)
+        let settled = false
+        const finalize = (error?: Error) => {
+            if (settled) return
+            settled = true
+            child.off('error', onError)
+            child.off('spawn', onSpawn)
+            if (error) {
+                reject(error)
+                return
+            }
+            resolve()
+        }
+        const onError = (error: Error) => {
+            finalize(error)
+        }
+        const onSpawn = () => {
+            finalize()
+        }
+        child.on('error', onError)
+        child.on('spawn', onSpawn)
         child.unref()
-        resolve()
     })
 }
 
