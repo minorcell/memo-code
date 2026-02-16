@@ -99,7 +99,8 @@ class MemoWsClient {
             method,
             params,
         }
-        const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
+        const timeoutMs =
+            options?.timeoutMs === undefined ? DEFAULT_TIMEOUT_MS : options.timeoutMs
 
         return new Promise<T>((resolve, reject) => {
             const timeoutId =
