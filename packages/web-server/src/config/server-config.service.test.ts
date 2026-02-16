@@ -93,4 +93,152 @@ describe('ServerConfigService', () => {
       restoreEnv(envSnapshot);
     }
   });
+
+  test('creates default yaml config when missing', async () => {
+    const envSnapshot = snapshotEnv();
+    const memoHome = await mkdtemp(join(tmpdir(), 'memo-web-server-default-'));
+    tempRoots.push(memoHome);
+    process.env.MEMO_HOME = memoHome;
+    delete process.env.MEMO_SERVER_CONFIG;
+
+    const service = new ServerConfigService();
+    try {
+      const loaded = await service.load();
+      const configPath = join(memoHome, 'server.yaml');
+      const persisted = parse(await readFile(configPath, 'utf8')) as {
+        auth?: { username?: string; password?: string };
+      };
+
+      assert.strictEqual(service.getConfigPath(), configPath);
+      assert.strictEqual(loaded.auth.username, 'memo');
+      assert.ok(loaded.auth.password.length > 0);
+      assert.strictEqual(persisted.auth?.username, 'memo');
+      assert.strictEqual(typeof persisted.auth?.password, 'string');
+    } finally {
+      restoreEnv(envSnapshot);
+    }
+  });
+
+  test('loads explicit JSON config path and normalizes malformed fields', async () => {
+    const envSnapshot = snapshotEnv();
+    const memoHome = await mkdtemp(join(tmpdir(), 'memo-web-server-json-'));
+    tempRoots.push(memoHome);
+    const configPath = join(memoHome, 'custom-server.json');
+
+    process.env.MEMO_HOME = memoHome;
+    process.env.MEMO_SERVER_CONFIG = configPath;
+
+    await writeFile(
+      configPath,
+      JSON.stringify(
+        {
+          auth: {
+            username: true,
+            password: 12345,
+            accessTokenSecret: '',
+            refreshTokenSecret: '',
+            accessTokenTtlSeconds: -1,
+            refreshTokenTtlSeconds: 'abc',
+          },
+          security: {
+            corsAllowedHosts: [],
+          },
+          workspaces: [
+            { id: 'same', name: 'workspace-a', cwd: '/tmp/workspace-a' },
+            { id: 'same', name: 'workspace-b', cwd: '/tmp/workspace-a' },
+            { foo: 'invalid' },
+          ],
+          workspaceBrowser: {
+            rootPath: '',
+          },
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+
+    const service = new ServerConfigService();
+    try {
+      const loaded = await service.load();
+      assert.strictEqual(loaded.auth.username, 'true');
+      assert.strictEqual(loaded.auth.password, '12345');
+      assert.strictEqual(loaded.workspaces.length, 1);
+      assert.strictEqual(loaded.workspaceBrowser.rootPath, '/');
+      assert.ok(loaded.security.corsAllowedHosts.length > 0);
+
+      const persisted = JSON.parse(await readFile(configPath, 'utf8')) as {
+        workspaces?: unknown[];
+        auth?: { accessTokenSecret?: string; refreshTokenSecret?: string };
+      };
+      assert.strictEqual(Array.isArray(persisted.workspaces), true);
+      assert.strictEqual(persisted.workspaces?.length, 1);
+      assert.ok((persisted.auth?.accessTokenSecret?.length ?? 0) > 0);
+      assert.ok((persisted.auth?.refreshTokenSecret?.length ?? 0) > 0);
+    } finally {
+      restoreEnv(envSnapshot);
+    }
+  });
+
+  test('throws clear parsing error for invalid json config', async () => {
+    const envSnapshot = snapshotEnv();
+    const memoHome = await mkdtemp(join(tmpdir(), 'memo-web-server-bad-json-'));
+    tempRoots.push(memoHome);
+    const configPath = join(memoHome, 'server.json');
+
+    process.env.MEMO_HOME = memoHome;
+    process.env.MEMO_SERVER_CONFIG = configPath;
+    await writeFile(configPath, '{"auth": ', 'utf8');
+
+    try {
+      await assert.rejects(
+        () => new ServerConfigService().load(),
+        /Failed to parse .*server\.json/,
+      );
+    } finally {
+      restoreEnv(envSnapshot);
+    }
+  });
+
+  test('updateConfig persists normalized updates', async () => {
+    const envSnapshot = snapshotEnv();
+    const memoHome = await mkdtemp(join(tmpdir(), 'memo-web-server-update-'));
+    tempRoots.push(memoHome);
+    process.env.MEMO_HOME = memoHome;
+    delete process.env.MEMO_SERVER_CONFIG;
+
+    const service = new ServerConfigService();
+    try {
+      await service.load();
+      const updated = await service.updateConfig((config) => ({
+        ...config,
+        security: {
+          corsAllowedHosts: ['example.com', 'localhost'],
+        },
+        workspaceBrowser: {
+          rootPath: '/tmp/root',
+        },
+      }));
+
+      assert.deepStrictEqual(updated.security.corsAllowedHosts, [
+        'example.com',
+        'localhost',
+      ]);
+      assert.strictEqual(updated.workspaceBrowser.rootPath, '/tmp/root');
+
+      const persisted = parse(
+        await readFile(join(memoHome, 'server.yaml'), 'utf8'),
+      ) as {
+        security?: { corsAllowedHosts?: string[] };
+        workspaceBrowser?: { rootPath?: string };
+      };
+      assert.deepStrictEqual(persisted.security?.corsAllowedHosts, [
+        'example.com',
+        'localhost',
+      ]);
+      assert.strictEqual(persisted.workspaceBrowser?.rootPath, '/tmp/root');
+    } finally {
+      restoreEnv(envSnapshot);
+    }
+  });
 });
