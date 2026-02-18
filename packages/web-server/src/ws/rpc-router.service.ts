@@ -47,7 +47,9 @@ function asString(value: unknown): string | undefined {
 }
 
 function asFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function asStringArray(value: unknown): string[] | undefined {
@@ -122,9 +124,14 @@ export class RpcRouterService {
     return {
       'sessions.list': (_context, input) => this.sessionsService.list(input),
       'sessions.detail': (_context, input) =>
-        this.sessionsService.getSessionDetail(requireString(input, 'sessionId')),
+        this.sessionsService.getSessionDetail(
+          requireString(input, 'sessionId'),
+        ),
       'sessions.events': (_context, input) =>
-        this.sessionsService.getSessionEvents(requireString(input, 'sessionId'), input),
+        this.sessionsService.getSessionEvents(
+          requireString(input, 'sessionId'),
+          input,
+        ),
       'sessions.remove': (_context, input) =>
         this.chatService.deleteSession(requireString(input, 'sessionId')),
     };
@@ -137,7 +144,10 @@ export class RpcRouterService {
           providerName: asString(input.providerName),
           workspaceId: asString(input.workspaceId),
           cwd: asString(input.cwd),
-          toolPermissionMode: asEnum(input.toolPermissionMode, TOOL_PERMISSION_MODES),
+          toolPermissionMode: asEnum(
+            input.toolPermissionMode,
+            TOOL_PERMISSION_MODES,
+          ),
           activeMcpServers: asStringArray(input.activeMcpServers),
         }),
       'chat.providers.list': () => this.chatService.listProviders(),
@@ -146,7 +156,9 @@ export class RpcRouterService {
           workspaceId: asString(input.workspaceId),
         }),
       'chat.session.state': (context, input) =>
-        this.chatService.getSessionState(this.requireOwnedSession(input, context)),
+        this.chatService.getSessionState(
+          this.requireOwnedSession(input, context),
+        ),
       'chat.session.attach': async (context, input) => {
         const sessionId = requireString(input, 'sessionId');
         this.sessionRegistry.claim(sessionId, context.connectionId);
@@ -186,11 +198,17 @@ export class RpcRouterService {
           requireString(input, 'queueId'),
         ),
       'chat.queue.send_now': (context, input) =>
-        this.chatService.sendQueuedInputNow(this.requireOwnedSession(input, context)),
+        this.chatService.sendQueuedInputNow(
+          this.requireOwnedSession(input, context),
+        ),
       'chat.turn.cancel': (context, input) =>
-        this.chatService.cancelCurrentTurn(this.requireOwnedSession(input, context)),
+        this.chatService.cancelCurrentTurn(
+          this.requireOwnedSession(input, context),
+        ),
       'chat.session.compact': (context, input) =>
-        this.chatService.compactSession(this.requireOwnedSession(input, context)),
+        this.chatService.compactSession(
+          this.requireOwnedSession(input, context),
+        ),
       'chat.approval.respond': (context, input) =>
         this.chatService.applyApprovalDecision(
           this.requireOwnedSession(input, context),
@@ -216,7 +234,10 @@ export class RpcRouterService {
       'mcp.servers.remove': (_context, input) =>
         this.mcpService.remove(requireString(input, 'name')),
       'mcp.servers.login': (_context, input) =>
-        this.mcpService.login(requireString(input, 'name'), asStringArray(input.scopes)),
+        this.mcpService.login(
+          requireString(input, 'name'),
+          asStringArray(input.scopes),
+        ),
       'mcp.servers.logout': (_context, input) =>
         this.mcpService.logout(requireString(input, 'name')),
       'mcp.active.set': (_context, input) =>
@@ -270,7 +291,8 @@ export class RpcRouterService {
         const workspaceId = requireString(input, 'workspaceId');
         const sessionsResult =
           await this.sessionsService.removeSessionsByWorkspace(workspaceId);
-        const workspaceResult = await this.workspacesService.remove(workspaceId);
+        const workspaceResult =
+          await this.workspacesService.remove(workspaceId);
         return {
           ...workspaceResult,
           deletedSessions: sessionsResult.deletedSessions,

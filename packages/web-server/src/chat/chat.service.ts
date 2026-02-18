@@ -489,7 +489,9 @@ export class ChatService {
       throw new BadRequestException('queueId is required');
     }
 
-    const next = session.queuedInputs.filter((item) => item.id !== targetQueueId);
+    const next = session.queuedInputs.filter(
+      (item) => item.id !== targetQueueId,
+    );
     if (next.length === session.queuedInputs.length) {
       return { removed: false };
     }

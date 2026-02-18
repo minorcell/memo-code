@@ -187,7 +187,10 @@ describe('RpcRouterService', () => {
       (error: unknown) => {
         assert.ok(error instanceof WsRpcError);
         assert.strictEqual(error.code, 'BAD_REQUEST');
-        assert.strictEqual(error.message, 'decision must be once | session | deny');
+        assert.strictEqual(
+          error.message,
+          'decision must be once | session | deny',
+        );
         return true;
       },
     );

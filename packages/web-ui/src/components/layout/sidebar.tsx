@@ -536,7 +536,6 @@ export function Sidebar({
                         Settings
                     </NavLink>
                 </div>
-
             </div>
 
             {pickerOpen && (

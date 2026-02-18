@@ -305,7 +305,9 @@ function ensureSubscriptions(
         if (typeof sessionId !== 'string') return
         const state = asRecord(data.state) as LiveSessionState | null
         if (!state) return
-        const normalizedCurrentContextTokens = normalizeNonNegativeNumber(state.currentContextTokens)
+        const normalizedCurrentContextTokens = normalizeNonNegativeNumber(
+            state.currentContextTokens,
+        )
         const normalizedContextWindow = normalizeNonNegativeNumber(state.contextWindow)
         const normalizedContextPercent = calculateContextPercent(
             normalizedCurrentContextTokens,
@@ -347,7 +349,9 @@ function ensureSubscriptions(
         if (typeof sessionId !== 'string') return
         const state = asRecord(data.state) as LiveSessionState | null
         if (!state) return
-        const normalizedCurrentContextTokens = normalizeNonNegativeNumber(state.currentContextTokens)
+        const normalizedCurrentContextTokens = normalizeNonNegativeNumber(
+            state.currentContextTokens,
+        )
         const normalizedContextWindow = normalizeNonNegativeNumber(state.contextWindow)
         const normalizedContextPercent = calculateContextPercent(
             normalizedCurrentContextTokens,

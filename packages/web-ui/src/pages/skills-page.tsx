@@ -39,14 +39,8 @@ export function SkillsPage() {
         void load()
     }, [items.length, load])
 
-    const globalSkills = useMemo(
-        () => items.filter((item) => item.scope === 'global'),
-        [items],
-    )
-    const projectSkills = useMemo(
-        () => items.filter((item) => item.scope === 'project'),
-        [items],
-    )
+    const globalSkills = useMemo(() => items.filter((item) => item.scope === 'global'), [items])
+    const projectSkills = useMemo(() => items.filter((item) => item.scope === 'project'), [items])
 
     useEffect(() => {
         if (!detailTarget) return

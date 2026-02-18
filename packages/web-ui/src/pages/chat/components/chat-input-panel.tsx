@@ -274,7 +274,9 @@ export function ChatInputPanel({
                             Queued messages ({queuedInputs.length}/3)
                         </p>
                         {isRunning ? (
-                            <span className="text-[11px] text-muted-foreground">Waiting for turn</span>
+                            <span className="text-[11px] text-muted-foreground">
+                                Waiting for turn
+                            </span>
                         ) : null}
                     </div>
                     <div className="space-y-1">
