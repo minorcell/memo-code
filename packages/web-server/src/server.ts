@@ -105,9 +105,10 @@ function setupStaticHosting(
     ) => void;
   };
 
-  const indexPath = join(staticDir, 'index.html');
   expressApp.get(/^\/(?!api(?:\/|$)|healthz$).*/, (_req, res) => {
-    res.sendFile(indexPath);
+    // Use root + relative file path to avoid dotfile filtering on absolute paths
+    // (e.g. global installs under "~/.nvm/...").
+    res.sendFile('index.html', { root: staticDir });
   });
   logger.log(`Serving web-ui static files from ${staticDir}`);
 }
