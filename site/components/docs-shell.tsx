@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react'
 import type { DocPageSummary } from '@/lib/docs'
-import { DocToc } from '@/components/doc-toc'
 import { ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import enMessages from '@/lib/i18n/messages/en.json'
@@ -52,16 +51,11 @@ export function DocsShell({
     }
 
     const activePage = pages.find((page) => page.slug === activeSlug)
-    const hasSectionToc = Boolean(sections?.length)
 
     const groupedPages = CATEGORY_ORDER.map((category) => ({
         category,
         pages: pages.filter((page) => page.category === category),
     })).filter((group) => group.pages.length > 0)
-
-    const layoutClassName = hasSectionToc
-        ? 'lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)_220px]'
-        : 'lg:grid-cols-[250px_minmax(0,1fr)]'
 
     return (
         <div className="mx-auto w-full max-w-[1300px] px-4 pb-20 pt-6 md:px-8">
@@ -118,7 +112,7 @@ export function DocsShell({
                 </div>
             </details>
 
-            <div className={`grid gap-6 ${layoutClassName}`}>
+            <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
                 <aside className="hidden lg:block">
                     <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-auto pr-1">
                         <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4">
@@ -177,25 +171,6 @@ export function DocsShell({
                                     {description}
                                 </p>
                             ) : null}
-
-                            {sections?.length ? (
-                                <div className="mt-5 xl:hidden">
-                                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                                        {t('docs.onThisPage')}
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {sections.map((section) => (
-                                            <a
-                                                key={section.id}
-                                                href={`#${section.id}`}
-                                                className="rounded-md border border-[var(--border-default)] bg-[var(--bg-tertiary)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                                            >
-                                                {section.title}
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : null}
                         </div>
 
                         <div className="doc-prose">{children}</div>
@@ -213,8 +188,6 @@ export function DocsShell({
                         </div>
                     ) : null}
                 </section>
-
-                {sections?.length ? <DocToc sections={sections} lang={lang} /> : null}
             </div>
         </div>
     )

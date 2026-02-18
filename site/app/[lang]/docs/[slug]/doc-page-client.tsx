@@ -1,7 +1,6 @@
 'use client'
 
 import { DocsShell } from '@/components/docs-shell'
-import { DocToc } from '@/components/doc-toc'
 import type { DocPage as DocPageType, DocPageSummary } from '@/lib/docs'
 import enMessages from '@/lib/i18n/messages/en.json'
 import zhMessages from '@/lib/i18n/messages/zh.json'
@@ -120,10 +119,6 @@ export function DocPageClient({ page, pages, neighbors, lang }: DocPageClientPro
                         )}
                     </article>
                 </div>
-                <DocToc
-                    sections={page.sections.map((s) => ({ id: s.id, title: s.title }))}
-                    lang={lang}
-                />
             </DocsShell>
         </main>
     )
