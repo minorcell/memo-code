@@ -5,6 +5,8 @@
 - `packages/tui/`：终端运行时包（入口文件 `src/cli.tsx`，包含交互式应用、聊天时间线、斜杠命令注册、批准/设置覆盖层）。
 - `packages/core/`：会话状态机、提供商/配置处理、共享类型。
 - `packages/tools/`：内置的类似 MCP 的工具；测试文件与实现文件放在一起，并使用 `*.test.ts` 命名。
+- `packages/web-ui/`：Web 版本的前端实现；包含 WebSocket 客户端、React 组件和样式。
+- `packages/web-server/`：Web 版本的后端实现；包含 WebSocket 服务器、会话管理和 API 适配器。
 - `docs/`：开发文档和设计方向；`public/`：TUI 静态资源。
 - 根脚本由 `package.json` 管理；需要 Node.js >=20 和 pnpm。安装 `rg` 以加快搜索速度。类型/路径别名在 `tsconfig.json` 中。
 - 运行时配置和日志默认存储在 `~/.memo/` 中，可以通过 `MEMO_HOME` 环境变量重定向。
