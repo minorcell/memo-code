@@ -3,6 +3,7 @@ import type {
     FileSuggestion as CoreFileSuggestion,
     LiveSessionState as CoreLiveSessionState,
     McpServerRecord as CoreMcpServerRecord,
+    QueuedInputItem as CoreQueuedInputItem,
     SessionDateInfo as CoreSessionDateInfo,
     SessionDetail as CoreSessionDetail,
     SessionEventItem as CoreSessionEventItem,
@@ -70,6 +71,7 @@ export type SessionRuntimeBadge = CoreSessionRuntimeBadge
 export type SkillRecord = CoreSkillRecord
 export type McpServerRecord = CoreMcpServerRecord
 export type FileSuggestion = CoreFileSuggestion
+export type QueuedInputItem = CoreQueuedInputItem
 
 export type ListSessionsQuery = {
     page?: number

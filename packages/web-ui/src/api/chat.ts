@@ -42,6 +42,14 @@ export function submitSessionInput(sessionId: string, input: string) {
     )
 }
 
+export function removeQueuedInput(sessionId: string, queueId: string) {
+    return wsRequest<{ removed: boolean }>('chat.queue.remove', { sessionId, queueId })
+}
+
+export function sendQueuedInputNow(sessionId: string) {
+    return wsRequest<{ triggered: boolean }>('chat.queue.send_now', { sessionId })
+}
+
 export function cancelSessionTurn(sessionId: string) {
     return wsRequest<{ cancelled: boolean }>('chat.turn.cancel', { sessionId })
 }

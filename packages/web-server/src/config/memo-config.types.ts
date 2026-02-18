@@ -8,7 +8,7 @@ export type { MemoMcpServerConfig, MemoProviderConfig };
 
 export type MemoRuntimeConfig = Pick<
   MemoConfig,
-  'current_provider' | 'providers'
+  'current_provider' | 'providers' | 'model_profiles'
 > & {
   mcp_servers: Record<string, MemoMcpServerConfig>;
   active_mcp_servers: string[];

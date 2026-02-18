@@ -5,7 +5,7 @@ import {
     useState,
     type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
-import { ArrowUp, Square } from 'lucide-react'
+import { ArrowUp, Pencil, Square, Trash2, Zap } from 'lucide-react'
 import { chatApi } from '@/api'
 import {
     Select,
@@ -17,7 +17,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import type { ChatProviderRecord, FileSuggestion, LiveSessionState } from '@/api/types'
+import type {
+    ChatProviderRecord,
+    FileSuggestion,
+    LiveSessionState,
+    QueuedInputItem,
+} from '@/api/types'
 
 type ToolPermissionMode = 'none' | 'once' | 'full'
 type ApprovalDecision = 'once' | 'session' | 'deny'
@@ -84,6 +89,11 @@ type ChatInputPanelProps = {
     onApprovalDecision: (decision: ApprovalDecision) => Promise<void> | void
     sessionId?: string | null
     workspaceId?: string | null
+    contextPercent: number
+    queuedInputs: QueuedInputItem[]
+    onEditQueuedInput: (item: QueuedInputItem) => Promise<void> | void
+    onDeleteQueuedInput: (queueId: string) => Promise<void> | void
+    onSendQueuedInputNow: () => Promise<void> | void
 }
 
 export function ChatInputPanel({
@@ -102,8 +112,21 @@ export function ChatInputPanel({
     onApprovalDecision,
     sessionId,
     workspaceId,
+    contextPercent,
+    queuedInputs,
+    onEditQueuedInput,
+    onDeleteQueuedInput,
+    onSendQueuedInputNow,
 }: ChatInputPanelProps) {
-    const sendDisabled = !hasActiveSession || isRunning || !input.trim()
+    const sendDisabled = !hasActiveSession || !input.trim()
+    const clampedContextPercent = Math.max(0, Math.min(100, contextPercent))
+    const contextPercentText = `${clampedContextPercent.toFixed(1)}%`
+    const contextTextClass =
+        clampedContextPercent >= 90
+            ? 'text-destructive'
+            : clampedContextPercent >= 75
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-muted-foreground'
     const escStateRef = useRef<{ count: number; ts: number }>({ count: 0, ts: 0 })
     const requestIdRef = useRef(0)
     const requestTimerRef = useRef<number | null>(null)
@@ -244,6 +267,76 @@ export function ChatInputPanel({
                     </div>
                 </div>
             ) : null}
+            {queuedInputs.length > 0 ? (
+                <div className="mx-auto mb-0 w-4/5 rounded-t-lg rounded-b-none border border-border/70 border-b-0 bg-muted/20 p-1.5">
+                    <div className="mb-1 flex items-center justify-between gap-1.5">
+                        <p className="text-xs font-medium text-foreground">
+                            Queued messages ({queuedInputs.length}/3)
+                        </p>
+                        {isRunning ? (
+                            <span className="text-[11px] text-muted-foreground">
+                                Waiting for turn
+                            </span>
+                        ) : null}
+                    </div>
+                    <div className="space-y-1">
+                        {queuedInputs.map((item, index) => (
+                            <div
+                                key={item.id}
+                                className="rounded-md border border-border/60 bg-background/70 px-1.5 py-1"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <p className="max-h-10 overflow-hidden text-xs text-foreground">
+                                        {item.input}
+                                    </p>
+                                    <div className="flex shrink-0 items-center gap-1">
+                                        {index === 0 ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                className="h-5 px-1.5 text-[10px]"
+                                                onClick={() => {
+                                                    void onSendQueuedInputNow()
+                                                }}
+                                                disabled={!hasActiveSession}
+                                            >
+                                                <Zap className="mr-1 size-2.5" />
+                                                Send now
+                                            </Button>
+                                        ) : null}
+                                        <Button
+                                            type="button"
+                                            size="icon-sm"
+                                            variant="ghost"
+                                            className="size-5"
+                                            onClick={() => {
+                                                void onEditQueuedInput(item)
+                                            }}
+                                            title="Edit queued message"
+                                            disabled={!hasActiveSession}
+                                        >
+                                            <Pencil className="size-3.5" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="icon-sm"
+                                            variant="ghost"
+                                            className="size-5"
+                                            onClick={() => {
+                                                void onDeleteQueuedInput(item.id)
+                                            }}
+                                            title="Delete queued message"
+                                            disabled={!hasActiveSession}
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
             {(hasFileSuggestions || loadingFileSuggestions) && activeTrigger ? (
                 <div className="mb-2 max-h-44 overflow-y-auto rounded-lg border border-border/70 bg-background/95 p-1.5">
                     {loadingFileSuggestions && !hasFileSuggestions ? (
@@ -377,6 +470,18 @@ export function ChatInputPanel({
                 />
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span
+                        className={cn(
+                            'inline-flex items-center rounded-full border border-border/70 px-2 py-0.5',
+                            contextTextClass,
+                        )}
+                        title={`Context used: ${contextPercentText}`}
+                        aria-label={`Context used: ${contextPercentText}`}
+                    >
+                        <span className="text-[11px] font-medium tabular-nums">
+                            {contextPercentText}
+                        </span>
+                    </span>
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-muted-foreground">
                         <Select
                             value={liveSession?.providerName ?? undefined}
@@ -430,7 +535,7 @@ export function ChatInputPanel({
                         </Select>
                     </div>
 
-                    <div className="ml-auto flex items-center">
+                    <div className="ml-auto flex items-center gap-1.5">
                         {isRunning ? (
                             <Button
                                 type="button"
@@ -446,28 +551,28 @@ export function ChatInputPanel({
                             >
                                 <Square className="size-3.5" />
                             </Button>
-                        ) : (
-                            <Button
-                                type="button"
-                                onClick={() => {
-                                    if (!sendDisabled) {
-                                        void onSend()
-                                    }
-                                }}
-                                disabled={sendDisabled}
-                                size="icon"
-                                variant="ghost"
-                                className={cn(
-                                    'h-8 w-8 rounded-full transition-colors',
-                                    sendDisabled
-                                        ? 'bg-muted text-muted-foreground/50'
-                                        : 'bg-foreground text-background hover:opacity-90',
-                                )}
-                                aria-label="Send message"
-                            >
-                                <ArrowUp className="size-4" />
-                            </Button>
-                        )}
+                        ) : null}
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                if (!sendDisabled) {
+                                    void onSend()
+                                }
+                            }}
+                            disabled={sendDisabled}
+                            size="icon"
+                            variant="ghost"
+                            className={cn(
+                                'h-8 w-8 rounded-full transition-colors',
+                                sendDisabled
+                                    ? 'bg-muted text-muted-foreground/50'
+                                    : 'bg-foreground text-background hover:opacity-90',
+                            )}
+                            aria-label={isRunning ? 'Queue message' : 'Send message'}
+                            title={isRunning ? 'Queue message' : 'Send message'}
+                        >
+                            <ArrowUp className="size-4" />
+                        </Button>
                     </div>
                 </div>
             </div>

@@ -44,7 +44,19 @@ type ConnectionState = WsConnectionContext & {
 type StreamPayload =
   | {
       type: 'turn.start';
-      payload: { turn: number; input: string };
+      payload: { turn: number; input: string; promptTokens?: number };
+    }
+  | {
+      type: 'context.usage';
+      payload: {
+        turn: number;
+        step: number;
+        phase: 'turn_start' | 'step_start' | 'post_compact';
+        promptTokens: number;
+        contextWindow: number;
+        thresholdTokens: number;
+        usagePercent: number;
+      };
     }
   | {
       type: 'assistant.chunk';
@@ -506,6 +518,13 @@ export class WsGatewayService implements OnModuleDestroy {
     if (frame.type === 'assistant.chunk') {
       return {
         topic: 'chat.turn.chunk',
+        data: { sessionId, ...frame.payload },
+      };
+    }
+
+    if (frame.type === 'context.usage') {
+      return {
+        topic: 'chat.context.usage',
         data: { sessionId, ...frame.payload },
       };
     }

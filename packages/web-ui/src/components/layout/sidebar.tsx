@@ -536,153 +536,149 @@ export function Sidebar({
                         Settings
                     </NavLink>
                 </div>
+            </div>
 
-                {pickerOpen && (
-                    <div className="fixed inset-0 z-50 bg-black/40 p-2 backdrop-blur-sm sm:p-4">
-                        <div className="mx-auto flex h-full max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:max-h-[760px]">
-                            <div className="flex items-center justify-between border-b px-4 py-3">
-                                <h3 className="font-medium text-sm">Select Project Directory</h3>
+            {pickerOpen && (
+                <div className="fixed inset-0 z-50 bg-black/40 p-2 backdrop-blur-sm sm:p-4">
+                    <div className="mx-auto flex h-full max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:max-h-[760px]">
+                        <div className="flex items-center justify-between border-b px-4 py-3">
+                            <h3 className="font-medium text-sm">Select Project Directory</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setPickerOpen(false)}>
+                                Close
+                            </Button>
+                        </div>
+
+                        <div className="border-b px-4 py-2">
+                            <div className="mb-2 flex items-center gap-1 overflow-x-auto">
+                                {quickAccessEntries.map((item) => (
+                                    <Button
+                                        key={`${item.label}:${item.path}`}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 shrink-0 px-2 text-xs"
+                                        onClick={() => {
+                                            void loadDirectories(item.path)
+                                        }}
+                                    >
+                                        {item.label}
+                                    </Button>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-2">
                                 <Button
                                     variant="ghost"
-                                    size="sm"
-                                    onClick={() => setPickerOpen(false)}
+                                    size="icon-sm"
+                                    className="size-7"
+                                    onClick={() => {
+                                        if (!browserParentPath) return
+                                        void loadDirectories(browserParentPath)
+                                    }}
+                                    disabled={!browserParentPath}
+                                    title="Parent directory"
                                 >
-                                    Close
+                                    <Undo2 className="size-4" />
                                 </Button>
+                                <Input value={browserPath} readOnly className="h-8 text-xs" />
                             </div>
+                        </div>
 
-                            <div className="border-b px-4 py-2">
-                                <div className="mb-2 flex items-center gap-1 overflow-x-auto">
-                                    {quickAccessEntries.map((item) => (
+                        <div className="min-h-0 flex-1 overflow-auto px-4 py-2">
+                            {browsing ? (
+                                <p className="text-xs text-muted-foreground">Loading...</p>
+                            ) : (
+                                <div className="space-y-1">
+                                    {browserItems.map((item) => (
                                         <Button
-                                            key={`${item.label}:${item.path}`}
+                                            key={`${item.path}-${item.name}`}
                                             variant="ghost"
-                                            size="sm"
-                                            className="h-7 shrink-0 px-2 text-xs"
+                                            className="h-auto w-full justify-start px-2 py-1 text-left text-xs"
+                                            disabled={!item.readable}
                                             onClick={() => {
                                                 void loadDirectories(item.path)
                                             }}
                                         >
-                                            {item.label}
+                                            <House className="mr-2 size-3 shrink-0 opacity-70" />
+                                            <span className="truncate">{item.name}</span>
                                         </Button>
                                     ))}
+                                    {browserItems.length === 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            No directories
+                                        </p>
+                                    )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon-sm"
-                                        className="size-7"
-                                        onClick={() => {
-                                            if (!browserParentPath) return
-                                            void loadDirectories(browserParentPath)
-                                        }}
-                                        disabled={!browserParentPath}
-                                        title="Parent directory"
-                                    >
-                                        <Undo2 className="size-4" />
-                                    </Button>
-                                    <Input value={browserPath} readOnly className="h-8 text-xs" />
-                                </div>
-                            </div>
+                            )}
+                        </div>
 
-                            <div className="min-h-0 flex-1 overflow-auto px-4 py-2">
-                                {browsing ? (
-                                    <p className="text-xs text-muted-foreground">Loading...</p>
-                                ) : (
-                                    <div className="space-y-1">
-                                        {browserItems.map((item) => (
-                                            <Button
-                                                key={`${item.path}-${item.name}`}
-                                                variant="ghost"
-                                                className="h-auto w-full justify-start px-2 py-1 text-left text-xs"
-                                                disabled={!item.readable}
-                                                onClick={() => {
-                                                    void loadDirectories(item.path)
-                                                }}
-                                            >
-                                                <House className="mr-2 size-3 shrink-0 opacity-70" />
-                                                <span className="truncate">{item.name}</span>
-                                            </Button>
-                                        ))}
-                                        {browserItems.length === 0 && (
-                                            <p className="text-xs text-muted-foreground">
-                                                No directories
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-2 border-t px-4 py-3">
-                                <Input
-                                    value={workspaceName}
-                                    onChange={(event) => setWorkspaceName(event.target.value)}
-                                    placeholder="Project name (optional)"
-                                    className="h-8 text-xs"
-                                />
-                                <Button
-                                    className="h-8 w-full text-xs"
-                                    onClick={() => {
-                                        void handleAddCurrentPath()
-                                    }}
-                                >
-                                    Add this project
-                                </Button>
-                            </div>
+                        <div className="space-y-2 border-t px-4 py-3">
+                            <Input
+                                value={workspaceName}
+                                onChange={(event) => setWorkspaceName(event.target.value)}
+                                placeholder="Project name (optional)"
+                                className="h-8 text-xs"
+                            />
+                            <Button
+                                className="h-8 w-full text-xs"
+                                onClick={() => {
+                                    void handleAddCurrentPath()
+                                }}
+                            >
+                                Add this project
+                            </Button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {pendingDelete && (
+            {pendingDelete && (
+                <div
+                    className="fixed inset-0 z-[70] bg-black/40 p-2 backdrop-blur-sm sm:p-4"
+                    onClick={() => {
+                        if (deleting) return
+                        setPendingDelete(null)
+                    }}
+                >
                     <div
-                        className="fixed inset-0 z-[70] bg-black/40 p-2 backdrop-blur-sm sm:p-4"
-                        onClick={() => {
-                            if (deleting) return
-                            setPendingDelete(null)
+                        className="mx-auto mt-[20vh] w-full max-w-md rounded-xl border bg-background p-4 shadow-2xl sm:mt-[18vh]"
+                        onClick={(event) => {
+                            event.stopPropagation()
                         }}
                     >
-                        <div
-                            className="mx-auto mt-[20vh] w-full max-w-md rounded-xl border bg-background p-4 shadow-2xl sm:mt-[18vh]"
-                            onClick={(event) => {
-                                event.stopPropagation()
-                            }}
-                        >
-                            <h3 className="text-sm font-medium">
-                                {pendingDelete.kind === 'session'
-                                    ? 'Delete session?'
-                                    : 'Delete project?'}
-                            </h3>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                {pendingDelete.kind === 'session'
-                                    ? `This will permanently delete "${pendingDelete.title}".`
-                                    : `This will remove project "${pendingDelete.name}".`}
-                            </p>
-                            <div className="mt-4 flex items-center justify-end gap-2">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={deleting}
-                                    onClick={() => {
-                                        setPendingDelete(null)
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    disabled={deleting}
-                                    onClick={() => {
-                                        void handleConfirmDelete()
-                                    }}
-                                >
-                                    {deleting ? 'Deleting...' : 'Delete'}
-                                </Button>
-                            </div>
+                        <h3 className="text-sm font-medium">
+                            {pendingDelete.kind === 'session'
+                                ? 'Delete session?'
+                                : 'Delete project?'}
+                        </h3>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            {pendingDelete.kind === 'session'
+                                ? `This will permanently delete "${pendingDelete.title}".`
+                                : `This will remove project "${pendingDelete.name}".`}
+                        </p>
+                        <div className="mt-4 flex items-center justify-end gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={deleting}
+                                onClick={() => {
+                                    setPendingDelete(null)
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deleting}
+                                onClick={() => {
+                                    void handleConfirmDelete()
+                                }}
+                            >
+                                {deleting ? 'Deleting...' : 'Delete'}
+                            </Button>
                         </div>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </>
     )
 }

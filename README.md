@@ -84,6 +84,7 @@ memo web --host 127.0.0.1 --port 5494 --open
 - Sidebar includes dedicated entries for `MCP Servers` and `Skills`:
     - MCP: create/edit/remove/login/logout and active toggles.
     - Skills: create/delete, detail preview, and active toggles.
+- Web chat input panel shows live context usage percentage.
 
 ## Configuration
 
