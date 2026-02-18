@@ -1,0 +1,136 @@
+---
+title: 'Memo 为什么要做 Web 版本：一些问题和解决思路'
+description: '从 TUI 到 Web：Memo 面临的迁移挑战与解决方案——MCP/Skills 可视化、Workspace 多开、远程访问、资源管理器，以及构建优化。'
+date: '2026-02-18'
+order: 6
+---
+
+# Memo 为什么要做 Web 版本：一些问题和解决思路
+
+TUI 版 memo 做完之后，做 Web 版是顺理成章的事。但真正动手的时候才发现：从终端交互迁移到浏览器，坑不比当年做 TUI 时少。
+
+## 出发点
+
+我的出发点很简单：
+
+**TUI 交互的坑太多。** 之前写过一篇[终端输入框有多难搞](https://stack.mcell.top/blog/2026/why-memo-code-cli-first-and-the-terminal-input-challenge)，光一个多行输入就让我花了很长时间。更更何况我本来就不怎么懂 tui 开发，做起来属实有点赶鸭子上架。
+
+**TUI 做 workspace 比较困难。** 我尚且不知道 opencode 是否支持维护 workspace。多开几个终端窗口也算是"并发""workspace"，但总归不够优雅。
+
+**Web 是 GUI，可以做得更丰富、更好看。** 这点毋庸置疑。
+
+**远程访问是真的爽。** 本地起了 memo web 之后，用 ngrok 穿透，走亲戚路上在手机上操作 memo 更新仓库文档——这种体验用过就回不去。
+
+## 问题
+
+但真正迁移起来，问题一箩筐。
+
+### MCP 和 Skills 的可视化
+
+之前 memo 只有 TUI 的时候，MCP 和 Skills 都是非可视化配置：
+
+```bash
+memo mcp list
+memo mcp add
+pnpm dls skills ...
+```
+
+你得记住一长串命令，才能知道当前有哪些 MCP 服务、哪些 Skills 可用。Web 版本虽然还没完全做，但至少可以把这些配置直接展示出来让用户看到了——而不是靠命令行猜。
+
+这就是一个典型的"TUI vs Web"思维差异：终端交互擅长的是"快速执行"，而 Web 擅长的是"信息展示"。
+
+### Workspace 多开
+
+TUI 时，memo 不支持指定运行时目录。你大概需要这样：
+
+```bash
+cd ~/Desktop/projects/project_a/ && memo
+```
+
+每次都要先 cd，这很麻烦。更关键的是，如果你同时在多个项目里工作，想让 memo 同时帮你处理不同的事情——对不起，做不到。
+
+但在 Web 上，完全可以让 memo 支持 workspace，甚至多个 memo 同时在不同的项目中运行。
+
+这对原有实现是个难题。于是我针对 core 包做了不少改动：
+
+- **workspace 抽象**：核心包定义了 workspace 的数据结构，包括 id、name、cwd（当前工作目录）、创建时间、最后使用时间等字段。通过 `workspaceIdFromCwd` 用 SHA256 对路径做哈希，生成稳定的 workspace ID。
+
+- **多 workspace 支持**：web-server 的 `SessionRuntimeRegistry` 维护了 session 和 workspace 的映射关系。每个 session 可以关联一个 workspace，状态（idle/running/closed）也独立追踪。
+
+- **统一到 core**：把 TUI 的实现收拢到 core 中，这样就不必为不同端各维护一套代码。
+
+> 这里的 workspace 概念和 git worktree 不一样——它更像是"项目根目录"的逻辑抽象，用来区分不同的代码仓库或工作区。
+
+### 远程访问与资源管理器
+
+"Add project" 这个功能的前提是：远程访问时，资源管理器读取的是运行 memo 的那台机器的目录，然后映射到 Web UI 上。
+
+这和本地桌面应用完全不一样——浏览器跑在客户端，但文件操作发生在服务端。
+
+web-server 的 `WorkspacesService` 实现了这个功能：
+
+```typescript
+async listDirectories(pathInput: string | undefined): Promise<WorkspaceFsListResult> {
+  // 读取运行 memo 的那台机器的目录
+  const entries = await readdir(targetPath, { withFileTypes: true });
+  // 返回给浏览器展示
+  return { path, parentPath, items };
+}
+```
+
+关键设计点：
+
+1. **安全限制**：通过 `workspaceBrowser.rootPath` 限制用户只能浏览特定目录，防止越权访问
+2. **符号链接处理**：解析真实路径，确保不跨越 root 边界
+3. **自动补全历史**：从历史会话中自动发现 workspace，无需用户手动添加
+
+### 构建优化
+
+NestJS 的 sourcemap 又又又忘了关。。
+
+更大的坑是：Nest 打包默认保持原始目录结构，运行时还需要安装依赖。这对用户极不友好——总不能让用户 `pnpm i` 然后再构建吧？
+
+最后参考前端做了 bundle 打包：
+
+```bash
+# 之前
+dist/
+├── app/
+│   ├── module.js
+│   └── ...
+├── node_modules/
+└── package.json
+
+# 之后
+dist/
+├── index.js  # 单文件，包含所有依赖
+└── prompt.md
+```
+
+这样做完，用户只需要 `node index.js` 就能直接跑，无需关心依赖问题。
+
+### 通信层
+
+TUI 中所有逻辑都在同一进程，函数直接调用就行。但 Web 就不一样了——详情可以看 [Web 与 Server 的统一通信架构](https://stack.mcell.top/blog/2026/web-websocket-design) 那篇。
+
+核心区别在于：
+
+- TUI：进程内调用
+- Web：跨进程通信，需要序列化/反序列化
+
+这不仅仅是"加一层网络调用"的问题，而是整个架构思维要变——从"函数调用"变成"消息传递"。
+
+## 总结
+
+从 TUI 到 Web，不只是换个界面。背后涉及：
+
+- 核心逻辑的抽象与复用
+- 多端支持的架构调整
+- 构建流程的重新设计
+- 通信协议的全新实现
+
+但做下来，这些付出是值得的——Web 版让 memo 真正成了一款"可远程使用"的工具，而这恰恰是很多开发者的真实需求。
+
+想象一下：你在高铁上、咖啡馆里，甚至出国旅行，碰到一些着急的情况，只需要打开浏览器，就能远程操作家里/公司电脑上的 memo，帮你修改代码、提交 commit——这不比背着笔记本满世界跑香多了？
+
+（完）

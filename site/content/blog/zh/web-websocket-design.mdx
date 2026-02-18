@@ -1,0 +1,136 @@
+---
+title: 'Web 与 Server 的统一通信架构：All-in WebSocket 设计实践'
+description: '从 memo 的实践中提炼出 WebSocket 通信方案：JSON-RPC 帧设计、事件订阅模型、为什么选择全栈 WebSocket 以及在实际场景中的优势。'
+date: '2026-02-18'
+order: 5
+---
+
+# Web 与 Server 的统一通信架构：All-in WebSocket 设计实践
+
+把 TUI 做完后，做 Web 版是顺理成章的事。但真正动手的时候，第一个问题就把的我卡住了：
+
+**通信层怎么搞？**
+
+## 上来就被问住了
+
+TUI 版本不存在通信问题——所有逻辑都在同一个进程里，函数直接调用就行。但 Web 版不一样，浏览器和服务器是两个独立的进程，得通过网络说话。
+
+一开始我想都没想：那就 REST API 呗。正好我搞前端也熟，做起来应该顺手。
+
+但等真的把需求列完，我开始觉得不对劲了：
+
+- 流式输出：模型是一个字一个字吐的，界面得跟着刷新
+- 审批拦截：执行危险操作时，浏览器得弹窗让用户确认
+- 状态同步：会话 running 还是 idle，界面得实时知道
+- 请求响应：创建会话、发送消息、查询状态……
+
+这些场景都有一个共同点：**服务端需要主动推送到浏览器**。
+
+如果是 REST，就很麻烦：
+
+- 流式输出 → 得用轮询，或者 SSE
+- 审批拦截 → 同样得轮询，或者轮询状态再判断
+- 状态同步 → 也是轮询
+
+三套机制，光维护就够喝一壶。
+
+## WebSocket 是个现成答案
+
+想了一圈，WebSocket 正好就是为这种场景设计的：
+
+- 全双工：服务端可以主动推，浏览器也可以随时发
+- 低延迟：一次连接建立，之后全是帧传输
+- 有状态：一个连接对应一个会话，语义清晰
+
+但光有协议还不够，关键是怎么用。
+
+## 帧设计：JSON-RPC 的简化版
+
+memo 用了一套类似 JSON-RPC 的帧格式，不复杂，三种就够了：
+
+```typescript
+// 客户端发请求
+{ id: "uuid", type: "rpc.request", method: "session.create", params: {...} }
+
+// 服务端返回
+{ id: "uuid", type: "rpc.response", ok: true, data: {...} }
+
+// 服务端主动推
+{ type: "event", topic: "assistant.chunk", data: {...}, seq: 1, ts: "..." }
+```
+
+**RPC 调用**用来做"请求/响应"：客户端发一个，服务端处理完返回一个。比如创建会话、发送消息、查询状态。
+
+**事件推送**用来做"服务端主动"：订阅一个 topic，然后等服务端往这个 topic 推数据。比如模型开始吐字了、工具执行完了、该审批了。
+
+这两种模式加起来，几乎能覆盖所有通信场景。
+
+## 事件类型：覆盖 Agent 完整生命周期
+
+memo 的 WebSocket 会推这些事件：
+
+- `turn.start`：用户发来一条消息
+- `assistant.chunk`：模型吐了一个字/词
+- `turn.final`：这轮对话结束
+- `session.status`：会话状态变了（idle / running / closed）
+- `approval.request`：有个危险操作需要用户确认
+- `tool.action`：某个工具开始跑了
+- `tool.observation`：工具跑完了，返回结果
+
+这些事件串起来，就是一个 Agent 从"接需求"到"干完活"的完整生命周期。
+
+## 客户端实现：重连、超时、订阅管理
+
+浏览器端的 ws-client（`packages/web-ui/src/api/ws-client.ts`）做了几个关键设计：
+
+**自动重连**：网络不稳定是常态，断掉就默默重连，不用用户手动刷新。
+
+**请求超时**：默认 20 秒。发出去的请求不能无限等，超时就把 pending 状态清掉，防止卡死。
+
+**订阅管理**：一个 topic 可以有多个 handler，取消订阅返回一个小函数，用起来很顺：
+
+```typescript
+const unsub = wsClient.subscribe('assistant.chunk', (data) => {
+    appendToChat(data.chunk)
+})
+// 不用了
+unsub()
+```
+
+**认证**：通过 URL query 传 accessToken，服务端在 WebSocket 升级阶段验证。
+
+## 为什么 All-in
+
+说白了，就三个原因：
+
+**一是实时性。** 流式输出、审批拦截、状态同步，个个都需要"服务端主动推"。HTTP 搞不定这个，非得轮询或者 SSE，但维护成本高。
+
+**二是统一。** 一次连接把所有通信都包了：会话管理、聊天、工具调用、审批。没有其他 HTTP API。协议统一，调试也统一。
+
+**三是低开销。** HTTP 每次请求都要 TLS 握手 + TCP 建立，延迟高。WebSocket 建一次，之后全是帧。对话式交互里体验差别很明显。
+
+## 安全与容错
+
+WebSocket 也需要保护：
+
+```typescript
+// 服务端限流
+const MAX_REQUESTS_PER_MINUTE = 120
+const MAX_REQUEST_BYTES = 256 * 1024
+```
+
+断连也要给清晰的提示：
+
+- 4401：token 无效
+- 4404：会话不存在
+- 4409：会话被其他客户端抢走了
+
+## 总结
+
+memo 的 Web 通信层选 All-in WebSocket，核心就一个原因：**实时性 + 统一协议 + 低开销**。
+
+一套连接，RPC 做请求响应，事件订阅做服务端推送。适合交互性强、实时性要求高的 Agent 应用。
+
+如果是纯请求响应、实时性要求不高的场景，REST 也是好选择——简单就是硬道理。
+
+（完）

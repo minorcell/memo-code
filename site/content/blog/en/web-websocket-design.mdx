@@ -1,0 +1,136 @@
+---
+title: 'Unified Communication Architecture for Web and Server: All-in WebSocket Design Practice'
+description: 'Extracting WebSocket communication patterns from memo'"'"'s implementation: JSON-RPC frame design, event subscription model, why we chose full-stack WebSocket and its advantages in real scenarios.'
+date: '2026-02-18'
+order: 5
+---
+
+# Unified Communication Architecture for Web and Server: All-in WebSocket Design Practice
+
+After finishing the TUI version, building a Web version was the natural next step. But when I actually started working on it, the first question immediately stumped me:
+
+**How should the communication layer work?**
+
+## Getting Stuck Right Away
+
+The TUI version doesn'"'"'t have communication problems—all logic runs in the same process, and you can just call functions directly. But the Web version is different: the browser and server are two separate processes that need to communicate over the network.
+
+At first, I didn'"'"'t think much about it: REST API would work. Since I'"'"'ve been doing frontend work for a while, it should be straightforward.
+
+But after listing out all the requirements, things started to feel off:
+
+- **Streaming output**: The model outputs token by token, and the UI needs to update in real-time
+- **Approval interception**: When executing dangerous operations, the browser needs to popup a confirmation dialog
+- **Status synchronization**: Whether a session is running or idle, the UI needs to know immediately
+- **Request-response**: Creating sessions, sending messages, querying status...
+
+All these scenarios share one common characteristic: **the server needs to actively push to the browser**.
+
+With REST, this becomes cumbersome:
+
+- Streaming output → requires polling or SSE
+- Approval interception → same, polling or checking status then judging
+- Status synchronization → also polling
+
+Three separate mechanisms to maintain. That'"'"'s a lot of overhead.
+
+## WebSocket Is a Ready-Made Answer
+
+After thinking it through, WebSocket is exactly designed for this scenario:
+
+- **Full-duplex**: Server can push actively, browser can send at any time
+- **Low latency**: Connection established once, then all frame transfers
+- **Stateful**: One connection corresponds to one session, semantics are clear
+
+But having the protocol isn'"'"'t enough—the key is how to use it.
+
+## Frame Design: Simplified JSON-RPC
+
+memo uses a JSON-RPC-like frame format—not complicated, just three types:
+
+```typescript
+// Client sends request
+{ id: "uuid", type: "rpc.request", method: "session.create", params: {...} }
+
+// Server responds
+{ id: "uuid", type: "rpc.response", ok: true, data: {...} }
+
+// Server pushes proactively
+{ type: "event", topic: "assistant.chunk", data: {...}, seq: 1, ts: "..." }
+```
+
+**RPC calls** handle "request/response": client sends one, server processes and returns one. For example: creating sessions, sending messages, querying status.
+
+**Event pushes** handle "server-initiated": subscribe to a topic, then wait for the server to push data to that topic. For example: model started outputting tokens, tool execution completed, approval needed.
+
+These two patterns combined can cover almost all communication scenarios.
+
+## Event Types: Covering the Complete Agent Lifecycle
+
+memo'"'"'s WebSocket pushes these events:
+
+- `turn.start`: User sent a message
+- `assistant.chunk`: Model output a token
+- `turn.final`: This turn of conversation ended
+- `session.status`: Session status changed (idle / running / closed)
+- `approval.request`: A dangerous operation needs user confirmation
+- `tool.action`: A tool started running
+- `tool.observation`: Tool finished, returning results
+
+These events strung together represent the complete lifecycle of an Agent from "receiving requirements" to "finishing work".
+
+## Client Implementation: Reconnection, Timeout, Subscription Management
+
+The browser'"'"'s ws-client (`packages/web-ui/src/api/ws-client.ts`) has several key designs:
+
+**Auto-reconnection**: Network instability is common. When disconnected, silently reconnect without requiring user manual refresh.
+
+**Request timeout**: Default 20 seconds. Outgoing requests can'"'"'t wait indefinitely—timeout clears the pending state to prevent freezing.
+
+**Subscription management**: A topic can have multiple handlers. Unsubscribing returns a small function, which is very convenient to use:
+
+```typescript
+const unsub = wsClient.subscribe('assistant.chunk', (data) => {
+    appendToChat(data.chunk)
+})
+// When done
+unsub()
+```
+
+**Authentication**: Pass accessToken via URL query, server validates during WebSocket upgrade stage.
+
+## Why All-in
+
+Simply put, three reasons:
+
+**1. Real-time capability.** Streaming output, approval interception, status synchronization—all require "server active push". HTTP can'"'"'t handle this, either polling or SSE, but maintenance cost is high.
+
+**2. Unification.** One connection packages all communication: session management, chat, tool calls, approval. No other HTTP APIs. Unified protocol, unified debugging.
+
+**3. Low overhead.** Every HTTP request needs TLS handshake + TCP establishment, high latency. WebSocket establishes once, then all frames. In conversational interaction, the experience difference is obvious.
+
+## Security and Fault Tolerance
+
+WebSocket also needs protection:
+
+```typescript
+// Server rate limiting
+const MAX_REQUESTS_PER_MINUTE = 120
+const MAX_REQUEST_BYTES = 256 * 1024
+```
+
+Disconnection should also give clear error codes:
+
+- 4401: Invalid token
+- 4404: Session does not exist
+- 4409: Session was taken over by another client
+
+## Summary
+
+memo'"'"'s Web communication layer chose All-in WebSocket, core reason: **real-time capability + unified protocol + low overhead**.
+
+One connection, RPC for request-response, event subscription for server push. Suitable for Agent applications with strong interactivity and high real-time requirements.
+
+If it'"'"'s pure request-response with low real-time requirements, REST is also a good choice—simplicity is king.
+
+(EOF)

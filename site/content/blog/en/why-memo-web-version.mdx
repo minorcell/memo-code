@@ -1,0 +1,136 @@
+---
+title: 'Why Memo Needs a Web Version: Problems and Solutions'
+description: 'From TUI to Web: Memo'"'"'s migration challenges and solutions—MCP/Skills visualization, multi-workspace support, remote access, file explorer, and build optimization.'
+date: '2026-02-18'
+order: 6
+---
+
+# Why Memo Needs a Web Version: Problems and Solutions
+
+After completing the TUI version of memo, building a Web version was the natural next step. But when I actually started working on it, I realized that migrating from terminal interaction to the browser had just as many pitfalls as when I first built the TUI.
+
+## Motivation
+
+My reasoning was simple:
+
+**TUI interaction has too many pitfalls.** I previously wrote about how difficult terminal input boxes are—just handling multi-line input took me a long time. Besides, I don'"'"'t really know much about TUI development, so building it felt like being forced to do something I wasn'"'"'t qualified for.
+
+**TUI makes workspace management difficult.** I'"'"'m not sure if opencode supports maintaining workspaces. Opening multiple terminal windows can be considered "concurrent" "workspace", but it'"'"'s not elegant enough.
+
+**Web is GUI, can be richer and more beautiful.** This is undeniable.
+
+**Remote access is genuinely awesome.** After starting memo web locally, using ngrok for tunneling and operating memo on my phone while visiting relatives during Chinese New Year to update repository documents—this experience, once tried, you can'"'"'t go back.
+
+## Problems
+
+But when actually migrating, there were many challenges.
+
+### Visualization of MCP and Skills
+
+When memo only had TUI, MCP and Skills were non-visual configurations:
+
+```bash
+memo mcp list
+memo mcp add
+pnpm dls skills ...
+```
+
+You had to remember a long string of commands to know which MCP services and Skills were currently available. Although the Web version isn'"'"'t fully done yet, at least it can display these configurations directly to users—instead of guessing through command lines.
+
+This is a typical "TUI vs Web" thinking difference: terminal interaction excels at "quick execution", while Web excels at "information display".
+
+### Multiple Workspaces
+
+In TUI, memo didn'"'"'t support specifying a runtime directory. You probably needed to do:
+
+```bash
+cd ~/Desktop/projects/project_a/ && memo
+```
+
+Having to cd every time is troublesome. More importantly, if you'"'"'re working on multiple projects simultaneously and want memo to help with different tasks—sorry, not possible.
+
+But on Web, you can fully support workspaces, even multiple memos running in different projects simultaneously.
+
+This was a difficult problem for the original implementation. So I made many changes to the core package:
+
+- **Workspace abstraction**: The core package defines workspace data structure, including fields like id, name, cwd (current working directory), creation time, last used time. Using `workspaceIdFromCwd` with SHA256 hashing on the path generates a stable workspace ID.
+
+- **Multi-workspace support**: web-server'"'"'s `SessionRuntimeRegistry` maintains session and workspace mappings. Each session can be associated with a workspace, with status (idle/running/closed) tracked independently.
+
+- **Unified into core**: Consolidating TUI implementation into core, so we don'"'"'t need to maintain separate code for different endpoints.
+
+> Note: This workspace concept is different from git worktree—it'"'"'s more of a logical abstraction of "project root directory" to distinguish between different code repositories or working directories.
+
+### Remote Access and File Explorer
+
+The premise of "Add project" is: during remote access, the file explorer reads the directory of the machine running memo, then maps it to the Web UI.
+
+This is completely different from local desktop applications—the browser runs on the client, but file operations happen on the server.
+
+web-server'"'"'s `WorkspacesService` implements this:
+
+```typescript
+async listDirectories(pathInput: string | undefined): Promise<WorkspaceFsListResult> {
+  // Read the directory of the machine running memo
+  const entries = await readdir(targetPath, { withFileTypes: true });
+  // Return to browser for display
+  return { path, parentPath, items };
+}
+```
+
+Key design points:
+
+1. **Security restrictions**: Through `workspaceBrowser.rootPath` to restrict users to only browse specific directories, preventing unauthorized access
+2. **Symlink handling**: Resolve real paths, ensuring no crossing of root boundaries
+3. **Auto-completion history**: Automatically discover workspaces from historical sessions, no need for manual addition
+
+### Build Optimization
+
+I forgot to turn off NestJS sourcemap again...
+
+The bigger pitfall: Nest packaging keeps the original directory structure by default, and runtime still needs to install dependencies. This is extremely unfriendly to users—can'"'"'t let users run `pnpm i` then build, right?
+
+Finally, I referenced frontend build practices and did bundle packaging:
+
+```bash
+# Before
+dist/
+├── app/
+│   ├── module.js
+│   └── ...
+├── node_modules/
+└── package.json
+
+# After
+dist/
+├── index.js  # Single file, includes all dependencies
+└── prompt.md
+```
+
+After this, users only need `node index.js` to run directly, no need to worry about dependencies.
+
+### Communication Layer
+
+In TUI, all logic is in the same process, functions can be called directly. But Web is different—for details, see the article [Unified Communication Architecture for Web and Server](https://stack.mcell.top/blog/2026/web-websocket-design).
+
+Core differences:
+
+- TUI: In-process calls
+- Web: Cross-process communication, needs serialization/deserialization
+
+This isn'"'"'t just "adding a layer of network calls"—the entire architectural thinking needs to change—from "function calls" to "message passing".
+
+## Summary
+
+From TUI to Web isn'"'"'t just changing the interface. It involves:
+
+- Abstraction and reuse of core logic
+- Architecture adjustments for multi-endpoint support
+- Redesign of build process
+- Brand new implementation of communication protocol
+
+But after doing it, these efforts are worth it—Web version makes memo truly a "remotely usable" tool, and this is exactly the real need of many developers.
+
+Imagine: You'"'"'re on a high-speed train, in a coffee shop, or traveling abroad, and encounter some urgent situation. You just need to open a browser to remotely operate memo on your home/work computer, helping you modify code, commit—wouldn'"'"'t that be better than carrying a laptop around the world?
+
+(EOF)
