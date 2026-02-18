@@ -63,7 +63,7 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
             })
             await get().load()
         } catch (error) {
-            set({ error: getErrorMessage(error, 'Failed to create skill') })
+            set({ error: getErrorMessage(error, 'Failed to add skill') })
         }
     },
 

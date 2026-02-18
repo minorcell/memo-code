@@ -3,23 +3,14 @@ import { cjk } from '@streamdown/cjk'
 import { code } from '@streamdown/code'
 import { mermaid } from '@streamdown/mermaid'
 import { Streamdown } from 'streamdown'
-import { FileText, Folder, Globe, Loader2, Plus, Search, Trash2, X, Zap } from 'lucide-react'
+import { FileText, Folder, Globe, Loader2, Trash2, X, Zap } from 'lucide-react'
 import type { SkillDetail, SkillRecord } from '@/api/types'
 import { skillsApi } from '@/api'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useSkillsStore } from '@/stores'
@@ -31,11 +22,6 @@ const streamdownPlugins = {
 }
 
 export function SkillsPage() {
-    const [showAddForm, setShowAddForm] = useState(false)
-    const [scope, setScope] = useState<'project' | 'global'>('project')
-    const [name, setName] = useState('')
-    const [description, setDescription] = useState('')
-    const [searchQuery, setSearchQuery] = useState('')
     const [detailTarget, setDetailTarget] = useState<SkillRecord | null>(null)
     const [detail, setDetail] = useState<SkillDetail | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)
@@ -45,7 +31,6 @@ export function SkillsPage() {
     const loading = useSkillsStore((state) => state.loading)
     const error = useSkillsStore((state) => state.error)
     const load = useSkillsStore((state) => state.load)
-    const create = useSkillsStore((state) => state.create)
     const remove = useSkillsStore((state) => state.remove)
     const toggleActive = useSkillsStore((state) => state.toggleActive)
 
@@ -54,25 +39,13 @@ export function SkillsPage() {
         void load()
     }, [items.length, load])
 
-    const filteredItems = useMemo(() => {
-        const keyword = searchQuery.trim().toLowerCase()
-        if (!keyword) return items
-        return items.filter((item) => {
-            return (
-                item.name.toLowerCase().includes(keyword) ||
-                item.description.toLowerCase().includes(keyword) ||
-                item.path.toLowerCase().includes(keyword)
-            )
-        })
-    }, [items, searchQuery])
-
     const globalSkills = useMemo(
-        () => filteredItems.filter((item) => item.scope === 'global'),
-        [filteredItems],
+        () => items.filter((item) => item.scope === 'global'),
+        [items],
     )
     const projectSkills = useMemo(
-        () => filteredItems.filter((item) => item.scope === 'project'),
-        [filteredItems],
+        () => items.filter((item) => item.scope === 'project'),
+        [items],
     )
 
     useEffect(() => {
@@ -117,19 +90,6 @@ export function SkillsPage() {
         }
     }, [detailTarget?.id])
 
-    async function handleCreate() {
-        const trimmed = name.trim()
-        if (!trimmed) return
-        await create({
-            scope,
-            name: trimmed,
-            description: description.trim() || `${trimmed} skill`,
-        })
-        setName('')
-        setDescription('')
-        setShowAddForm(false)
-    }
-
     async function handleDelete(skill: SkillRecord) {
         if (detailTarget?.id === skill.id) {
             setDetailTarget(null)
@@ -167,15 +127,6 @@ export function SkillsPage() {
                     >
                         {loading ? <Loader2 className="size-4 animate-spin" /> : 'Refresh'}
                     </Button>
-                    <Button
-                        size="sm"
-                        onClick={() => setShowAddForm(true)}
-                        disabled={showAddForm}
-                        className="h-8 gap-1.5"
-                    >
-                        <Plus className="size-4" />
-                        Create Skill
-                    </Button>
                 </div>
             </header>
 
@@ -186,102 +137,6 @@ export function SkillsPage() {
                         <AlertDescription>{error}</AlertDescription>
                     </Alert>
                 ) : null}
-
-                {showAddForm ? (
-                    <div className="mb-4">
-                        <Card className="gap-0 border-0 bg-muted/35 py-0 shadow-none">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div>
-                                        <CardTitle className="text-sm">Create New Skill</CardTitle>
-                                        <CardDescription>
-                                            Define a reusable skill entry for your agent.
-                                        </CardDescription>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon-sm"
-                                        onClick={() => setShowAddForm(false)}
-                                    >
-                                        <X className="size-4" />
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-3 pb-4">
-                                <div className="grid gap-2 sm:grid-cols-[160px_1fr]">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="skill-scope">Scope</Label>
-                                        <Select
-                                            value={scope}
-                                            onValueChange={(value) => {
-                                                if (value === 'project' || value === 'global') {
-                                                    setScope(value)
-                                                }
-                                            }}
-                                        >
-                                            <SelectTrigger id="skill-scope" className="w-full">
-                                                <SelectValue placeholder="Select scope" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="project">Project</SelectItem>
-                                                <SelectItem value="global">Global</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="skill-name">Name</Label>
-                                        <Input
-                                            id="skill-name"
-                                            type="text"
-                                            placeholder="Skill name"
-                                            value={name}
-                                            onChange={(event) => setName(event.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="skill-description">Description</Label>
-                                    <Input
-                                        id="skill-description"
-                                        type="text"
-                                        placeholder="Description (optional)"
-                                        value={description}
-                                        onChange={(event) => setDescription(event.target.value)}
-                                    />
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setShowAddForm(false)}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        onClick={() => void handleCreate()}
-                                        disabled={!name.trim() || loading}
-                                    >
-                                        Create
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                ) : null}
-
-                <div className="mb-4 rounded-xl bg-muted/30 p-3">
-                    <div className="relative w-full max-w-xl">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="Search by name, description or path..."
-                            value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            className="pl-9"
-                        />
-                    </div>
-                </div>
 
                 <section className="space-y-4">
                     {globalSkills.length > 0 ? (
@@ -316,16 +171,12 @@ export function SkillsPage() {
                         />
                     ) : null}
 
-                    {filteredItems.length === 0 && !loading ? (
+                    {items.length === 0 && !loading ? (
                         <Card className="border-0 bg-muted/20 shadow-none">
                             <CardContent className="py-10 text-center text-muted-foreground">
                                 <Zap className="mx-auto mb-2 size-8 opacity-50" />
                                 <p className="text-sm">No skills found</p>
-                                {searchQuery ? (
-                                    <p className="text-xs">Try adjusting your search</p>
-                                ) : (
-                                    <p className="text-xs">Create a skill to get started</p>
-                                )}
+                                <p className="text-xs">Skills will appear here when available</p>
                             </CardContent>
                         </Card>
                     ) : null}
