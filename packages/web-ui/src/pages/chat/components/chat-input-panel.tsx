@@ -197,7 +197,7 @@ export function ChatInputPanel({
     }
 
     return (
-        <div className="mx-auto mb-3 w-[calc(100%-2rem)] max-w-[50.4rem]">
+        <div className="mx-auto mb-2 w-[calc(100%-1rem)] max-w-[50.4rem] sm:mb-3 sm:w-[calc(100%-2rem)]">
             {pendingApproval ? (
                 <div className="mb-2 rounded-lg border border-border/70 px-3 py-2">
                     <p className="text-xs font-medium text-foreground">
@@ -376,8 +376,8 @@ export function ChatInputPanel({
                     disabled={!hasActiveSession}
                 />
 
-                <div className="mt-2 flex items-center justify-between gap-1.5">
-                    <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-muted-foreground">
                         <Select
                             value={liveSession?.providerName ?? undefined}
                             onValueChange={(value) => {
@@ -392,7 +392,7 @@ export function ChatInputPanel({
                         >
                             <SelectTrigger
                                 size="sm"
-                                className="h-6 min-w-[128px] border-0 bg-transparent px-1.5 text-xs text-muted-foreground shadow-none focus-visible:ring-0 dark:bg-transparent dark:hover:bg-transparent"
+                                className="h-6 min-w-[112px] border-0 bg-transparent px-1.5 text-xs text-muted-foreground shadow-none focus-visible:ring-0 sm:min-w-[128px] dark:bg-transparent dark:hover:bg-transparent"
                             >
                                 <SelectValue placeholder="Select model" />
                             </SelectTrigger>
@@ -416,7 +416,7 @@ export function ChatInputPanel({
                         >
                             <SelectTrigger
                                 size="sm"
-                                className="h-6 min-w-[112px] border-0 bg-transparent px-1.5 text-xs text-muted-foreground shadow-none focus-visible:ring-0 dark:bg-transparent dark:hover:bg-transparent"
+                                className="h-6 min-w-[104px] border-0 bg-transparent px-1.5 text-xs text-muted-foreground shadow-none focus-visible:ring-0 sm:min-w-[112px] dark:bg-transparent dark:hover:bg-transparent"
                             >
                                 <SelectValue placeholder="Tool permission" />
                             </SelectTrigger>
@@ -430,7 +430,7 @@ export function ChatInputPanel({
                         </Select>
                     </div>
 
-                    <div className="flex items-center">
+                    <div className="ml-auto flex items-center">
                         {isRunning ? (
                             <Button
                                 type="button"

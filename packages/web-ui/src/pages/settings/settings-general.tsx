@@ -23,7 +23,7 @@ export function SettingsGeneral() {
     }, [theme])
 
     return (
-        <div className="w-full p-8">
+        <div className="w-full p-4 sm:p-6 lg:p-8">
             <h1 className="text-xl font-semibold">General</h1>
             <p className="text-sm text-muted-foreground">
                 Manage local web preferences for this browser.
@@ -33,7 +33,7 @@ export function SettingsGeneral() {
                 <section className={SETTINGS_SECTION_CLASS}>
                     <h2 className="text-sm font-medium">Theme</h2>
                     <p className="text-xs text-muted-foreground">Current: {themeLabel}</p>
-                    <div className="mt-3 grid grid-cols-3 gap-3">
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <ThemeOption
                             icon={<Sun className="size-4" />}
                             label="Light"
@@ -58,7 +58,7 @@ export function SettingsGeneral() {
                 <section className={SETTINGS_SECTION_CLASS}>
                     <h2 className="text-sm font-medium">Font Size</h2>
                     <p className="text-xs text-muted-foreground">Adjust web UI text size.</p>
-                    <div className="mt-3 flex items-center gap-4">
+                    <div className="mt-3 flex items-center gap-3 sm:gap-4">
                         <Slider
                             value={[fontSize]}
                             min={12}
@@ -84,7 +84,7 @@ export function SettingsGeneral() {
                     <div className="mt-3 flex items-center gap-3">
                         <Switch checked={autoCompact} onCheckedChange={toggleAutoCompact} />
                         <Label
-                            className="cursor-pointer text-sm"
+                            className="cursor-pointer text-sm leading-relaxed"
                             onClick={(event) => {
                                 event.preventDefault()
                                 toggleAutoCompact()

@@ -55,7 +55,7 @@ export function ChatEmptyState({
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No project yet. Add one from the left sidebar.
+                        No project yet. Add one from the navigation menu.
                     </p>
                 )}
             </div>

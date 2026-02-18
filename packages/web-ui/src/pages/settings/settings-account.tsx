@@ -25,7 +25,7 @@ export function SettingsAccount() {
     }
 
     return (
-        <div className="w-full p-8">
+        <div className="w-full p-4 sm:p-6 lg:p-8">
             <h1 className="text-xl font-semibold">Account</h1>
             <p className="text-sm text-muted-foreground">
                 Authentication and local session details.
@@ -35,7 +35,7 @@ export function SettingsAccount() {
                 <section className={SETTINGS_SECTION_CLASS}>
                     <h2 className="mb-3 text-sm font-medium">Profile</h2>
                     <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <User className="size-4 text-muted-foreground" />
                             <span className="text-muted-foreground">Username:</span>
                             <span className="font-medium">{username || 'memo'}</span>
@@ -50,17 +50,17 @@ export function SettingsAccount() {
                     <h2 className="mb-3 text-sm font-medium">Token Status</h2>
                     {tokens ? (
                         <div className="space-y-2 text-xs">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <KeyRound className="size-3.5 text-muted-foreground" />
                                 <span className="text-muted-foreground">Access:</span>
-                                <code className="rounded bg-muted px-2 py-1">
+                                <code className="break-all rounded bg-muted px-2 py-1">
                                     {maskedToken(tokens.accessToken)}
                                 </code>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Shield className="size-3.5 text-muted-foreground" />
                                 <span className="text-muted-foreground">Refresh:</span>
-                                <code className="rounded bg-muted px-2 py-1">
+                                <code className="break-all rounded bg-muted px-2 py-1">
                                     {maskedToken(tokens.refreshToken)}
                                 </code>
                             </div>

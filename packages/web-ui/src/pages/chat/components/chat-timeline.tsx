@@ -28,7 +28,7 @@ export function ChatTimeline({
     if (!hasActiveSession) {
         return (
             <div className="flex-1 overflow-auto">
-                <div className="px-4 py-6">
+                <div className="px-3 py-4 sm:px-4 sm:py-6">
                     <div className="mx-auto flex min-h-full max-w-3xl items-center justify-center">
                         <div className="w-full translate-y-16">
                             <ChatEmptyState
@@ -45,7 +45,7 @@ export function ChatTimeline({
 
     return (
         <div className="flex-1 overflow-auto">
-            <div className="px-4 py-6">
+            <div className="px-3 py-4 sm:px-4 sm:py-6">
                 <div className="mx-auto max-w-3xl">
                     {turns.map((turn) => {
                         const assistantContent = stripThinkingBlocks(turn.assistant)
@@ -89,7 +89,7 @@ export function ChatTimeline({
                         return (
                             <div key={turn.turn} className="mb-6">
                                 <div className="mb-4 flex justify-end">
-                                    <div className="max-w-[85%] rounded-2xl bg-muted px-3 py-2 text-sm font-medium leading-relaxed text-foreground">
+                                    <div className="max-w-[92%] rounded-2xl bg-muted px-3 py-2 text-sm font-medium leading-relaxed text-foreground sm:max-w-[85%]">
                                         <MarkdownMessage content={turn.input} />
                                     </div>
                                 </div>

@@ -23,21 +23,21 @@ export function SettingsPage() {
 
     return (
         <div
-            className="fixed inset-0 z-40 bg-black/35 p-5 backdrop-blur-[2px]"
+            className="fixed inset-0 z-40 bg-black/35 p-2 backdrop-blur-[2px] sm:p-5"
             onClick={() => {
                 navigate(closeTarget, { replace: true })
             }}
         >
             <div
                 className={cn(
-                    'mx-auto flex h-full max-h-[860px] w-full max-w-6xl overflow-hidden',
+                    'mx-auto flex h-full max-h-[860px] w-full max-w-6xl flex-col overflow-hidden md:flex-row',
                     SETTINGS_CONTAINER_CLASS,
                 )}
                 onClick={(event) => {
                     event.stopPropagation()
                 }}
             >
-                <aside className="flex w-72 shrink-0 flex-col bg-muted/35 px-3 py-3">
+                <aside className="flex w-full shrink-0 flex-col border-b bg-muted/35 px-3 py-3 md:w-72 md:border-b-0 md:border-r">
                     <div className="mb-2 flex h-10 items-center justify-between px-2">
                         <h1 className="text-sm font-medium">Settings</h1>
                         <Button
@@ -52,25 +52,27 @@ export function SettingsPage() {
                             <X className="size-4" />
                         </Button>
                     </div>
-                    <nav className="flex-1 overflow-auto p-1">
-                        {settingsNavItems.map((item) => (
-                            <NavLink
-                                key={item.to}
-                                to={item.to}
-                                state={{ from: closeTarget }}
-                                className={({ isActive }) =>
-                                    cn(
-                                        'mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                                        isActive
-                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                            : 'hover:bg-sidebar-accent',
-                                    )
-                                }
-                            >
-                                {item.icon}
-                                {item.label}
-                            </NavLink>
-                        ))}
+                    <nav className="overflow-auto p-1">
+                        <div className="flex gap-1 md:block">
+                            {settingsNavItems.map((item) => (
+                                <NavLink
+                                    key={item.to}
+                                    to={item.to}
+                                    state={{ from: closeTarget }}
+                                    className={({ isActive }) =>
+                                        cn(
+                                            'mb-0 flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors md:mb-1 md:gap-3',
+                                            isActive
+                                                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                                : 'hover:bg-sidebar-accent',
+                                        )
+                                    }
+                                >
+                                    {item.icon}
+                                    {item.label}
+                                </NavLink>
+                            ))}
+                        </div>
                     </nav>
                 </aside>
 

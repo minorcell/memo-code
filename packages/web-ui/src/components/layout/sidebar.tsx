@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -12,6 +12,7 @@ import {
     Settings,
     Trash2,
     Undo2,
+    X,
     Zap,
 } from 'lucide-react'
 import { sessionsApi, workspacesApi } from '@/api'
@@ -29,6 +30,8 @@ type SidebarProps = {
     selectedWorkspaceId: string | null
     onSelectWorkspace: (workspaceId: string | null) => void
     onCreateSession: (workspaceId: string) => Promise<string | null>
+    mobileOpen: boolean
+    onMobileOpenChange: (open: boolean) => void
 }
 
 type WorkspaceGroup = {
@@ -67,6 +70,8 @@ export function Sidebar({
     selectedWorkspaceId,
     onSelectWorkspace,
     onCreateSession,
+    mobileOpen,
+    onMobileOpenChange,
 }: SidebarProps) {
     const [collapsed, setCollapsed] = useState(false)
     const [pickerOpen, setPickerOpen] = useState(false)
@@ -126,6 +131,7 @@ export function Sidebar({
         if (!sessionId) return
         onSelectWorkspace(workspaceId)
         navigate(`/chat?session=${sessionId}`)
+        onMobileOpenChange(false)
     }
 
     async function handleOpenPicker() {
@@ -221,9 +227,15 @@ export function Sidebar({
         [homePath],
     )
 
-    if (collapsed) {
+    useEffect(() => {
+        if (mobileOpen) {
+            setCollapsed(false)
+        }
+    }, [mobileOpen])
+
+    if (collapsed && !mobileOpen) {
         return (
-            <div className="flex h-full w-12 flex-col bg-sidebar">
+            <div className="hidden h-full w-12 flex-col bg-sidebar md:flex">
                 <div className="flex h-10 items-center justify-center">
                     <Button
                         onClick={() => setCollapsed(false)}
@@ -250,6 +262,7 @@ export function Sidebar({
                     <NavLink
                         to="/mcp"
                         end
+                        onClick={() => onMobileOpenChange(false)}
                         className={({ isActive }) =>
                             cn(
                                 'mx-1.5 mb-1 flex size-8 items-center justify-center rounded-md transition-colors',
@@ -265,6 +278,7 @@ export function Sidebar({
                     <NavLink
                         to="/skills"
                         end
+                        onClick={() => onMobileOpenChange(false)}
                         className={({ isActive }) =>
                             cn(
                                 'mx-1.5 mb-1 flex size-8 items-center justify-center rounded-md transition-colors',
@@ -283,6 +297,7 @@ export function Sidebar({
                     <NavLink
                         to="/settings/general"
                         state={{ from: `${location.pathname}${location.search}` }}
+                        onClick={() => onMobileOpenChange(false)}
                         className={({ isActive }) =>
                             cn(
                                 'mx-1.5 mb-1 flex size-8 items-center justify-center rounded-md transition-colors',
@@ -301,333 +316,373 @@ export function Sidebar({
     }
 
     return (
-        <div className="relative flex h-full w-72 flex-col bg-sidebar">
-            <div className="flex items-center gap-1 px-2 py-1">
-                <Button
-                    onClick={() => {
-                        void handleOpenPicker()
-                    }}
-                    variant="ghost"
-                    className="h-auto flex-1 justify-start gap-2 px-2 py-1.5 text-xs font-medium"
-                >
-                    <FolderPlus className="size-3.5" />
-                    Add project
-                </Button>
-                <Button
-                    onClick={() => setCollapsed(true)}
-                    variant="ghost"
-                    size="icon-sm"
-                    className="size-6 shrink-0"
-                    title="Collapse sidebar"
-                >
-                    <ChevronLeft className="size-3.5" />
-                </Button>
-            </div>
+        <>
+            <div
+                className={cn(
+                    'fixed inset-0 z-40 bg-black/45 transition-opacity md:hidden',
+                    mobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+                )}
+                onClick={() => onMobileOpenChange(false)}
+            />
+            <div
+                className={cn(
+                    'fixed inset-y-0 left-0 z-50 flex h-dvh w-[84vw] max-w-80 flex-col bg-sidebar shadow-xl transition-transform md:static md:z-auto md:h-full md:w-72 md:max-w-none md:translate-x-0 md:shadow-none',
+                    mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+                )}
+            >
+                <div className="flex items-center gap-1 px-2 py-1">
+                    <Button
+                        onClick={() => {
+                            void handleOpenPicker()
+                        }}
+                        variant="ghost"
+                        className="h-auto flex-1 justify-start gap-2 px-2 py-1.5 text-xs font-medium"
+                    >
+                        <FolderPlus className="size-3.5" />
+                        Add project
+                    </Button>
+                    <Button
+                        onClick={() => onMobileOpenChange(false)}
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-6 shrink-0 md:hidden"
+                        title="Close sidebar"
+                    >
+                        <X className="size-3.5" />
+                    </Button>
+                    <Button
+                        onClick={() => setCollapsed(true)}
+                        variant="ghost"
+                        size="icon-sm"
+                        className="hidden size-6 shrink-0 md:inline-flex"
+                        title="Collapse sidebar"
+                    >
+                        <ChevronLeft className="size-3.5" />
+                    </Button>
+                </div>
 
-            <div className="px-2 pb-1">
-                <NavLink
-                    to="/mcp"
-                    end
-                    className={({ isActive }) =>
-                        cn(
-                            'mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                            isActive
-                                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                : 'hover:bg-sidebar-accent',
-                        )
-                    }
-                >
-                    <Bot className="size-3.5" />
-                    MCP Servers
-                </NavLink>
-                <NavLink
-                    to="/skills"
-                    end
-                    className={({ isActive }) =>
-                        cn(
-                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                            isActive
-                                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                : 'hover:bg-sidebar-accent',
-                        )
-                    }
-                >
-                    <Zap className="size-3.5" />
-                    Skills
-                </NavLink>
-            </div>
+                <div className="px-2 pb-1">
+                    <NavLink
+                        to="/mcp"
+                        end
+                        onClick={() => onMobileOpenChange(false)}
+                        className={({ isActive }) =>
+                            cn(
+                                'mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                                isActive
+                                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                    : 'hover:bg-sidebar-accent',
+                            )
+                        }
+                    >
+                        <Bot className="size-3.5" />
+                        MCP Servers
+                    </NavLink>
+                    <NavLink
+                        to="/skills"
+                        end
+                        onClick={() => onMobileOpenChange(false)}
+                        className={({ isActive }) =>
+                            cn(
+                                'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                                isActive
+                                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                    : 'hover:bg-sidebar-accent',
+                            )
+                        }
+                    >
+                        <Zap className="size-3.5" />
+                        Skills
+                    </NavLink>
+                </div>
 
-            <div className="flex-1 overflow-auto">
-                <div className="px-2 py-1">
-                    <div className="px-1 py-0.5">
-                        <span className="text-xs font-medium text-muted-foreground">Projects</span>
-                    </div>
+                <div className="flex-1 overflow-auto">
+                    <div className="px-2 py-1">
+                        <div className="px-1 py-0.5">
+                            <span className="text-xs font-medium text-muted-foreground">
+                                Projects
+                            </span>
+                        </div>
 
-                    <div className="mt-0.5 space-y-1.5">
-                        {groupedSessions.map(({ workspace, sessions: workspaceSessions }) => {
-                            const selected =
-                                workspace.id === selectedWorkspaceId && activeSessionId === null
-                            return (
-                                <div key={workspace.id} className="space-y-0.5">
-                                    <div
-                                        className={cn(
-                                            'group/workspace flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors duration-75',
-                                            selected
-                                                ? 'bg-sidebar-accent text-foreground'
-                                                : 'text-muted-foreground',
-                                        )}
-                                    >
-                                        <button
-                                            type="button"
-                                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                            onClick={() => onSelectWorkspace(workspace.id)}
-                                        >
-                                            <FolderGit className="size-3 shrink-0" />
-                                            <span className="truncate">{workspace.name}</span>
-                                            <span className="text-[11px]">
-                                                ({workspaceSessions.length})
-                                            </span>
-                                        </button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            className="size-[18px]"
-                                            onClick={() => {
-                                                void handleCreateSession(workspace.id)
-                                            }}
-                                            title={`New thread in ${workspace.name}`}
-                                        >
-                                            <Plus className="size-3" />
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            className="size-[18px] opacity-0 transition-opacity group-hover/workspace:opacity-100"
-                                            onClick={(event) => {
-                                                event.stopPropagation()
-                                                requestDeleteWorkspace(workspace)
-                                            }}
-                                            title={`Delete project ${workspace.name}`}
-                                        >
-                                            <Trash2 className="size-3" />
-                                        </Button>
-                                    </div>
-
-                                    {workspaceSessions.map((session) => (
+                        <div className="mt-0.5 space-y-1.5">
+                            {groupedSessions.map(({ workspace, sessions: workspaceSessions }) => {
+                                const selected =
+                                    workspace.id === selectedWorkspaceId && activeSessionId === null
+                                return (
+                                    <div key={workspace.id} className="space-y-0.5">
                                         <div
-                                            key={session.sessionId}
                                             className={cn(
-                                                'group/session flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors duration-75',
-                                                activeSessionId === session.sessionId
+                                                'group/workspace flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors duration-75',
+                                                selected
                                                     ? 'bg-sidebar-accent text-foreground'
-                                                    : 'hover:bg-sidebar-accent',
+                                                    : 'text-muted-foreground',
                                             )}
                                         >
                                             <button
                                                 type="button"
-                                                className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                                                className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                                 onClick={() => {
                                                     onSelectWorkspace(workspace.id)
-                                                    navigate(`/chat?session=${session.sessionId}`)
+                                                    onMobileOpenChange(false)
                                                 }}
                                             >
-                                                <span
-                                                    className={cn(
-                                                        'mt-[2px] inline-block size-1.5 shrink-0 rounded-full',
-                                                        statusDotClass(session, runtimeBadges),
-                                                    )}
-                                                />
-                                                <span className="truncate font-medium leading-5">
-                                                    {session.title}
+                                                <FolderGit className="size-3 shrink-0" />
+                                                <span className="truncate">{workspace.name}</span>
+                                                <span className="text-[11px]">
+                                                    ({workspaceSessions.length})
                                                 </span>
                                             </button>
                                             <Button
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon-sm"
-                                                className="size-[18px] opacity-0 transition-opacity group-hover/session:opacity-100"
+                                                className="size-[18px]"
+                                                onClick={() => {
+                                                    void handleCreateSession(workspace.id)
+                                                }}
+                                                title={`New thread in ${workspace.name}`}
+                                            >
+                                                <Plus className="size-3" />
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                className="size-[18px] opacity-0 transition-opacity group-hover/workspace:opacity-100"
                                                 onClick={(event) => {
                                                     event.stopPropagation()
-                                                    requestDeleteSession(session)
+                                                    requestDeleteWorkspace(workspace)
                                                 }}
-                                                title={`Delete session ${session.title}`}
+                                                title={`Delete project ${workspace.name}`}
                                             >
                                                 <Trash2 className="size-3" />
                                             </Button>
                                         </div>
-                                    ))}
-                                </div>
-                            )
-                        })}
 
-                        {groupedSessions.length === 0 && (
-                            <p className="px-1.5 py-1 text-xs text-muted-foreground">No projects</p>
-                        )}
+                                        {workspaceSessions.map((session) => (
+                                            <div
+                                                key={session.sessionId}
+                                                className={cn(
+                                                    'group/session flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors duration-75',
+                                                    activeSessionId === session.sessionId
+                                                        ? 'bg-sidebar-accent text-foreground'
+                                                        : 'hover:bg-sidebar-accent',
+                                                )}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                                                    onClick={() => {
+                                                        onSelectWorkspace(workspace.id)
+                                                        navigate(
+                                                            `/chat?session=${session.sessionId}`,
+                                                        )
+                                                        onMobileOpenChange(false)
+                                                    }}
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            'mt-[2px] inline-block size-1.5 shrink-0 rounded-full',
+                                                            statusDotClass(session, runtimeBadges),
+                                                        )}
+                                                    />
+                                                    <span className="truncate font-medium leading-5">
+                                                        {session.title}
+                                                    </span>
+                                                </button>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon-sm"
+                                                    className="size-[18px] opacity-0 transition-opacity group-hover/session:opacity-100"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        requestDeleteSession(session)
+                                                    }}
+                                                    title={`Delete session ${session.title}`}
+                                                >
+                                                    <Trash2 className="size-3" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            })}
+
+                            {groupedSessions.length === 0 && (
+                                <p className="px-1.5 py-1 text-xs text-muted-foreground">
+                                    No projects
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="px-2 py-1.5">
-                <NavLink
-                    to="/settings/general"
-                    state={{ from: `${location.pathname}${location.search}` }}
-                    className={({ isActive }) =>
-                        cn(
-                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                            isActive
-                                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                : 'hover:bg-sidebar-accent',
-                        )
-                    }
-                >
-                    <Settings className="size-3.5" />
-                    Settings
-                </NavLink>
-            </div>
+                <div className="px-2 py-1.5">
+                    <NavLink
+                        to="/settings/general"
+                        state={{ from: `${location.pathname}${location.search}` }}
+                        onClick={() => onMobileOpenChange(false)}
+                        className={({ isActive }) =>
+                            cn(
+                                'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                                isActive
+                                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                    : 'hover:bg-sidebar-accent',
+                            )
+                        }
+                    >
+                        <Settings className="size-3.5" />
+                        Settings
+                    </NavLink>
+                </div>
 
-            {pickerOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 p-4 backdrop-blur-sm">
-                    <div className="mx-auto flex h-full max-h-[760px] w-full max-w-2xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
-                        <div className="flex items-center justify-between border-b px-4 py-3">
-                            <h3 className="font-medium text-sm">Select Project Directory</h3>
-                            <Button variant="ghost" size="sm" onClick={() => setPickerOpen(false)}>
-                                Close
-                            </Button>
-                        </div>
-
-                        <div className="border-b px-4 py-2">
-                            <div className="mb-2 flex items-center gap-1 overflow-x-auto">
-                                {quickAccessEntries.map((item) => (
-                                    <Button
-                                        key={`${item.label}:${item.path}`}
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 shrink-0 px-2 text-xs"
-                                        onClick={() => {
-                                            void loadDirectories(item.path)
-                                        }}
-                                    >
-                                        {item.label}
-                                    </Button>
-                                ))}
-                            </div>
-                            <div className="flex items-center gap-2">
+                {pickerOpen && (
+                    <div className="fixed inset-0 z-50 bg-black/40 p-2 backdrop-blur-sm sm:p-4">
+                        <div className="mx-auto flex h-full max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:max-h-[760px]">
+                            <div className="flex items-center justify-between border-b px-4 py-3">
+                                <h3 className="font-medium text-sm">Select Project Directory</h3>
                                 <Button
                                     variant="ghost"
-                                    size="icon-sm"
-                                    className="size-7"
-                                    onClick={() => {
-                                        if (!browserParentPath) return
-                                        void loadDirectories(browserParentPath)
-                                    }}
-                                    disabled={!browserParentPath}
-                                    title="Parent directory"
+                                    size="sm"
+                                    onClick={() => setPickerOpen(false)}
                                 >
-                                    <Undo2 className="size-4" />
+                                    Close
                                 </Button>
-                                <Input value={browserPath} readOnly className="h-8 text-xs" />
                             </div>
-                        </div>
 
-                        <div className="min-h-0 flex-1 overflow-auto px-4 py-2">
-                            {browsing ? (
-                                <p className="text-xs text-muted-foreground">Loading...</p>
-                            ) : (
-                                <div className="space-y-1">
-                                    {browserItems.map((item) => (
+                            <div className="border-b px-4 py-2">
+                                <div className="mb-2 flex items-center gap-1 overflow-x-auto">
+                                    {quickAccessEntries.map((item) => (
                                         <Button
-                                            key={`${item.path}-${item.name}`}
+                                            key={`${item.label}:${item.path}`}
                                             variant="ghost"
-                                            className="h-auto w-full justify-start px-2 py-1 text-left text-xs"
-                                            disabled={!item.readable}
+                                            size="sm"
+                                            className="h-7 shrink-0 px-2 text-xs"
                                             onClick={() => {
                                                 void loadDirectories(item.path)
                                             }}
                                         >
-                                            <House className="mr-2 size-3 shrink-0 opacity-70" />
-                                            <span className="truncate">{item.name}</span>
+                                            {item.label}
                                         </Button>
                                     ))}
-                                    {browserItems.length === 0 && (
-                                        <p className="text-xs text-muted-foreground">
-                                            No directories
-                                        </p>
-                                    )}
                                 </div>
-                            )}
-                        </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        className="size-7"
+                                        onClick={() => {
+                                            if (!browserParentPath) return
+                                            void loadDirectories(browserParentPath)
+                                        }}
+                                        disabled={!browserParentPath}
+                                        title="Parent directory"
+                                    >
+                                        <Undo2 className="size-4" />
+                                    </Button>
+                                    <Input value={browserPath} readOnly className="h-8 text-xs" />
+                                </div>
+                            </div>
 
-                        <div className="space-y-2 border-t px-4 py-3">
-                            <Input
-                                value={workspaceName}
-                                onChange={(event) => setWorkspaceName(event.target.value)}
-                                placeholder="Project name (optional)"
-                                className="h-8 text-xs"
-                            />
-                            <Button
-                                className="h-8 w-full text-xs"
-                                onClick={() => {
-                                    void handleAddCurrentPath()
-                                }}
-                            >
-                                Add this project
-                            </Button>
+                            <div className="min-h-0 flex-1 overflow-auto px-4 py-2">
+                                {browsing ? (
+                                    <p className="text-xs text-muted-foreground">Loading...</p>
+                                ) : (
+                                    <div className="space-y-1">
+                                        {browserItems.map((item) => (
+                                            <Button
+                                                key={`${item.path}-${item.name}`}
+                                                variant="ghost"
+                                                className="h-auto w-full justify-start px-2 py-1 text-left text-xs"
+                                                disabled={!item.readable}
+                                                onClick={() => {
+                                                    void loadDirectories(item.path)
+                                                }}
+                                            >
+                                                <House className="mr-2 size-3 shrink-0 opacity-70" />
+                                                <span className="truncate">{item.name}</span>
+                                            </Button>
+                                        ))}
+                                        {browserItems.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                No directories
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-2 border-t px-4 py-3">
+                                <Input
+                                    value={workspaceName}
+                                    onChange={(event) => setWorkspaceName(event.target.value)}
+                                    placeholder="Project name (optional)"
+                                    className="h-8 text-xs"
+                                />
+                                <Button
+                                    className="h-8 w-full text-xs"
+                                    onClick={() => {
+                                        void handleAddCurrentPath()
+                                    }}
+                                >
+                                    Add this project
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {pendingDelete && (
-                <div
-                    className="fixed inset-0 z-[70] bg-black/40 p-4 backdrop-blur-sm"
-                    onClick={() => {
-                        if (deleting) return
-                        setPendingDelete(null)
-                    }}
-                >
+                {pendingDelete && (
                     <div
-                        className="mx-auto mt-[18vh] w-full max-w-md rounded-xl border bg-background p-4 shadow-2xl"
-                        onClick={(event) => {
-                            event.stopPropagation()
+                        className="fixed inset-0 z-[70] bg-black/40 p-2 backdrop-blur-sm sm:p-4"
+                        onClick={() => {
+                            if (deleting) return
+                            setPendingDelete(null)
                         }}
                     >
-                        <h3 className="text-sm font-medium">
-                            {pendingDelete.kind === 'session'
-                                ? 'Delete session?'
-                                : 'Delete project?'}
-                        </h3>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                            {pendingDelete.kind === 'session'
-                                ? `This will permanently delete "${pendingDelete.title}".`
-                                : `This will remove project "${pendingDelete.name}".`}
-                        </p>
-                        <div className="mt-4 flex items-center justify-end gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={deleting}
-                                onClick={() => {
-                                    setPendingDelete(null)
-                                }}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                disabled={deleting}
-                                onClick={() => {
-                                    void handleConfirmDelete()
-                                }}
-                            >
-                                {deleting ? 'Deleting...' : 'Delete'}
-                            </Button>
+                        <div
+                            className="mx-auto mt-[20vh] w-full max-w-md rounded-xl border bg-background p-4 shadow-2xl sm:mt-[18vh]"
+                            onClick={(event) => {
+                                event.stopPropagation()
+                            }}
+                        >
+                            <h3 className="text-sm font-medium">
+                                {pendingDelete.kind === 'session'
+                                    ? 'Delete session?'
+                                    : 'Delete project?'}
+                            </h3>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                {pendingDelete.kind === 'session'
+                                    ? `This will permanently delete "${pendingDelete.title}".`
+                                    : `This will remove project "${pendingDelete.name}".`}
+                            </p>
+                            <div className="mt-4 flex items-center justify-end gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={deleting}
+                                    onClick={() => {
+                                        setPendingDelete(null)
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={deleting}
+                                    onClick={() => {
+                                        void handleConfirmDelete()
+                                    }}
+                                >
+                                    {deleting ? 'Deleting...' : 'Delete'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+        </>
     )
 }

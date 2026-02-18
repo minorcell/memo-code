@@ -352,15 +352,15 @@ export function SettingsMcp() {
     }
 
     return (
-        <div className="w-full p-8">
-            <div className="flex items-center justify-between gap-3">
+        <div className="w-full p-4 sm:p-6 lg:p-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-xl font-semibold">MCP Servers</h1>
                     <p className="text-sm text-muted-foreground">
                         Visual management for `memo mcp` (list/add/edit/remove/login/active).
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={openCreateEditor}>
                         <Plus className="size-4" />
                         Add server
@@ -410,9 +410,9 @@ export function SettingsMcp() {
                     return (
                         <Card key={item.name} className="border-0 bg-card/70 shadow-none">
                             <CardContent className="py-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <h3 className="truncate text-sm font-medium">
                                                 {item.name}
                                             </h3>
@@ -455,7 +455,7 @@ export function SettingsMcp() {
                                         </details>
                                     </div>
 
-                                    <div className="flex shrink-0 items-center gap-2">
+                                    <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">
                                         <div className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1">
                                             <span className="text-xs text-muted-foreground">
                                                 Active
@@ -525,7 +525,7 @@ export function SettingsMcp() {
                 >
                     <div
                         className={cn(
-                            'w-full max-w-2xl border-0 p-5 shadow-2xl',
+                            'max-h-[92vh] w-full max-w-2xl overflow-y-auto border-0 p-4 shadow-2xl sm:p-5',
                             SETTINGS_MODAL_CLASS,
                         )}
                         onClick={(event) => {
@@ -719,7 +719,7 @@ export function SettingsMcp() {
                 >
                     <div
                         className={cn(
-                            'w-full max-w-md border-0 p-5 shadow-2xl',
+                            'w-full max-w-md border-0 p-4 shadow-2xl sm:p-5',
                             SETTINGS_MODAL_CLASS,
                         )}
                         onClick={(event) => {

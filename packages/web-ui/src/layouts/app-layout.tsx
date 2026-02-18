@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Menu } from 'lucide-react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { chatApi, sessionsApi, wsSubscribe } from '@/api'
+import { MemoLogo } from '@/components/layout/memo-logo'
 import { Sidebar } from '@/components/layout/sidebar'
+import { Button } from '@/components/ui/button'
 import type { SessionListItem } from '@/api/types'
 import { useChatStore, useWorkspaceStore } from '@/stores'
 import { onAppRefresh } from '@/utils/refresh-bus'
@@ -11,6 +14,8 @@ export function AppLayout() {
     const [sessions, setSessions] = useState<SessionListItem[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+    const location = useLocation()
 
     const workspaces = useWorkspaceStore((state) => state.items)
     const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId)
@@ -96,8 +101,20 @@ export function AppLayout() {
         return map
     }, [workspaces])
 
+    const mobileTitle = useMemo(() => {
+        if (location.pathname.startsWith('/settings')) return 'Settings'
+        if (location.pathname.startsWith('/mcp')) return 'MCP Servers'
+        if (location.pathname.startsWith('/skills')) return 'Skills'
+        if (location.pathname.startsWith('/chat')) return 'Chat'
+        return 'Memo Code'
+    }, [location.pathname])
+
+    useEffect(() => {
+        setMobileSidebarOpen(false)
+    }, [location.pathname, location.search])
+
     return (
-        <div className="flex h-screen w-full overflow-hidden bg-background">
+        <div className="flex h-dvh w-full overflow-hidden bg-background">
             <Sidebar
                 sessions={sessions}
                 runtimeBadges={runtimeBadges}
@@ -105,23 +122,42 @@ export function AppLayout() {
                 selectedWorkspaceId={selectedWorkspaceId}
                 onSelectWorkspace={setSelectedWorkspaceId}
                 onCreateSession={createSessionForWorkspace}
+                mobileOpen={mobileSidebarOpen}
+                onMobileOpenChange={setMobileSidebarOpen}
             />
-            <main className="flex-1 overflow-hidden">
-                <Outlet
-                    context={{
-                        sessions,
-                        loading,
-                        error,
-                        refreshSessions: loadSessions,
-                        workspaces,
-                        selectedWorkspaceId,
-                        selectedWorkspace:
-                            selectedWorkspaceId && workspaceById.has(selectedWorkspaceId)
-                                ? workspaceById.get(selectedWorkspaceId)
-                                : null,
-                        createSessionForWorkspace,
-                    }}
-                />
+            <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <header className="flex h-12 items-center border-b px-3 md:hidden">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-7"
+                            onClick={() => setMobileSidebarOpen(true)}
+                            title="Open navigation"
+                        >
+                            <Menu className="size-4" />
+                        </Button>
+                        <MemoLogo className="size-5" />
+                        <span className="truncate text-sm font-medium">{mobileTitle}</span>
+                    </div>
+                </header>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                    <Outlet
+                        context={{
+                            sessions,
+                            loading,
+                            error,
+                            refreshSessions: loadSessions,
+                            workspaces,
+                            selectedWorkspaceId,
+                            selectedWorkspace:
+                                selectedWorkspaceId && workspaceById.has(selectedWorkspaceId)
+                                    ? workspaceById.get(selectedWorkspaceId)
+                                    : null,
+                            createSessionForWorkspace,
+                        }}
+                    />
+                </div>
             </main>
         </div>
     )

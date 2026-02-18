@@ -149,15 +149,15 @@ export function SkillsPage() {
 
     return (
         <div className="flex h-full flex-col">
-            <header className="flex h-14 items-center justify-between px-4">
-                <div className="flex items-center gap-3">
+            <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 px-4 py-2">
+                <div className="flex min-w-0 items-center gap-3">
                     <Zap className="size-5" />
                     <h1 className="text-sm font-medium">Skills</h1>
                     <Badge variant="outline" className="text-xs">
                         {items.length}
                     </Badge>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     <Button
                         variant="ghost"
                         size="sm"
@@ -271,7 +271,7 @@ export function SkillsPage() {
                 ) : null}
 
                 <div className="mb-4 rounded-xl bg-muted/30 p-3">
-                    <div className="relative max-w-xl">
+                    <div className="relative w-full max-w-xl">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                         <Input
                             type="text"
@@ -334,7 +334,7 @@ export function SkillsPage() {
 
             {detailTarget ? (
                 <div
-                    className="fixed inset-0 z-50 bg-black/45 p-4 backdrop-blur-sm"
+                    className="fixed inset-0 z-50 bg-black/45 p-2 backdrop-blur-sm sm:p-4"
                     onClick={closeDetailModal}
                 >
                     <div
@@ -489,7 +489,7 @@ function SkillCard({
                         }
                     }}
                     className={cn(
-                        'flex items-start gap-3 p-3 text-left outline-none',
+                        'flex flex-col gap-3 p-3 text-left outline-none sm:flex-row sm:items-start',
                         selected ? 'bg-primary/[0.02]' : '',
                     )}
                 >
@@ -526,7 +526,7 @@ function SkillCard({
                         <p className="mt-1 truncate text-xs text-muted-foreground">{skill.path}</p>
                     </div>
                     <div
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 self-end sm:self-auto"
                         onClick={(event) => {
                             event.stopPropagation()
                         }}
