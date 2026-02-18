@@ -12,7 +12,9 @@ import {
   getFileSuggestions,
   type FileSuggestion,
   JsonlHistorySink,
+  type QueuedInputItem,
   resolveSlashCommand,
+  resolveContextWindowForProvider,
   type AgentSession,
   type AgentSessionDeps,
   type ApprovalDecision,
@@ -69,10 +71,15 @@ type InternalSession = {
   pendingApproval?: ApprovalRequest;
   nextInputDisplay?: string;
   activeTurn?: number;
+  currentContextTokens: number;
+  contextWindow: number;
+  queuedInputs: QueuedInputItem[];
+  queueDraining: boolean;
   agentSession: AgentSession;
 };
 
 const MAX_LIVE_SESSIONS = 20;
+const MAX_QUEUED_INPUTS = 3;
 
 function normalizeMode(value: unknown): 'none' | 'once' | 'full' {
   if (value === 'none' || value === 'once' || value === 'full') return value;
@@ -178,6 +185,7 @@ export class ChatService {
       input.providerName,
       config.current_provider,
     );
+    const contextWindow = resolveContextWindowForProvider(config, provider);
 
     const sessionId = randomUUID();
     const runtime = await this.createRuntime({
@@ -194,6 +202,7 @@ export class ChatService {
           ? input.activeMcpServers
           : config.active_mcp_servers,
       toolPermissionMode: normalizeMode(input.toolPermissionMode),
+      contextWindow,
     });
 
     this.sessions.set(runtime.id, runtime);
@@ -225,6 +234,7 @@ export class ChatService {
       undefined,
       config.current_provider,
     );
+    const contextWindow = resolveContextWindowForProvider(config, provider);
 
     const historyMessages: ChatMessage[] = [];
     const turns: InternalTurnRecord[] = [];
@@ -262,6 +272,7 @@ export class ChatService {
       activeMcpServers: config.active_mcp_servers,
       toolPermissionMode: 'once',
       historyFilePath: detail.filePath,
+      contextWindow,
     });
 
     const system = runtime.agentSession.history[0];
@@ -432,18 +443,36 @@ export class ChatService {
     input: string,
   ): Promise<SessionInputResult> {
     const session = this.requireSession(sessionId);
-    if (session.status === 'running') {
-      return {
-        accepted: false,
-        kind: 'turn',
-        status: 'error',
-        message: 'Session is busy.',
-      };
-    }
-
     const trimmed = input.trim();
     if (!trimmed) {
       throw new BadRequestException('input is required');
+    }
+
+    if (session.status === 'running') {
+      if (session.queuedInputs.length >= MAX_QUEUED_INPUTS) {
+        return {
+          accepted: false,
+          kind: 'turn',
+          status: 'error',
+          message: `Queue is full (max ${MAX_QUEUED_INPUTS}).`,
+        };
+      }
+
+      session.queuedInputs.push({
+        id: randomUUID(),
+        input: trimmed,
+        createdAt: new Date().toISOString(),
+      });
+      this.touchSession(session);
+      this.streamService.broadcast(session.id, {
+        type: 'session.snapshot',
+        payload: this.toState(session),
+      });
+      return {
+        accepted: true,
+        kind: 'turn',
+        status: 'ok',
+      };
     }
 
     if (trimmed.startsWith('/')) {
@@ -451,6 +480,42 @@ export class ChatService {
     }
 
     return this.runCoreTurn(session, trimmed, trimmed);
+  }
+
+  removeQueuedInput(sessionId: string, queueId: string): { removed: boolean } {
+    const session = this.requireSession(sessionId);
+    const targetQueueId = queueId.trim();
+    if (!targetQueueId) {
+      throw new BadRequestException('queueId is required');
+    }
+
+    const next = session.queuedInputs.filter((item) => item.id !== targetQueueId);
+    if (next.length === session.queuedInputs.length) {
+      return { removed: false };
+    }
+
+    session.queuedInputs = next;
+    this.touchSession(session);
+    this.streamService.broadcast(session.id, {
+      type: 'session.snapshot',
+      payload: this.toState(session),
+    });
+    return { removed: true };
+  }
+
+  sendQueuedInputNow(sessionId: string): { triggered: boolean } {
+    const session = this.requireSession(sessionId);
+    if (session.queuedInputs.length === 0) {
+      return { triggered: false };
+    }
+
+    if (session.status === 'running') {
+      this.cancelCurrentTurn(sessionId);
+      return { triggered: true };
+    }
+
+    void this.drainQueuedInputs(session);
+    return { triggered: true };
   }
 
   cancelCurrentTurn(sessionId: string): { cancelled: boolean } {
@@ -467,6 +532,12 @@ export class ChatService {
   ): Promise<{ compacted: boolean; keptMessages: number }> {
     const session = this.requireSession(sessionId);
     const result = await session.agentSession.compactHistory('manual');
+    session.currentContextTokens = Math.max(0, result.afterTokens);
+    this.touchSession(session);
+    this.streamService.broadcast(session.id, {
+      type: 'session.snapshot',
+      payload: this.toState(session),
+    });
 
     this.streamService.broadcast(session.id, {
       type: 'system.message',
@@ -544,6 +615,10 @@ export class ChatService {
       await this.recreateSessionRuntime(session, {
         title: 'New Session',
         resetTurns: true,
+      });
+      this.streamService.broadcast(session.id, {
+        type: 'session.snapshot',
+        payload: this.toState(session),
       });
       this.sendSystemMessage(
         session,
@@ -662,6 +737,37 @@ export class ChatService {
     }
   }
 
+  private async drainQueuedInputs(session: InternalSession): Promise<void> {
+    if (session.status !== 'idle') return;
+    if (session.queueDraining) return;
+    if (session.queuedInputs.length === 0) return;
+
+    session.queueDraining = true;
+    try {
+      while (session.status === 'idle' && session.queuedInputs.length > 0) {
+        const next = session.queuedInputs.shift();
+        if (!next) break;
+
+        this.touchSession(session);
+        this.streamService.broadcast(session.id, {
+          type: 'session.snapshot',
+          payload: this.toState(session),
+        });
+
+        const input = next.input.trim();
+        if (!input) continue;
+
+        if (input.startsWith('/')) {
+          await this.runSlashCommand(session, input);
+        } else {
+          await this.runCoreTurn(session, input, input);
+        }
+      }
+    } finally {
+      session.queueDraining = false;
+    }
+  }
+
   private async recreateSessionRuntime(
     session: InternalSession,
     options: {
@@ -675,6 +781,7 @@ export class ChatService {
   ): Promise<void> {
     this.resolvePendingApprovals(session, 'deny');
     await session.agentSession.close();
+    const config = await this.memoConfigService.load();
 
     if (options.providerName) session.providerName = options.providerName;
     if (options.model) session.model = options.model;
@@ -687,6 +794,12 @@ export class ChatService {
     if (options.title) {
       session.title = options.title;
     }
+
+    session.contextWindow = resolveContextWindowForProvider(config, {
+      name: session.providerName,
+      model: session.model,
+    });
+    session.currentContextTokens = 0;
 
     if (options.resetTurns) {
       session.turn = 0;
@@ -744,6 +857,7 @@ export class ChatService {
     startedAt: string;
     activeMcpServers: string[];
     toolPermissionMode: 'none' | 'once' | 'full';
+    contextWindow: number;
     historyFilePath?: string;
   }): Promise<InternalSession> {
     const runtime: InternalSession = {
@@ -763,6 +877,10 @@ export class ChatService {
       historyFilePath: input.historyFilePath,
       turns: [],
       pendingApprovals: new Map<string, (decision: ApprovalDecision) => void>(),
+      currentContextTokens: 0,
+      contextWindow: input.contextWindow,
+      queuedInputs: [],
+      queueDraining: false,
       agentSession: null as unknown as AgentSession,
     };
 
@@ -822,10 +940,14 @@ export class ChatService {
         });
       },
       hooks: {
-        onTurnStart: ({ turn, input }) => {
+        onTurnStart: ({ turn, input, promptTokens }) => {
           runtime.status = 'running';
           runtime.activeTurn = turn;
           runtime.turn = Math.max(runtime.turn, turn);
+          runtime.currentContextTokens =
+            typeof promptTokens === 'number' && Number.isFinite(promptTokens)
+              ? Math.max(0, promptTokens)
+              : runtime.currentContextTokens;
 
           const displayInput = runtime.nextInputDisplay ?? input;
           runtime.nextInputDisplay = undefined;
@@ -851,6 +973,31 @@ export class ChatService {
             payload: {
               turn,
               input: displayInput,
+              promptTokens,
+            },
+          });
+        },
+        onContextUsage: ({
+          turn,
+          step,
+          phase,
+          promptTokens,
+          contextWindow,
+          thresholdTokens,
+          usagePercent,
+        }) => {
+          runtime.currentContextTokens = Math.max(0, promptTokens);
+          runtime.contextWindow = Math.max(0, contextWindow);
+          this.streamService.broadcast(runtime.id, {
+            type: 'context.usage',
+            payload: {
+              turn,
+              step,
+              phase,
+              promptTokens,
+              contextWindow,
+              thresholdTokens,
+              usagePercent,
             },
           });
         },
@@ -935,6 +1082,7 @@ export class ChatService {
             type: 'session.snapshot',
             payload: this.toState(runtime),
           });
+          void this.drainQueuedInputs(runtime);
         },
         onTitleGenerated: ({ title }) => {
           runtime.title = title;
@@ -962,6 +1110,7 @@ export class ChatService {
       sessionId: runtime.id,
       mode: 'interactive',
       providerName: runtime.providerName,
+      contextWindow: runtime.contextWindow,
       activeMcpServers: runtime.activeMcpServers,
       toolPermissionMode: runtime.toolPermissionMode as ToolPermissionMode,
       dangerous: runtime.toolPermissionMode === 'full',
@@ -1058,6 +1207,9 @@ export class ChatService {
         : undefined,
       activeMcpServers: session.activeMcpServers,
       toolPermissionMode: session.toolPermissionMode,
+      queuedInputs: session.queuedInputs.map((item) => ({ ...item })),
+      currentContextTokens: session.currentContextTokens,
+      contextWindow: session.contextWindow,
     };
   }
 

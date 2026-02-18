@@ -119,6 +119,12 @@ export type SessionEventsResponse = {
     nextCursor: string | null
 }
 
+export type QueuedInputItem = {
+    id: string
+    input: string
+    createdAt: string
+}
+
 export type LiveSessionState = {
     id: string
     title: string
@@ -138,6 +144,9 @@ export type LiveSessionState = {
     }
     activeMcpServers: string[]
     toolPermissionMode: 'none' | 'once' | 'full'
+    queuedInputs: QueuedInputItem[]
+    currentContextTokens?: number
+    contextWindow?: number
 }
 
 export type WsServerEvent =

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { chatApi } from '@/api'
-import type { ChatProviderRecord, WorkspaceRecord } from '@/api/types'
+import type { ChatProviderRecord, QueuedInputItem, WorkspaceRecord } from '@/api/types'
 import { ChatInputPanel } from '@/pages/chat/components/chat-input-panel'
 import { ChatTimeline } from '@/pages/chat/components/chat-timeline'
 import { useChatStore, useWorkspaceStore } from '@/stores'
@@ -31,9 +31,12 @@ export function ChatPage() {
     const systemMessages = useChatStore((state) => state.systemMessages)
     const connected = useChatStore((state) => state.connected)
     const error = useChatStore((state) => state.error)
+    const contextPercent = useChatStore((state) => state.contextPercent)
     const clearError = useChatStore((state) => state.clearError)
     const attachSession = useChatStore((state) => state.attachSession)
     const sendInput = useChatStore((state) => state.sendInput)
+    const removeQueuedInput = useChatStore((state) => state.removeQueuedInput)
+    const sendQueuedInputNow = useChatStore((state) => state.sendQueuedInputNow)
     const cancelCurrentTurn = useChatStore((state) => state.cancelCurrentTurn)
     const approvePendingApproval = useChatStore((state) => state.approvePendingApproval)
     const connectStream = useChatStore((state) => state.connectStream)
@@ -156,6 +159,19 @@ export function ChatPage() {
         await approvePendingApproval(decision)
     }
 
+    async function handleEditQueuedInput(item: QueuedInputItem) {
+        setInput(item.input)
+        await removeQueuedInput(item.id)
+    }
+
+    async function handleDeleteQueuedInput(queueId: string) {
+        await removeQueuedInput(queueId)
+    }
+
+    async function handleSendQueuedInputNow() {
+        await sendQueuedInputNow()
+    }
+
     return (
         <div className="flex h-full flex-col bg-background">
             <ChatTimeline
@@ -183,6 +199,11 @@ export function ChatPage() {
                 onApprovalDecision={handleApprovalDecision}
                 sessionId={liveSession?.id ?? selectedSessionId}
                 workspaceId={liveSession?.workspaceId ?? layout.selectedWorkspaceId}
+                contextPercent={contextPercent}
+                queuedInputs={liveSession?.queuedInputs ?? []}
+                onEditQueuedInput={handleEditQueuedInput}
+                onDeleteQueuedInput={handleDeleteQueuedInput}
+                onSendQueuedInputNow={handleSendQueuedInputNow}
             />
         </div>
     )

@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 import { chatApi, onWsReconnect, wsSubscribe } from '@/api'
-import type { ChatTurn, LiveSessionState, SessionRuntimeBadge, SessionTurnStep } from '@/api/types'
+import type {
+    ChatTurn,
+    LiveSessionState,
+    SessionInputResult,
+    SessionRuntimeBadge,
+    SessionTurnStep,
+} from '@/api/types'
+import { calculateContextPercent } from '@/utils/context'
 import { getErrorMessage } from '@/utils/error'
 
 type ChatStore = {
@@ -8,6 +15,9 @@ type ChatStore = {
     turns: ChatTurn[]
     systemMessages: string[]
     runtimeBadges: Record<string, SessionRuntimeBadge>
+    currentContextTokens: number
+    contextLimit: number
+    contextPercent: number
     loading: boolean
     connected: boolean
     error: string | null
@@ -15,7 +25,9 @@ type ChatStore = {
     setRuntimeBadges: (items: SessionRuntimeBadge[]) => void
     createSession: (workspaceId: string) => Promise<string | null>
     attachSession: (sessionId: string) => Promise<void>
-    sendInput: (value: string) => Promise<void>
+    sendInput: (value: string) => Promise<SessionInputResult | null>
+    removeQueuedInput: (queueId: string) => Promise<boolean>
+    sendQueuedInputNow: () => Promise<boolean>
     cancelCurrentTurn: () => Promise<void>
     approvePendingApproval: (decision: 'once' | 'session' | 'deny') => Promise<boolean>
     compactCurrentSession: () => Promise<void>
@@ -253,6 +265,28 @@ function withRuntimeBadge(
     }
 }
 
+function normalizeNonNegativeNumber(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, value)
+    if (typeof value === 'string') {
+        const parsed = Number(value.trim())
+        if (Number.isFinite(parsed)) return Math.max(0, parsed)
+    }
+    return 0
+}
+
+function normalizePercent(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.max(0, Math.min(100, value))
+    }
+    if (typeof value === 'string') {
+        const parsed = Number(value.trim())
+        if (Number.isFinite(parsed)) {
+            return Math.max(0, Math.min(100, parsed))
+        }
+    }
+    return undefined
+}
+
 function ensureSubscriptions(
     set: (updater: Partial<ChatStore> | ((state: ChatStore) => Partial<ChatStore>)) => void,
 ): void {
@@ -271,6 +305,13 @@ function ensureSubscriptions(
         if (typeof sessionId !== 'string') return
         const state = asRecord(data.state) as LiveSessionState | null
         if (!state) return
+        const normalizedCurrentContextTokens = normalizeNonNegativeNumber(state.currentContextTokens)
+        const normalizedContextWindow = normalizeNonNegativeNumber(state.contextWindow)
+        const normalizedContextPercent = calculateContextPercent(
+            normalizedCurrentContextTokens,
+            normalizedContextWindow,
+        )
+        const ignored = sessionId !== activeSessionId
 
         const badge: SessionRuntimeBadge = {
             sessionId,
@@ -279,7 +320,7 @@ function ensureSubscriptions(
             updatedAt: new Date().toISOString(),
         }
 
-        if (sessionId !== activeSessionId) {
+        if (ignored) {
             set((store) => ({
                 runtimeBadges: withRuntimeBadge(store.runtimeBadges, badge),
             }))
@@ -292,6 +333,9 @@ function ensureSubscriptions(
             turns: normalizeTurns(data.turns),
             systemMessages: [],
             error: null,
+            currentContextTokens: normalizedCurrentContextTokens,
+            contextLimit: normalizedContextWindow,
+            contextPercent: normalizedContextPercent,
             runtimeBadges: withRuntimeBadge(store.runtimeBadges, badge),
         }))
     })
@@ -300,13 +344,24 @@ function ensureSubscriptions(
         const data = asRecord(raw)
         if (!data) return
         const sessionId = data.sessionId
-        if (typeof sessionId !== 'string' || sessionId !== activeSessionId) return
+        if (typeof sessionId !== 'string') return
         const state = asRecord(data.state) as LiveSessionState | null
         if (!state) return
+        const normalizedCurrentContextTokens = normalizeNonNegativeNumber(state.currentContextTokens)
+        const normalizedContextWindow = normalizeNonNegativeNumber(state.contextWindow)
+        const normalizedContextPercent = calculateContextPercent(
+            normalizedCurrentContextTokens,
+            normalizedContextWindow,
+        )
+        const ignored = sessionId !== activeSessionId
+        if (ignored) return
 
         set((store) => ({
             connected: true,
             liveSession: state,
+            currentContextTokens: normalizedCurrentContextTokens,
+            contextLimit: normalizedContextWindow,
+            contextPercent: normalizedContextPercent,
             runtimeBadges: withRuntimeBadge(store.runtimeBadges, {
                 sessionId,
                 workspaceId: state.workspaceId,
@@ -381,14 +436,47 @@ function ensureSubscriptions(
         const data = asRecord(raw)
         if (!data) return
         const sessionId = data.sessionId
-        if (typeof sessionId !== 'string' || sessionId !== activeSessionId) return
+        if (typeof sessionId !== 'string') return
         const turn = data.turn
         if (typeof turn !== 'number') return
+        const ignored = sessionId !== activeSessionId
         const input = typeof data.input === 'string' ? data.input : ''
+        const promptTokens =
+            typeof data.promptTokens === 'number' && Number.isFinite(data.promptTokens)
+                ? Math.max(0, data.promptTokens)
+                : undefined
+        if (ignored) return
 
-        set((state) => ({
-            turns: applyTurnStart(state.turns, turn, input),
-        }))
+        set((state) => {
+            const next: Partial<ChatStore> = {
+                turns: applyTurnStart(state.turns, turn, input),
+            }
+            if (typeof promptTokens === 'number') {
+                next.currentContextTokens = promptTokens
+                next.contextPercent = calculateContextPercent(promptTokens, state.contextLimit)
+            }
+            return next
+        })
+    })
+
+    wsSubscribe('chat.context.usage', (raw) => {
+        const data = asRecord(raw)
+        if (!data) return
+        const sessionId = data.sessionId
+        if (typeof sessionId !== 'string') return
+        const ignored = sessionId !== activeSessionId
+        const promptTokens = normalizeNonNegativeNumber(data.promptTokens)
+        const contextWindow = normalizeNonNegativeNumber(data.contextWindow)
+        const usagePercent =
+            normalizePercent(data.usagePercent) ??
+            calculateContextPercent(promptTokens, contextWindow)
+        if (ignored) return
+
+        set({
+            currentContextTokens: promptTokens,
+            contextLimit: contextWindow,
+            contextPercent: usagePercent,
+        })
     })
 
     wsSubscribe('chat.turn.chunk', (raw) => {
@@ -556,6 +644,14 @@ function ensureSubscriptions(
                 connected: true,
                 liveSession: snapshot.state,
                 turns: normalizeTurns(snapshot.turns),
+                currentContextTokens: normalizeNonNegativeNumber(
+                    snapshot.state.currentContextTokens,
+                ),
+                contextLimit: normalizeNonNegativeNumber(snapshot.state.contextWindow),
+                contextPercent: calculateContextPercent(
+                    snapshot.state.currentContextTokens ?? 0,
+                    snapshot.state.contextWindow ?? 0,
+                ),
                 error: null,
                 runtimeBadges: withRuntimeBadge(state.runtimeBadges, {
                     sessionId: currentSessionId,
@@ -582,6 +678,9 @@ export const useChatStore = create<ChatStore>((set, get) => {
         turns: [],
         systemMessages: [],
         runtimeBadges: {},
+        currentContextTokens: 0,
+        contextLimit: 0,
+        contextPercent: 0,
         loading: false,
         connected: false,
         error: null,
@@ -616,6 +715,14 @@ export const useChatStore = create<ChatStore>((set, get) => {
                     liveSession: snapshot.state,
                     turns: normalizeTurns(snapshot.turns),
                     systemMessages: [],
+                    currentContextTokens: normalizeNonNegativeNumber(
+                        snapshot.state.currentContextTokens,
+                    ),
+                    contextLimit: normalizeNonNegativeNumber(snapshot.state.contextWindow),
+                    contextPercent: calculateContextPercent(
+                        snapshot.state.currentContextTokens ?? 0,
+                        snapshot.state.contextWindow ?? 0,
+                    ),
                     loading: false,
                     connected: true,
                     runtimeBadges: withRuntimeBadge(store.runtimeBadges, {
@@ -650,6 +757,14 @@ export const useChatStore = create<ChatStore>((set, get) => {
                     liveSession: snapshot.state,
                     turns: normalizeTurns(snapshot.turns),
                     systemMessages: [],
+                    currentContextTokens: normalizeNonNegativeNumber(
+                        snapshot.state.currentContextTokens,
+                    ),
+                    contextLimit: normalizeNonNegativeNumber(snapshot.state.contextWindow),
+                    contextPercent: calculateContextPercent(
+                        snapshot.state.currentContextTokens ?? 0,
+                        snapshot.state.contextWindow ?? 0,
+                    ),
                     runtimeBadges: withRuntimeBadge(state.runtimeBadges, {
                         sessionId: target,
                         workspaceId: snapshot.state.workspaceId,
@@ -668,17 +783,52 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
         async sendInput(value) {
             const sessionId = activeSessionId
-            if (!sessionId) return
+            if (!sessionId) return null
 
             const input = value.trim()
-            if (!input) return
+            if (!input) return null
 
             set({ error: null })
 
             try {
-                await chatApi.submitSessionInput(sessionId, input)
+                const result = await chatApi.submitSessionInput(sessionId, input)
+                if (!result.accepted && result.message) {
+                    set({ error: result.message })
+                }
+                return result
             } catch (error) {
                 set({ error: getErrorMessage(error, 'Failed to send chat input') })
+                return null
+            }
+        },
+
+        async removeQueuedInput(queueId) {
+            const sessionId = activeSessionId
+            if (!sessionId) return false
+            const targetQueueId = queueId.trim()
+            if (!targetQueueId) return false
+
+            set({ error: null })
+            try {
+                const result = await chatApi.removeQueuedInput(sessionId, targetQueueId)
+                return result.removed
+            } catch (error) {
+                set({ error: getErrorMessage(error, 'Failed to remove queued message') })
+                return false
+            }
+        },
+
+        async sendQueuedInputNow() {
+            const sessionId = activeSessionId
+            if (!sessionId) return false
+
+            set({ error: null })
+            try {
+                const result = await chatApi.sendQueuedInputNow(sessionId)
+                return result.triggered
+            } catch (error) {
+                set({ error: getErrorMessage(error, 'Failed to send queued message now') })
+                return false
             }
         },
 
@@ -722,7 +872,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
         disconnectStream() {
             activeSessionId = null
-            set({ connected: false })
+            set({
+                connected: false,
+                currentContextTokens: 0,
+                contextLimit: 0,
+                contextPercent: 0,
+            })
         },
 
         reset() {
@@ -734,6 +889,9 @@ export const useChatStore = create<ChatStore>((set, get) => {
                 loading: false,
                 connected: false,
                 runtimeBadges: {},
+                currentContextTokens: 0,
+                contextLimit: 0,
+                contextPercent: 0,
                 error: null,
             })
         },
