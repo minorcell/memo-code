@@ -86,6 +86,45 @@ function resolveWebStaticDir(explicitPath?: string): string | null {
     return null
 }
 
+function resolveTaskPromptsDir(): string {
+    const runtimeDir = dirname(fileURLToPath(import.meta.url))
+    const packageRoot = findMemoPackageRoot(runtimeDir) ?? findMemoPackageRoot(process.cwd())
+    const candidates: string[] = []
+    if (packageRoot) {
+        candidates.push(join(packageRoot, 'dist/task-prompts'))
+        candidates.push(join(packageRoot, 'packages/tui/src/task-prompts'))
+    }
+    candidates.push(resolve(runtimeDir, '../task-prompts'))
+    candidates.push(resolve(runtimeDir, 'task-prompts'))
+
+    for (const candidate of candidates) {
+        if (hasFile(join(candidate, 'init_agents.md'))) return candidate
+    }
+
+    return candidates[0] ?? resolve(runtimeDir, '../task-prompts')
+}
+
+function resolveSystemPromptPath(): string | null {
+    const runtimeDir = dirname(fileURLToPath(import.meta.url))
+    const packageRoot = findMemoPackageRoot(runtimeDir) ?? findMemoPackageRoot(process.cwd())
+    const candidates: string[] = []
+    if (process.env.MEMO_SYSTEM_PROMPT_PATH) {
+        candidates.push(resolve(process.env.MEMO_SYSTEM_PROMPT_PATH))
+    }
+    if (packageRoot) {
+        candidates.push(join(packageRoot, 'dist/prompt.md'))
+        candidates.push(join(packageRoot, 'packages/core/src/runtime/prompt.md'))
+    }
+    candidates.push(resolve(runtimeDir, '../prompt.md'))
+    candidates.push(resolve(runtimeDir, '../../core/src/runtime/prompt.md'))
+
+    for (const candidate of candidates) {
+        if (hasFile(candidate)) return candidate
+    }
+
+    return null
+}
+
 async function isPortAvailable(host: string, port: number): Promise<boolean> {
     return new Promise((resolveAvailable) => {
         const server = createServer()
@@ -179,6 +218,8 @@ export async function runWebCommand(argv: string[]): Promise<void> {
     console.log(`[memo web] Server: ${url}`)
     console.log(`[memo web] Entry: ${serverEntry}`)
     console.log(`[memo web] Static: ${staticDir}`)
+    const taskPromptsDir = resolveTaskPromptsDir()
+    const systemPromptPath = resolveSystemPromptPath()
 
     const child = spawn(process.execPath, [serverEntry], {
         stdio: 'inherit',
@@ -188,10 +229,8 @@ export async function runWebCommand(argv: string[]): Promise<void> {
             MEMO_WEB_PORT: String(port),
             MEMO_WEB_STATIC_DIR: staticDir,
             MEMO_CLI_ENTRY: process.argv[1],
-            MEMO_TASK_PROMPTS_DIR: resolve(
-                dirname(fileURLToPath(import.meta.url)),
-                '../task-prompts',
-            ),
+            MEMO_TASK_PROMPTS_DIR: taskPromptsDir,
+            ...(systemPromptPath ? { MEMO_SYSTEM_PROMPT_PATH: systemPromptPath } : {}),
         },
     })
 

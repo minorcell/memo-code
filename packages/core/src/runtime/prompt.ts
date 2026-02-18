@@ -1,6 +1,7 @@
 /** @file System prompt loading: reads built-in Markdown template by default. */
 import os from 'node:os'
 import { readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadSkills, renderSkillsSection } from '@memo/core/runtime/skills'
@@ -32,6 +33,8 @@ type LoadSystemPromptOptions = {
     activeSkillPaths?: string[]
     /** Disable skills injection into system prompt when false. */
     includeSkills?: boolean
+    /** Optional explicit prompt template path (overrides default lookup). */
+    promptPath?: string
 }
 
 function normalizePath(path: string): string {
@@ -89,13 +92,33 @@ function resolveModuleDir(): string {
     return dirname(fileURLToPath(import.meta.url))
 }
 
+function resolvePromptPath(explicitPath?: string): string {
+    const moduleDir = resolveModuleDir()
+    const candidates = [
+        explicitPath,
+        process.env.MEMO_SYSTEM_PROMPT_PATH,
+        join(moduleDir, 'prompt.md'),
+        join(moduleDir, '../prompt.md'),
+        join(moduleDir, '../../prompt.md'),
+    ]
+        .filter((item): item is string => Boolean(item))
+        .map((item) => resolve(item))
+
+    for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+            return candidate
+        }
+    }
+    return join(moduleDir, 'prompt.md')
+}
+
 /**
  * Load built-in system prompt template.
  * Can be overridden externally via dependency injection.
  */
 export async function loadSystemPrompt(options: LoadSystemPromptOptions = {}): Promise<string> {
     const startupRoot = options.cwd ?? process.cwd()
-    const promptPath = join(resolveModuleDir(), 'prompt.md')
+    const promptPath = resolvePromptPath(options.promptPath)
     const prompt = await readFile(promptPath, 'utf-8')
     const vars = {
         date: new Date().toISOString(),
