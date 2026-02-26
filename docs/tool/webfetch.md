@@ -1,43 +1,60 @@
 # Memo CLI `webfetch` Tool
 
-Performs restricted HTTP GET and returns processed plain-text body preview (HTML tags stripped), with timeout and size limits.
+Fetches web content with pagination, optional HTML-to-Markdown extraction, robots policy checks, and private-network protection.
 
 ## Basic Info
 
 - Tool name: `webfetch`
-- Description: HTTP GET that returns cleaned plain-text body preview (auto-strips HTML)
+- Description: Fetch URL content and return paged text; HTML can be simplified into Markdown.
 - File: `packages/tools/src/tools/webfetch.ts`
 - Confirmation: no
 
 ## Parameters
 
-- `url` (string, required): full request URL. Supported schemes: `http:`, `https:`, `data:`.
+- `url` (string, required): URL to fetch. Supported schemes: `http:`, `https:`.
+- `max_length` (number, optional): max returned characters for this call. Default `5000`, range `1..999999`.
+- `start_index` (number, optional): start offset for paged reads. Default `0`.
+- `raw` (boolean, optional): return raw response body instead of simplifying HTML. Default `false`.
+- `proxy_url` (string, optional): HTTP(S) proxy URL.
 
 ## Behavior
 
-- Validates URL and scheme; unsupported/invalid URL is rejected.
-- 10-second timeout via AbortController.
-- Body size cap 512000 bytes:
-    - rejects early if `content-length` exceeds limit
-    - aborts during stream read if limit is exceeded
-- For HTML responses, strips content:
-    - removes `<script>/<style>`
-    - converts block elements and line breaks to newlines
-    - prefixes `<li>` with `- `
-    - removes other tags
-    - decodes common entities and compresses extra whitespace/blank lines
-- Non-HTML content is `trim`med directly.
-- Preview text max length is 4000 chars; longer text is truncated with `text_truncated=true`.
-- Return format:
-    - `status=<code> bytes=<len> text_chars=<chars> text="<preview>" [text_truncated=true] [source=html_stripped]`
-- Timeout/abort/fetch errors return `isError=true` with error message.
+- Validates URL/proxy URL and requires HTTP(S) protocols.
+- Applies private-network guard by default:
+    - blocks `localhost`, loopback, link-local, RFC1918, ULA, and related reserved ranges
+    - checks both IP literals and DNS-resolved addresses
+- Applies robots.txt policy by default for autonomous fetches:
+    - robots URL is `{scheme}://{host}/robots.txt`
+    - `401/403` blocks fetch
+    - other `4xx` allows fetch
+    - robots network failures are treated as errors
+- Follows redirects (up to 10 hops), and enforces timeout and response-byte limits.
+- For HTML (when `raw=false`), extracts readable article content with Readability and converts to Markdown.
+- For non-HTML or `raw=true`, returns raw body with a prefix note.
+- Supports pagination with `start_index` + `max_length`:
+    - appends continuation hint when truncated
+    - returns `<error>No more content available.</error>` when offset is out of range
 
 ## Output Example
 
-`status=200 bytes=10240 text_chars=3800 text="Example content..." source=html_stripped`
+Success (simplified HTML):
+
+`Contents of https://example.com/article:`
+`# Title`
+`...`
+
+Success (raw / non-HTML):
+
+`Content type application/json cannot be simplified to markdown, but here is the raw content:`
+`Contents of https://example.com/data:`
+`{"ok":true}`
 
 ## Notes
 
-- GET only. No custom headers. Redirect/compression details are not specially handled.
-- Always decoded as UTF-8; non-UTF-8 pages may produce garbled text.
-- Large `data:` URLs still go through fetch and may hit size limits.
+- All failures return `isError=true` with a readable message.
+- Default environment settings:
+    - `MEMO_WEBFETCH_USER_AGENT`
+    - `MEMO_WEBFETCH_IGNORE_ROBOTS_TXT=0`
+    - `MEMO_WEBFETCH_TIMEOUT_MS=30000`
+    - `MEMO_WEBFETCH_MAX_BODY_BYTES=5000000`
+    - `MEMO_WEBFETCH_BLOCK_PRIVATE_NET=1`

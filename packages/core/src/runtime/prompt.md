@@ -342,7 +342,7 @@ Common tools include:
 - **read_text_file / read_media_file / read_files / write_file / edit_file / list_directory / search_files**: Local filesystem read/write/edit/search
 - **list_mcp_resources / list_mcp_resource_templates / read_mcp_resource**: MCP resource context access
 - **update_plan**: Structured progress plan updates
-- **webfetch**: Fetch a URL and return sanitized plain text
+- **webfetch**: Fetch a URL with pagination and return extracted markdown or raw content
 - **get_memory**: Read persisted memory payload
 
 ## Memory Tool Usage

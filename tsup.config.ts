@@ -51,7 +51,7 @@ export default defineConfig({
     sourcemap: false,
     splitting: false,
     bundle: true,
-    external: [],
+    external: ['@mozilla/readability', 'ipaddr.js', 'jsdom', 'robots-parser', 'turndown', 'undici'],
     esbuildOptions(options) {
         options.jsx = 'automatic'
     },

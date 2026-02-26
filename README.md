@@ -127,7 +127,7 @@ memo-code/
 - `exec_command` / `write_stdin` - Execute Shell commands
 - `apply_patch` - Structured patch editing (`*** Begin Patch`/`*** End Patch`)
 - `read_text_file` / `read_media_file` / `read_files` / `write_file` / `edit_file` / `list_directory` / `search_files` - Filesystem read/write/search
-- `webfetch` - Webpage fetching
+- `webfetch` - Paged web fetching with markdown extraction and policy guards
 - MCP resource access - `list_mcp_resources`, `read_mcp_resource`
 - `update_plan` - Structured task progress management
 - `get_memory` - Persistent memory reading

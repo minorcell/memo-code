@@ -11,5 +11,13 @@ export default defineConfig({
     minify: false,
     splitting: false,
     bundle: true,
-    external: ['@dqbd/tiktoken'],
+    external: [
+        '@dqbd/tiktoken',
+        '@mozilla/readability',
+        'ipaddr.js',
+        'jsdom',
+        'robots-parser',
+        'turndown',
+        'undici',
+    ],
 })
