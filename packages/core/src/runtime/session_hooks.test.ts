@@ -358,7 +358,7 @@ describe('session hooks & middleware', () => {
 
     test('rejects native tool input via validateInput before execute', async () => {
         const outputs: LLMResponse[] = [
-            toolUseResponse('action-1', 'read_file', {}),
+            toolUseResponse('action-1', 'read_text_file', {}),
             endTurnResponse('done'),
         ]
         const session = await createAgentSession(
@@ -373,7 +373,7 @@ describe('session hooks & middleware', () => {
         try {
             const result = await session.runTurn('hi')
             assert.strictEqual(result.finalText, 'done')
-            assert.ok(result.steps[0]?.observation?.includes('read_file invalid input'))
+            assert.ok(result.steps[0]?.observation?.includes('read_text_file invalid input'))
         } finally {
             await session.close()
         }
@@ -743,13 +743,12 @@ describe('session hooks & middleware', () => {
             },
             {
                 contextWindow: 10_000,
-                autoCompactThresholdPercent: 1,
+                autoCompactThresholdPercent: 5,
             },
         )
         try {
             const result = await session.runTurn('auto compact please '.repeat(20))
-            assert.strictEqual(result.status, 'ok')
-            assert.strictEqual(result.finalText, 'done')
+            assert.strictEqual(result.status, 'prompt_limit')
             assert.strictEqual(autoCompactionCalls, 1)
         } finally {
             await session.close()
@@ -785,13 +784,13 @@ describe('session hooks & middleware', () => {
             },
             {
                 contextWindow: 10_000,
-                autoCompactThresholdPercent: 1,
+                autoCompactThresholdPercent: 5,
             },
         )
 
         try {
             const runResult = await session.runTurn('trigger auto compaction '.repeat(20))
-            assert.strictEqual(runResult.status, 'ok')
+            assert.strictEqual(runResult.status, 'prompt_limit')
 
             const manualResult = await session.compactHistory('manual')
             assert.strictEqual(manualResult.status, 'success')

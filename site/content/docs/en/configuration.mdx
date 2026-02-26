@@ -255,8 +255,7 @@ active_skills = [
 ### Advanced tool/runtime switches
 
 - `MEMO_SHELL_TOOL_TYPE`: `unified_exec` (default) / `shell` / `shell_command` / `disabled`.
-- `MEMO_EXPERIMENTAL_TOOLS`: comma-separated subset of `read_file,list_dir,grep_files`.
-    - empty value means all three are enabled.
+- `MEMO_FS_ALLOWED_ROOTS`: comma-separated additional allowed filesystem roots for file tools.
 - `MEMO_ENABLE_MEMORY_TOOL=0`: disable `get_memory`.
 - `MEMO_ENABLE_COLLAB_TOOLS=0`: disable subagent tools.
 - `MEMO_SUBAGENT_COMMAND`: command used to spawn subagents.

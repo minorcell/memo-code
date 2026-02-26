@@ -41,15 +41,19 @@ Memo 包含一套 codex 风格的工具集，并可通过 MCP 服务器扩展能
 
 ### 文件和搜索
 
-- `read_file`
-- `list_dir`
-- `grep_files`
+- `read_text_file`
+- `read_media_file`
+- `read_files`
+- `write_file`
+- `edit_file`
+- `list_directory`
+- `search_files`
 - `apply_patch`
 
 注意：
 
-- `read_file` 和 `list_dir` 需要绝对路径。
-- `grep_files` 需要 PATH 中有 `rg`（ripgrep）。
+- 文件系统工具受允许根目录约束（运行时 `cwd` + `MEMO_FS_ALLOWED_ROOTS`）。
+- `read_media_file` 会返回包含 `type`、`mimeType` 和 base64 `data` 的 JSON 文本。
 - `apply_patch` 是结构化写入工具。
 
 ### MCP 资源工具
@@ -81,30 +85,11 @@ Memo 包含一套 codex 风格的工具集，并可通过 MCP 服务器扩展能
 ## 功能开关
 
 - `MEMO_SHELL_TOOL_TYPE`
-- `MEMO_EXPERIMENTAL_TOOLS`
+- `MEMO_FS_ALLOWED_ROOTS`
 - `MEMO_ENABLE_MEMORY_TOOL`
 - `MEMO_ENABLE_COLLAB_TOOLS`
 - `MEMO_SUBAGENT_COMMAND`
 - `MEMO_SUBAGENT_MAX_AGENTS`
-
-### 实验性工具开关行为
-
-`MEMO_EXPERIMENTAL_TOOLS` 控制：
-
-- `read_file`
-- `list_dir`
-- `grep_files`
-
-行为：
-
-- 空或未设置：三个都启用
-- 非空列表：仅列出已启用的工具
-
-示例：
-
-```bash
-export MEMO_EXPERIMENTAL_TOOLS=read_file,list_dir
-```
 
 ## 审批概述
 

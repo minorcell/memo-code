@@ -1,58 +1,54 @@
 # Memo CLI `apply_patch` Tool
 
-Edits a file by direct string replacement.
+Applies structured patch text to local files.
 
 ## Basic Info
 
 - Tool name: `apply_patch`
-- Description: Edit a local file by direct string replacement. Supports single replacement fields or batch edits.
+- Description: Apply a structured patch envelope (`*** Begin Patch` ... `*** End Patch`) with Add/Delete/Update hunks.
 - File: `packages/tools/src/tools/apply_patch.ts`
 - Confirmation: no
 
 ## Parameters
 
-Use one of the following modes:
+- `input` (string, required): full patch text.
 
-1. Single replacement mode
+Patch format:
 
-- `file_path` (string, required): target file path
-- `old_string` (string, required)
-- `new_string` (string, required)
-- `replace_all` (boolean, optional, default `false`)
-
-2. Batch replacement mode
-
-- `file_path` (string, required)
-- `edits` (array, required)
-
-Each item in `edits`:
-
-- `old_string` (string, required)
-- `new_string` (string, required)
-- `replace_all` (boolean, optional)
-
-Do not mix `edits` with `old_string/new_string` in the same request.
+```
+*** Begin Patch
+*** Add File: path/to/file
++line
+*** Update File: path/to/existing
+*** Move to: path/to/new
+@@ optional context
+-old line
++new line
+*** Delete File: path/to/delete
+*** End Patch
+```
 
 ## Behavior
 
-- Normalizes target paths to absolute paths.
-- Enforces writable-root sandbox policy before writing.
-- Reads the file once, applies replacements in order, writes once.
-- Batch edits are atomic: if any edit cannot find its target text, no file changes are written.
-- Returns `isError=true` for missing files, sandbox denial, invalid input, or failed replacements.
+- Supports `Add File`, `Delete File`, `Update File`, optional `Move to`, `@@` chunks, and `*** End of File`.
+- Requires relative file paths (absolute paths are rejected).
+- Resolves paths against runtime cwd and enforces writable-root sandbox policy.
+- Computes update replacements with tolerant matching (`exact` -> `trimEnd` -> `trim` -> normalized unicode punctuation).
+- Returns `isError=true` for parse failures, missing files/context, sandbox denial, or invalid input.
 
 ## Output Example
 
 Success:
 
 ```
-Success. Updated file: /path/to/file.txt
-Edits: 2
-Replacements: 3
+Success. Updated the following files:
+A nested/new.txt
+M src/app.ts
+D obsolete.txt
 ```
 
 Failure:
 
 ```
-apply_patch failed: target text not found at edit 2.
+Invalid patch hunk on line 4: Expected update hunk to start with a @@ context marker, got: '...'
 ```

@@ -84,17 +84,17 @@ assistant: [Makes ONE message with TWO exec_command tool calls in parallel]
 
 <example>
 user: Read package.json and tsconfig.json
-assistant: [Makes ONE message with TWO read_file tool calls in parallel]
+assistant: [Makes ONE message with TWO read_text_file tool calls in parallel]
 </example>
 
 <example>
 user: Show me TypeScript files and test files
-assistant: [Makes ONE message with list_dir + grep_files tool calls in parallel]
+assistant: [Makes ONE message with list_directory + search_files tool calls in parallel]
 </example>
 
 ## Tool Selection
 
-- Prefer specialized tools over generic shell calls: read_file/list_dir/grep_files/apply_patch first, exec_command second
+- Prefer specialized tools over generic shell calls: read_text_file/read_files/list_directory/search_files/apply_patch first, exec_command second
 - Use update_plan for open-ended tasks requiring multiple rounds
 - Use exec_command/shell tools only for actual shell commands and operations
 
@@ -338,8 +338,8 @@ Common tools include:
 
 - **exec_command / write_stdin**: Run and continue interactive shell sessions
 - **shell / shell_command**: Shell execution compatibility variants
-- **apply_patch**: Direct string-replacement edits on a target file
-- **read_file / list_dir / grep_files**: Local file reading, directory listing, and content-based file search
+- **apply_patch**: structured patch edits (`Begin/End`, `Add/Delete/Update`, `@@` hunks)
+- **read_text_file / read_media_file / read_files / write_file / edit_file / list_directory / search_files**: Local filesystem read/write/edit/search
 - **list_mcp_resources / list_mcp_resource_templates / read_mcp_resource**: MCP resource context access
 - **update_plan**: Structured progress plan updates
 - **webfetch**: Fetch a URL and return sanitized plain text

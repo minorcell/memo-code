@@ -41,15 +41,19 @@ Disable execution tools:
 
 ### File and Search
 
-- `read_file`
-- `list_dir`
-- `grep_files`
+- `read_text_file`
+- `read_media_file`
+- `read_files`
+- `write_file`
+- `edit_file`
+- `list_directory`
+- `search_files`
 - `apply_patch`
 
 Notes:
 
-- `read_file` and `list_dir` require absolute paths.
-- `grep_files` requires `rg` (ripgrep) in PATH.
+- filesystem tools are constrained to allowed roots (runtime `cwd` + `MEMO_FS_ALLOWED_ROOTS`).
+- `read_media_file` returns JSON text with `type`, `mimeType`, and base64 `data`.
 - `apply_patch` is the structured write tool.
 
 ### MCP Resource Tools
@@ -81,30 +85,11 @@ Enabled unless `MEMO_ENABLE_COLLAB_TOOLS=0`.
 ## Feature Switches
 
 - `MEMO_SHELL_TOOL_TYPE`
-- `MEMO_EXPERIMENTAL_TOOLS`
+- `MEMO_FS_ALLOWED_ROOTS`
 - `MEMO_ENABLE_MEMORY_TOOL`
 - `MEMO_ENABLE_COLLAB_TOOLS`
 - `MEMO_SUBAGENT_COMMAND`
 - `MEMO_SUBAGENT_MAX_AGENTS`
-
-### Experimental Tool Switch Behavior
-
-`MEMO_EXPERIMENTAL_TOOLS` controls:
-
-- `read_file`
-- `list_dir`
-- `grep_files`
-
-Behavior:
-
-- empty or unset: all three enabled
-- non-empty list: only listed tools enabled
-
-Example:
-
-```bash
-export MEMO_EXPERIMENTAL_TOOLS=read_file,list_dir
-```
 
 ## Approval Overview
 

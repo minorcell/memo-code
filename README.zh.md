@@ -93,7 +93,7 @@ memo
 memo-code/
 ├── packages/
 │   ├── core/          # 核心逻辑：Session 状态机、Config 处理
-│   ├── tools/         # Tool 路由、MCP Client管理、内置工具实现（exec_command, read_file, apply_patch...）
+│   ├── tools/         # Tool 路由、MCP Client管理、内置工具实现（exec_command, read_text_file, apply_patch...）
 │   ├── tui/           # 终端运行时：CLI 入口、交互式 TUI
 │   ├── web-ui/        # Web 前端：React 组件
 │   └── web-server/    # Web 后端：会话管理、API 适配器
@@ -112,7 +112,7 @@ memo-code/
 
 - `exec_command` / `write_stdin` - 执行 Shell 命令
 - `apply_patch` - 字符串级代码编辑（单文件/批量）
-- `read_file` / `list_dir` / `grep_files` - 文件读取与检索
+- `read_text_file` / `read_media_file` / `read_files` / `write_file` / `edit_file` / `list_directory` / `search_files` - 文件系统读写与检索
 - `webfetch` - 网页抓取
 - MCP 资源访问 - `list_mcp_resources`, `read_mcp_resource`
 - `update_plan` - 结构化任务进度管理

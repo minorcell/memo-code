@@ -4,9 +4,13 @@ import { shellCommandTool } from '@memo/tools/tools/shell_command'
 import { execCommandTool } from '@memo/tools/tools/exec_command'
 import { writeStdinTool } from '@memo/tools/tools/write_stdin'
 import { applyPatchTool } from '@memo/tools/tools/apply_patch'
-import { readFileTool } from '@memo/tools/tools/read_file'
-import { listDirTool } from '@memo/tools/tools/list_dir'
-import { grepFilesTool } from '@memo/tools/tools/grep_files'
+import { readTextFileTool } from '@memo/tools/tools/read_text_file'
+import { readMediaFileTool } from '@memo/tools/tools/read_media_file'
+import { readFilesTool } from '@memo/tools/tools/read_files'
+import { writeFileTool } from '@memo/tools/tools/write_file'
+import { editFileTool } from '@memo/tools/tools/edit_file'
+import { listDirectoryTool } from '@memo/tools/tools/list_directory'
+import { searchFilesTool } from '@memo/tools/tools/search_files'
 import {
     listMcpResourceTemplatesTool,
     listMcpResourcesTool,
@@ -23,22 +27,9 @@ import {
     waitTool,
 } from '@memo/tools/tools/collab'
 
-function parseCsvEnv(name: string): Set<string> {
-    const raw = process.env[name]?.trim()
-    if (!raw) return new Set()
-    return new Set(
-        raw
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean),
-    )
-}
-
 function buildCodexTools(): McpTool[] {
     const tools: McpTool[] = []
     const shellMode = process.env.MEMO_SHELL_TOOL_TYPE?.trim() || 'unified_exec'
-    const experimental = parseCsvEnv('MEMO_EXPERIMENTAL_TOOLS')
-    const enableAllExperimental = experimental.size === 0
     const collabEnabled = process.env.MEMO_ENABLE_COLLAB_TOOLS !== '0'
     const memoryToolEnabled = process.env.MEMO_ENABLE_MEMORY_TOOL !== '0'
 
@@ -55,16 +46,15 @@ function buildCodexTools(): McpTool[] {
     tools.push(listMcpResourcesTool, listMcpResourceTemplatesTool, readMcpResourceTool)
     tools.push(updatePlanTool)
     tools.push(applyPatchTool)
-
-    if (enableAllExperimental || experimental.has('grep_files')) {
-        tools.push(grepFilesTool)
-    }
-    if (enableAllExperimental || experimental.has('read_file')) {
-        tools.push(readFileTool)
-    }
-    if (enableAllExperimental || experimental.has('list_dir')) {
-        tools.push(listDirTool)
-    }
+    tools.push(
+        readTextFileTool,
+        readMediaFileTool,
+        readFilesTool,
+        writeFileTool,
+        editFileTool,
+        listDirectoryTool,
+        searchFilesTool,
+    )
 
     if (memoryToolEnabled) {
         tools.push(getMemoryTool)

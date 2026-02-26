@@ -60,9 +60,9 @@ packages/core/src/  ─┤            │   - React/Ink UI
                      │            │
 packages/tools/src/ ─┤            │   ← all dependencies inlined
   ├─ exec_command.ts │            │
-  ├─ read_file.ts    │            │
-  ├─ list_dir.ts     │            │
-  ├─ grep_files.ts   │            │
+  ├─ read_text_file.ts │          │
+  ├─ write_file.ts     │          │
+  ├─ search_files.ts   │          │
   └─ ...             │            │
                      │            │
 packages/core/src/   │            │

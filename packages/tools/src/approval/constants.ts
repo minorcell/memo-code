@@ -11,9 +11,11 @@ export const DEFAULT_TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
     update_plan: 'read',
     get_memory: 'read',
     webfetch: 'read',
-    read_file: 'read',
-    list_dir: 'read',
-    grep_files: 'read',
+    read_text_file: 'read',
+    read_media_file: 'read',
+    read_files: 'read',
+    list_directory: 'read',
+    search_files: 'read',
     wait: 'read',
     spawn_agent: 'read',
     send_input: 'read',
@@ -22,6 +24,8 @@ export const DEFAULT_TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
 
     // Write tools: require approval.
     apply_patch: 'write',
+    write_file: 'write',
+    edit_file: 'write',
 
     // Execute tools: highest risk, require approval.
     shell: 'execute',

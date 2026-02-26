@@ -37,26 +37,25 @@ Fix:
 2. or use `memo --dangerous` in controlled environments
 3. or keep the task read-only
 
-## `grep_files` Fails Because `rg` Is Missing
+## `search_files` Returns Unexpected Results
 
 Symptom:
 
-- `grep_files failed` with ripgrep-related error
+- `search_files` returns no matches or too many matches
 
 Fix:
 
-- install ripgrep (`rg`) and ensure it is in PATH
+- use a glob pattern relative to the input `path` (for example `**/*.ts`)
+- use `excludePatterns` to reduce noise (for example `node_modules/**`)
 
 ## Tool Set Looks Different Than Expected
 
 Check environment switches:
 
 - `MEMO_SHELL_TOOL_TYPE`
-- `MEMO_EXPERIMENTAL_TOOLS`
+- `MEMO_FS_ALLOWED_ROOTS`
 - `MEMO_ENABLE_MEMORY_TOOL`
 - `MEMO_ENABLE_COLLAB_TOOLS`
-
-A non-empty `MEMO_EXPERIMENTAL_TOOLS` enables only listed experimental tools.
 
 ## Context Limit Exceeded
 

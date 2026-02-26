@@ -27,11 +27,15 @@ The tool system in memo is designed to enable AI assistants (Agents) to safely u
 ```
 packages/tools/src/tools/
 ├── exec_command.ts      # Execute shell commands
-├── read_file.ts         # Read file contents
+├── read_text_file.ts    # Read text file contents
+├── read_media_file.ts   # Read media file as base64 payload
+├── read_files.ts        # Read multiple text files
+├── write_file.ts        # Atomic file write
+├── edit_file.ts         # Structured text edits + diff
 ├── apply_patch.ts       # Modify files
 ├── webfetch.ts          # Make HTTP requests
-├── list_dir.ts          # List directory contents
-├── grep_files.ts        # Search file contents
+├── list_directory.ts    # List directory contents
+├── search_files.ts      # Search files by glob path pattern
 ├── update_plan.ts       # Update task plans
 ├── get_memory.ts        # Access persisted memory
 └── ...
@@ -47,17 +51,19 @@ packages/tools/src/tools/
 **Example Tool Definition**:
 
 ```typescript
-export const readFileTool = defineMcpTool({
-    name: 'read_file',
-    description: 'Reads a local file with 1-indexed line numbers',
-    inputSchema: z.object({
-        file_path: z.string().min(1),
-        offset: z.number().optional(),
-        limit: z.number().optional(),
-    }),
+export const readTextFileTool = defineMcpTool({
+    name: 'read_text_file',
+    description: 'Read text with optional head/tail line limits',
+    inputSchema: z
+        .object({
+            path: z.string().min(1),
+            head: z.number().int().positive().optional(),
+            tail: z.number().int().positive().optional(),
+        })
+        .strict(),
     execute: async (input) => {
-        const content = await fs.readFile(input.file_path, 'utf-8')
-        return { content: [{ type: 'text', text: content }] }
+        // validatePath + read
+        return textResult('...')
     },
 })
 ```
@@ -75,8 +81,8 @@ packages/tools/src/router/
 **ToolRouter Responsibilities**:
 
 1. **Registration**: `registerNativeTool()` - Store tools in registry
-2. **Discovery**: `getTool("read_file")` - Find tools by name
-3. **Execution**: `execute("read_file", {...})` - Run tools with input
+2. **Discovery**: `getTool("read_text_file")` - Find tools by name
+3. **Execution**: `execute("read_text_file", {...})` - Run tools with input
 4. **Documentation**: `generateToolDescriptions()` - Create tool list for AI
 5. **Unified Interface**: Handle both native and MCP tools transparently
 
@@ -126,7 +132,7 @@ packages/tools/src/approval/
 
 Tools are automatically classified into risk levels:
 
-- **read**: Low risk (e.g., `read_file`, `list_dir`, `webfetch`)
+- **read**: Low risk (e.g., `read_text_file`, `list_directory`, `webfetch`)
 - **write**: Medium risk (e.g., `apply_patch`, file modifications)
 - **execute**: High risk (e.g., `exec_command`, shell operations)
 
@@ -145,11 +151,15 @@ const DEFAULT_TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
     shell: 'execute',
     shell_command: 'execute',
     apply_patch: 'write',
-    read_file: 'read',
-    list_dir: 'read',
-    grep_files: 'read',
+    write_file: 'write',
+    edit_file: 'write',
+    read_text_file: 'read',
+    read_media_file: 'read',
+    read_files: 'read',
+    list_directory: 'read',
+    search_files: 'read',
     webfetch: 'read',
-    update_plan: 'write',
+    update_plan: 'read',
     get_memory: 'read',
 }
 ```
@@ -184,17 +194,17 @@ interface Tool {
 
 ```
 User: Help me check package.json and run tests
-AI: Needs two tools: read_file and exec_command
+AI: Needs two tools: read_text_file and exec_command
 
 Step 1: AI sends request
-→ Orchestrator receives: [read_file, exec_command]
+→ Orchestrator receives: [read_text_file, exec_command]
 
 Step 2: Safety check
-→ Approval manager: read_file(low risk) ✓, exec_command(high risk) ⚠️
+→ Approval manager: read_text_file(low risk) ✓, exec_command(high risk) ⚠️
 → User approves exec_command
 
 Step 3: Tool execution
-→ Router finds read_file tool
+→ Router finds read_text_file tool
 → Executes: reads package.json successfully
 → Router finds exec_command tool
 → Executes: runs "npm test"
@@ -243,11 +253,11 @@ Step 4: Result processing
 ### Tool Selection
 
 - `MEMO_SHELL_TOOL_TYPE`: Choose shell tool variant (`unified_exec`, `shell`, `shell_command`)
-- `MEMO_EXPERIMENTAL_TOOLS`: CSV list of experimental tools to enable
 - `MEMO_ENABLE_COLLAB_TOOLS`: Disable collaborative agent tools when set to `0` (enabled by default)
 - `MEMO_SUBAGENT_COMMAND`: Command executed for each subagent submission
 - `MEMO_SUBAGENT_MAX_AGENTS`: Max concurrent running subagents
 - `MEMO_ENABLE_MEMORY_TOOL`: Enable memory access tool
+- `MEMO_FS_ALLOWED_ROOTS`: Comma-separated additional allowed filesystem roots (default root is runtime `cwd`)
 
 ### Security Settings
 

@@ -56,9 +56,9 @@ if (toolUseBlocks.length > 1) {
 
 **Typical use cases**:
 
-- Read multiple files concurrently (`read_file + read_file + read_file`)
+- Read multiple files concurrently (`read_text_file + read_text_file + read_text_file`)
 - Run multiple git commands in parallel (`exec_command + exec_command + exec_command`)
-- Search and read simultaneously (`list_dir + grep_files + read_file`)
+- Search and read simultaneously (`list_directory + search_files + read_text_file`)
 
 ### 3. State Flow
 

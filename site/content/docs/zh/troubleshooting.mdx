@@ -37,26 +37,25 @@ category: 'Operations'
 2. 或在受控环境中使用 `memo --dangerous`
 3. 或保持任务只读
 
-## `grep_files` 失败因为缺少 `rg`
+## `search_files` 返回结果不符合预期
 
 症状：
 
-- `grep_files failed` 并显示 ripgrep 相关错误
+- `search_files` 没有匹配结果，或者结果过多
 
 修复：
 
-- 安装 ripgrep（`rg`）并确保它在 PATH 中
+- 使用相对于输入 `path` 的 glob 模式（例如 `**/*.ts`）
+- 使用 `excludePatterns` 缩小范围（例如 `node_modules/**`）
 
 ## 工具集看起来与预期不同
 
 检查环境开关：
 
 - `MEMO_SHELL_TOOL_TYPE`
-- `MEMO_EXPERIMENTAL_TOOLS`
+- `MEMO_FS_ALLOWED_ROOTS`
 - `MEMO_ENABLE_MEMORY_TOOL`
 - `MEMO_ENABLE_COLLAB_TOOLS`
-
-非空的 `MEMO_EXPERIMENTAL_TOOLS` 仅启用列出的实验性工具。
 
 ## 超出上下文限制
 

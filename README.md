@@ -103,7 +103,7 @@ First run will guide you through Provider/Model setup and save config to `~/.mem
 memo-code/
 ├── packages/
 │   ├── core/          # Core logic: Session state machine, Config handling
-│   ├── tools/         # Tool routing, MCP Client management, built-in tools (exec_command, read_file, apply_patch...)
+│   ├── tools/         # Tool routing, MCP Client management, built-in tools (exec_command, read_text_file, apply_patch...)
 │   ├── tui/           # Terminal runtime: CLI entry, interactive TUI
 │   ├── web-ui/        # Web frontend: React components
 │   └── web-server/    # Web backend: session management, API adapter
@@ -123,8 +123,8 @@ memo-code/
 ## 🔧 Built-in Tools
 
 - `exec_command` / `write_stdin` - Execute Shell commands
-- `apply_patch` - String-level code editing (single/batch)
-- `read_file` / `list_dir` / `grep_files` - File reading and search
+- `apply_patch` - Structured patch editing (`*** Begin Patch`/`*** End Patch`)
+- `read_text_file` / `read_media_file` / `read_files` / `write_file` / `edit_file` / `list_directory` / `search_files` - Filesystem read/write/search
 - `webfetch` - Webpage fetching
 - MCP resource access - `list_mcp_resources`, `read_mcp_resource`
 - `update_plan` - Structured task progress management

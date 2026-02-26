@@ -253,8 +253,7 @@ active_skills = [
 ### 高级工具/运行时开关
 
 - `MEMO_SHELL_TOOL_TYPE`：`unified_exec`（默认）/ `shell` / `shell_command` / `disabled`。
-- `MEMO_EXPERIMENTAL_TOOLS`：`read_file,list_dir,grep_files` 的子集，逗号分隔。
-    - 空值表示三个都启用。
+- `MEMO_FS_ALLOWED_ROOTS`：文件系统工具额外允许访问的根目录，逗号分隔。
 - `MEMO_ENABLE_MEMORY_TOOL=0`：禁用 `get_memory`。
 - `MEMO_ENABLE_COLLAB_TOOLS=0`：禁用子代理工具。
 - `MEMO_SUBAGENT_COMMAND`：用于生成子代理的命令。

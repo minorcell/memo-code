@@ -1,21 +1,23 @@
 import assert from 'node:assert'
-import { spawnSync } from 'node:child_process'
 import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, beforeAll, describe, test } from 'vitest'
+import { runWithRuntimeContext } from '@memo/tools/runtime/context'
 import { execCommandTool } from '@memo/tools/tools/exec_command'
 import { writeStdinTool } from '@memo/tools/tools/write_stdin'
 import { applyPatchTool } from '@memo/tools/tools/apply_patch'
-import { readFileTool } from '@memo/tools/tools/read_file'
-import { listDirTool } from '@memo/tools/tools/list_dir'
-import { grepFilesTool } from '@memo/tools/tools/grep_files'
+import { readTextFileTool } from '@memo/tools/tools/read_text_file'
+import { readFilesTool } from '@memo/tools/tools/read_files'
+import { listDirectoryTool } from '@memo/tools/tools/list_directory'
+import { searchFilesTool } from '@memo/tools/tools/search_files'
 import { updatePlanTool } from '@memo/tools/tools/update_plan'
 import { getMemoryTool } from '@memo/tools/tools/get_memory'
 
 let tempDir: string
 let prevWritableRoots: string | undefined
 let prevMemoHome: string | undefined
+let prevFsAllowedRoots: string | undefined
 
 async function makeTempDir(prefix: string) {
     const dir = join(tmpdir(), `${prefix}-${crypto.randomUUID()}`)
@@ -48,8 +50,10 @@ beforeAll(async () => {
     tempDir = await makeTempDir('memo-tools-codex')
     prevWritableRoots = process.env.MEMO_SANDBOX_WRITABLE_ROOTS
     prevMemoHome = process.env.MEMO_HOME
+    prevFsAllowedRoots = process.env.MEMO_FS_ALLOWED_ROOTS
     process.env.MEMO_SANDBOX_WRITABLE_ROOTS = tempDir
     process.env.MEMO_HOME = tempDir
+    process.env.MEMO_FS_ALLOWED_ROOTS = tempDir
 })
 
 afterAll(async () => {
@@ -62,6 +66,11 @@ afterAll(async () => {
         delete process.env.MEMO_HOME
     } else {
         process.env.MEMO_HOME = prevMemoHome
+    }
+    if (prevFsAllowedRoots === undefined) {
+        delete process.env.MEMO_FS_ALLOWED_ROOTS
+    } else {
+        process.env.MEMO_FS_ALLOWED_ROOTS = prevFsAllowedRoots
     }
     await rm(tempDir, { recursive: true, force: true })
 })
@@ -171,58 +180,81 @@ describe('codex shell family', () => {
 })
 
 describe('codex file/search family', () => {
-    test('apply_patch supports direct replace flow', async () => {
+    test('apply_patch supports codex patch flow', async () => {
         const target = join(tempDir, 'patched.txt')
         await writeFile(target, 'alpha beta alpha', 'utf8')
 
-        const singleRes = await applyPatchTool.execute({
-            file_path: target,
-            old_string: 'alpha',
-            new_string: 'A',
-        })
+        const singleRes = await runWithRuntimeContext({ cwd: tempDir }, () =>
+            applyPatchTool.execute({
+                input: [
+                    '*** Begin Patch',
+                    '*** Update File: patched.txt',
+                    '@@',
+                    '-alpha beta alpha',
+                    '+A beta alpha',
+                    '*** End Patch',
+                ].join('\n'),
+            }),
+        )
         assert.ok(!singleRes.isError)
-        assert.strictEqual(await readText(target), 'A beta alpha')
+        assert.strictEqual(await readText(target), 'A beta alpha\n')
 
-        const batchRes = await applyPatchTool.execute({
-            file_path: target,
-            edits: [
-                { old_string: 'beta', new_string: 'B' },
-                { old_string: 'alpha', new_string: 'A', replace_all: true },
-            ],
-        })
+        const batchRes = await runWithRuntimeContext({ cwd: tempDir }, () =>
+            applyPatchTool.execute({
+                input: [
+                    '*** Begin Patch',
+                    '*** Update File: patched.txt',
+                    '@@',
+                    '-A beta alpha',
+                    '+A B A',
+                    '*** End Patch',
+                ].join('\n'),
+            }),
+        )
         assert.ok(!batchRes.isError)
-        assert.strictEqual(await readText(target), 'A B A')
+        assert.strictEqual(await readText(target), 'A B A\n')
     })
 
-    test('read_file requires absolute path', async () => {
-        const result = await readFileTool.execute({ file_path: 'relative.txt' })
+    test('read_text_file requires valid path in allowed roots', async () => {
+        const result = await readTextFileTool.execute({ path: '/tmp/not-allowed.txt' })
         assert.strictEqual(result.isError, true)
-        assert.ok(textPayload(result).includes('absolute'))
+        assert.ok(textPayload(result).includes('Access denied'))
     })
 
-    test('list_dir lists entries with absolute path header', async () => {
-        const nested = join(tempDir, 'list-dir')
+    test('list_directory lists entries with dir/file labels', async () => {
+        const nested = join(tempDir, 'list-directory')
         await mkdir(nested, { recursive: true })
         await writeFile(join(nested, 'a.txt'), 'a', 'utf8')
 
-        const result = await listDirTool.execute({ dir_path: nested })
+        const result = await listDirectoryTool.execute({ path: nested })
         const text = textPayload(result)
-        assert.ok(text.includes('Absolute path:'), 'should include header')
-        assert.ok(text.includes('a.txt'), 'should include file name')
+        assert.ok(text.includes('[FILE] a.txt'), 'should include file label')
     })
 
-    test('grep_files returns matching file paths', async () => {
-        const rgAvailable = spawnSync('rg', ['--version'], { stdio: 'ignore' }).status === 0
-        if (!rgAvailable) return
+    test('read_files reads multiple files in one call', async () => {
+        const root = join(tempDir, 'read-files')
+        await mkdir(root, { recursive: true })
+        const fileA = join(root, 'a.txt')
+        const fileB = join(root, 'b.txt')
+        await writeFile(fileA, 'A', 'utf8')
+        await writeFile(fileB, 'B', 'utf8')
 
-        const searchRoot = join(tempDir, 'grep-files')
+        const result = await readFilesTool.execute({ paths: [fileA, fileB] })
+        const text = textPayload(result)
+        assert.ok(text.includes(`${fileA}:\nA`))
+        assert.ok(text.includes(`${fileB}:\nB`))
+    })
+
+    test('search_files returns matching file paths', async () => {
+        const searchRoot = join(tempDir, 'search-files')
         await mkdir(searchRoot, { recursive: true })
         await writeFile(join(searchRoot, 'm1.txt'), 'needle-here', 'utf8')
-        await writeFile(join(searchRoot, 'm2.txt'), 'nothing', 'utf8')
+        await writeFile(join(searchRoot, 'm2.md'), 'nothing', 'utf8')
 
-        const result = await grepFilesTool.execute({ pattern: 'needle-here', path: searchRoot })
+        const result = await searchFilesTool.execute({ pattern: '**/*.txt', path: searchRoot })
         const text = textPayload(result)
-        assert.ok(text.includes('m1.txt'))
+        assert.ok(text.includes('m1.txt'), 'should include file name')
+        assert.ok(!text.includes('m2.md'))
     })
 })
 

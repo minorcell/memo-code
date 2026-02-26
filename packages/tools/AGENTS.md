@@ -19,9 +19,10 @@ logic.
 
 - `src/tools/*`
     - Native tool implementations (codex-style tools such as
-      `exec_command`, `write_stdin`, `apply_patch`, `read_file`, `list_dir`,
-      `grep_files`, `list_mcp_resources`, `read_mcp_resource`, `update_plan`,
-      `webfetch`, `get_memory`).
+      `exec_command`, `write_stdin`, `apply_patch`, `read_text_file`,
+      `read_media_file`, `read_files`, `write_file`, `edit_file`,
+      `list_directory`, `search_files`, `list_mcp_resources`,
+      `read_mcp_resource`, `update_plan`, `webfetch`, `get_memory`).
     - `types.ts` provides `defineMcpTool(...)` to build unified tool objects.
     - `mcp.ts` contains common `CallToolResult` helpers.
 - `src/router/*`
