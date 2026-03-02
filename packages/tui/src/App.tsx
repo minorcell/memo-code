@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { Box, Text, useApp } from 'ink'
 import {
-    createAgentSession,
     loadMemoConfig,
     resolveContextWindowForProvider,
     selectProvider,
@@ -25,6 +24,7 @@ import { McpActivationOverlay } from './overlays/McpActivationOverlay'
 import { notifyApprovalRequested } from './notifications/approval_notification'
 import { SetupWizard } from './setup/SetupWizard'
 import { parseHistoryLog } from './controllers/history_parser'
+import { createHttpAgentSession } from './http/http_agent_session'
 import {
     chatTimelineReducer,
     createInitialTimelineState,
@@ -346,7 +346,7 @@ export function App({
                     await previous.close()
                 }
 
-                const created = await createAgentSession(deps, sessionOptionsState)
+                const created = await createHttpAgentSession(deps, sessionOptionsState)
                 if (cancelled) {
                     await created.close()
                     return
@@ -829,11 +829,41 @@ export function App({
 
     useEffect(() => {
         if (!session || !pendingHistoryMessages?.length) return
-        const systemMessage = session.history[0]
-        if (!systemMessage) return
-        session.history.splice(0, session.history.length, systemMessage, ...pendingHistoryMessages)
-        setPendingHistoryMessages(null)
-    }, [pendingHistoryMessages, session])
+
+        let cancelled = false
+        ;(async () => {
+            try {
+                if ('restoreHistory' in session && typeof session.restoreHistory === 'function') {
+                    await session.restoreHistory(pendingHistoryMessages)
+                } else {
+                    const systemMessage = session.history[0]
+                    if (!systemMessage) return
+                    session.history.splice(
+                        0,
+                        session.history.length,
+                        systemMessage,
+                        ...pendingHistoryMessages,
+                    )
+                }
+                if (!cancelled) {
+                    setPendingHistoryMessages(null)
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    appendSystemMessage(
+                        'History',
+                        `Failed to restore history: ${(err as Error).message}`,
+                        'error',
+                    )
+                    setPendingHistoryMessages(null)
+                }
+            }
+        })()
+
+        return () => {
+            cancelled = true
+        }
+    }, [appendSystemMessage, pendingHistoryMessages, session])
 
     const handleApprovalDecision = useCallback((decision: ApprovalDecision) => {
         const resolver = approvalResolverRef.current

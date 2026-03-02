@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Menu } from 'lucide-react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { chatApi, sessionsApi, wsSubscribe } from '@/api'
+import { chatApi, sessionsApi } from '@/api'
 import { MemoLogo } from '@/components/layout/memo-logo'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
@@ -44,16 +44,6 @@ export function AppLayout() {
         }
     }, [])
 
-    const createSessionForWorkspace = useCallback(
-        async (workspaceId: string) => {
-            const sessionId = await createSession(workspaceId)
-            if (!sessionId) return null
-            await loadSessions()
-            return sessionId
-        },
-        [createSession, loadSessions],
-    )
-
     const loadRuntimeBadges = useCallback(async () => {
         try {
             const response = await chatApi.listChatRuntimes({})
@@ -62,6 +52,16 @@ export function AppLayout() {
             // Ignore runtime badge bootstrap errors.
         }
     }, [setRuntimeBadges])
+
+    const createSessionForWorkspace = useCallback(
+        async (workspaceId: string) => {
+            const sessionId = await createSession(workspaceId)
+            if (!sessionId) return null
+            await Promise.all([loadSessions(), loadRuntimeBadges()])
+            return sessionId
+        },
+        [createSession, loadRuntimeBadges, loadSessions],
+    )
 
     const bootstrap = useCallback(async () => {
         await Promise.all([loadWorkspaces(), loadSessions(), loadRuntimeBadges()])
@@ -78,20 +78,14 @@ export function AppLayout() {
     }, [bootstrap])
 
     useEffect(() => {
-        const unsubs = [
-            wsSubscribe('workspace.changed', () => {
-                void Promise.all([loadWorkspaces(), loadSessions()])
-            }),
-            wsSubscribe('chat.runtime.status', () => {
-                void loadSessions()
-            }),
-        ]
+        const timer = window.setInterval(() => {
+            void Promise.all([loadSessions(), loadRuntimeBadges()])
+        }, 5000)
+
         return () => {
-            for (const unsub of unsubs) {
-                unsub()
-            }
+            window.clearInterval(timer)
         }
-    }, [loadSessions, loadWorkspaces])
+    }, [loadRuntimeBadges, loadSessions])
 
     const workspaceById = useMemo(() => {
         const map = new Map<string, { id: string; name: string; cwd: string }>()

@@ -76,8 +76,8 @@ packages/core/src/   │            │
 | --------------- | ------------- | -------------------------------- |
 | `react`, `ink`  | bundle inline | required at runtime              |
 | `fast-glob`     | bundle inline | avoid user-side install concerns |
-| `openai`        | bundle inline | API client                       |
-| `tiktoken`      | bundle inline | token counting                   |
+| `openai`        | bundle inline | compatibility type/runtime deps  |
+| `ai`            | bundle inline | AI SDK runtime                   |
 | `zod`           | bundle inline | schema validation                |
 | Node built-ins  | `external`    | provided by Node.js              |
 
@@ -276,7 +276,7 @@ memo --doctor
 
 ### 9.1 Possible Optimizations
 
-- **Code splitting**: lazy-load large dependencies (for example tiktoken wasm)
+- **Code splitting**: lazy-load large optional dependencies when needed
 - **Compression**: use Brotli to reduce package size further
 - **Incremental updates**: support hot-update style mechanism
 

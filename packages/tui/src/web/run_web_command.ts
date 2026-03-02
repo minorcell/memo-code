@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { startCoreHttpServer } from '@memo/core'
 import { parseWebArgs } from './cli_web_args'
 
 const DEFAULT_HOST = '127.0.0.1'
@@ -36,33 +37,6 @@ function hasFile(path: string): boolean {
     return existsSync(path)
 }
 
-function resolveServerEntry(explicitPath?: string): string | null {
-    const candidates: string[] = []
-    if (explicitPath) candidates.push(resolve(explicitPath))
-    if (process.env.MEMO_WEB_SERVER_ENTRY) {
-        candidates.push(resolve(process.env.MEMO_WEB_SERVER_ENTRY))
-    }
-
-    const runtimeDir = dirname(fileURLToPath(import.meta.url))
-    const packageRoot = findMemoPackageRoot(runtimeDir) ?? findMemoPackageRoot(process.cwd())
-    if (packageRoot) {
-        candidates.push(join(packageRoot, 'dist/web/server/main.cjs'))
-        candidates.push(join(packageRoot, 'dist/web/server/main.js'))
-        candidates.push(join(packageRoot, 'packages/web-server/dist/main.cjs'))
-        candidates.push(join(packageRoot, 'packages/web-server/dist/main.js'))
-    }
-
-    candidates.push(join(process.cwd(), 'dist/web/server/main.cjs'))
-    candidates.push(join(process.cwd(), 'dist/web/server/main.js'))
-    candidates.push(join(process.cwd(), 'packages/web-server/dist/main.cjs'))
-    candidates.push(join(process.cwd(), 'packages/web-server/dist/main.js'))
-
-    for (const candidate of candidates) {
-        if (hasFile(candidate)) return candidate
-    }
-    return null
-}
-
 function resolveWebStaticDir(explicitPath?: string): string | null {
     const candidates: string[] = []
     if (explicitPath) candidates.push(resolve(explicitPath))
@@ -83,45 +57,6 @@ function resolveWebStaticDir(explicitPath?: string): string | null {
     for (const candidate of candidates) {
         if (hasFile(join(candidate, 'index.html'))) return candidate
     }
-    return null
-}
-
-function resolveTaskPromptsDir(): string {
-    const runtimeDir = dirname(fileURLToPath(import.meta.url))
-    const packageRoot = findMemoPackageRoot(runtimeDir) ?? findMemoPackageRoot(process.cwd())
-    const candidates: string[] = []
-    if (packageRoot) {
-        candidates.push(join(packageRoot, 'dist/task-prompts'))
-        candidates.push(join(packageRoot, 'packages/tui/src/task-prompts'))
-    }
-    candidates.push(resolve(runtimeDir, '../task-prompts'))
-    candidates.push(resolve(runtimeDir, 'task-prompts'))
-
-    for (const candidate of candidates) {
-        if (hasFile(join(candidate, 'init_agents.md'))) return candidate
-    }
-
-    return candidates[0] ?? resolve(runtimeDir, '../task-prompts')
-}
-
-function resolveSystemPromptPath(): string | null {
-    const runtimeDir = dirname(fileURLToPath(import.meta.url))
-    const packageRoot = findMemoPackageRoot(runtimeDir) ?? findMemoPackageRoot(process.cwd())
-    const candidates: string[] = []
-    if (process.env.MEMO_SYSTEM_PROMPT_PATH) {
-        candidates.push(resolve(process.env.MEMO_SYSTEM_PROMPT_PATH))
-    }
-    if (packageRoot) {
-        candidates.push(join(packageRoot, 'dist/prompt.md'))
-        candidates.push(join(packageRoot, 'packages/core/src/runtime/prompt.md'))
-    }
-    candidates.push(resolve(runtimeDir, '../prompt.md'))
-    candidates.push(resolve(runtimeDir, '../../core/src/runtime/prompt.md'))
-
-    for (const candidate of candidates) {
-        if (hasFile(candidate)) return candidate
-    }
-
     return null
 }
 
@@ -178,30 +113,11 @@ function formatAddress(host: string, port: number): string {
     return `http://${safeHost}:${port}`
 }
 
-async function waitForServer(host: string, port: number, timeoutMs = 8000): Promise<boolean> {
-    const startedAt = Date.now()
-    while (Date.now() - startedAt < timeoutMs) {
-        if (!(await isPortAvailable(host, port))) {
-            return true
-        }
-        await new Promise((resolveDelay) => setTimeout(resolveDelay, 120))
-    }
-    return false
-}
-
 export async function runWebCommand(argv: string[]): Promise<void> {
     const options = parseWebArgs(argv)
     const host = options.host ?? DEFAULT_HOST
     const preferredPort = options.port ?? DEFAULT_PORT
     const port = await resolveAvailablePort(host, preferredPort)
-
-    const serverEntry = resolveServerEntry()
-    if (!serverEntry) {
-        console.error('web-server entry not found (main.js missing).')
-        console.error('Please run `pnpm run web:server:build` or `pnpm run build` first.')
-        process.exitCode = 1
-        return
-    }
 
     const staticDir = resolveWebStaticDir(options.staticDir)
     if (!staticDir) {
@@ -211,56 +127,61 @@ export async function runWebCommand(argv: string[]): Promise<void> {
         return
     }
 
+    const password = process.env.MEMO_SERVER_PASSWORD?.trim()
+    if (!password) {
+        console.error('MEMO_SERVER_PASSWORD is required for `memo web`.')
+        console.error('Example: MEMO_SERVER_PASSWORD=your-password memo web')
+        process.exitCode = 1
+        return
+    }
+
     if (port !== preferredPort) {
         console.log(`[memo web] Port ${preferredPort} is busy, using ${port}`)
     }
-    const url = formatAddress(host, port)
-    console.log(`[memo web] Server: ${url}`)
-    console.log(`[memo web] Entry: ${serverEntry}`)
-    console.log(`[memo web] Static: ${staticDir}`)
-    const taskPromptsDir = resolveTaskPromptsDir()
-    const systemPromptPath = resolveSystemPromptPath()
 
-    const child = spawn(process.execPath, [serverEntry], {
-        stdio: 'inherit',
-        env: {
-            ...process.env,
-            MEMO_WEB_HOST: host,
-            MEMO_WEB_PORT: String(port),
-            MEMO_WEB_STATIC_DIR: staticDir,
-            MEMO_CLI_ENTRY: process.argv[1],
-            MEMO_TASK_PROMPTS_DIR: taskPromptsDir,
-            ...(systemPromptPath ? { MEMO_SYSTEM_PROMPT_PATH: systemPromptPath } : {}),
-        },
-    })
-
-    if (options.open) {
-        const ready = await waitForServer(host, port)
-        if (!ready || !openBrowser(url)) {
-            console.warn(`[memo web] Failed to auto-open browser. Open manually: ${url}`)
-        }
-    }
-
-    const forwardSignal = (signal: NodeJS.Signals) => {
-        if (!child.killed) child.kill(signal)
-    }
-
-    process.once('SIGINT', () => {
-        forwardSignal('SIGINT')
-    })
-    process.once('SIGTERM', () => {
-        forwardSignal('SIGTERM')
-    })
-
-    await new Promise<void>((resolve) => {
-        child.once('exit', (code, signal) => {
-            if (signal) {
-                process.exitCode = 0
-                resolve()
-                return
-            }
-            process.exitCode = code ?? 0
-            resolve()
+    let handle: Awaited<ReturnType<typeof startCoreHttpServer>> | null = null
+    try {
+        handle = await startCoreHttpServer({
+            host,
+            port,
+            password,
+            staticDir,
         })
+    } catch (error) {
+        console.error(`Failed to start core server: ${(error as Error).message}`)
+        process.exitCode = 1
+        return
+    }
+
+    const url = handle.url || formatAddress(host, port)
+    console.log(`[memo web] Server: ${url}`)
+    console.log(`[memo web] Static: ${staticDir}`)
+    console.log(`[memo web] OpenAPI: ${url}${handle.openApiSpecPath}`)
+
+    if (options.open && !openBrowser(url)) {
+        console.warn(`[memo web] Failed to auto-open browser. Open manually: ${url}`)
+    }
+
+    const shutdown = async () => {
+        if (!handle) return
+        const toClose = handle
+        handle = null
+        await toClose.close()
+    }
+
+    await new Promise<void>((resolveDone) => {
+        const onSignal = (signal: NodeJS.Signals) => {
+            void shutdown()
+                .catch((error) => {
+                    console.error(
+                        `Failed to stop core server on ${signal}: ${(error as Error).message}`,
+                    )
+                    process.exitCode = 1
+                })
+                .finally(() => resolveDone())
+        }
+
+        process.once('SIGINT', () => onSignal('SIGINT'))
+        process.once('SIGTERM', () => onSignal('SIGTERM'))
     })
 }

@@ -13,6 +13,8 @@ export type ApiErrorMeta = ApiSuccessMeta & {
     path?: string
 }
 
+export type OpenApiError = ApiErrorInfo
+
 export type ApiEnvelope<T> =
     | {
           success: true
@@ -24,6 +26,22 @@ export type ApiEnvelope<T> =
           error: ApiErrorInfo
           meta: ApiErrorMeta
       }
+
+export type AuthLoginRequest = {
+    password: string
+}
+
+export type AuthLoginResponse = {
+    accessToken: string
+    expiresIn: number
+}
+
+export type SseEventEnvelope = {
+    event: string
+    data: unknown
+    seq: number
+    ts: string
+}
 
 export type TokenUsageSummary = {
     prompt: number
@@ -147,6 +165,8 @@ export type LiveSessionState = {
     queuedInputs: QueuedInputItem[]
     currentContextTokens?: number
     contextWindow?: number
+    historyFilePath?: string
+    availableToolNames?: string[]
 }
 
 export type WsServerEvent =
@@ -169,6 +189,21 @@ export type WsServerEvent =
               contextWindow: number
               thresholdTokens: number
               usagePercent: number
+          }
+      }
+    | {
+          type: 'context.compact'
+          payload: {
+              turn: number
+              step: number
+              reason: 'auto' | 'manual'
+              status: 'success' | 'failed' | 'skipped'
+              beforeTokens: number
+              afterTokens: number
+              thresholdTokens: number
+              reductionPercent: number
+              summary?: string
+              errorMessage?: string
           }
       }
     | {

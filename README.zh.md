@@ -89,16 +89,17 @@ memo
 | 继续会话   | `memo --prev`                                  | 加载当前目录的最新会话 |
 | Web 控制台 | `memo web --host 127.0.0.1 --port 5494 --open` | 浏览器操作             |
 
+`memo web` 需要通过 `MEMO_SERVER_PASSWORD` 提供共享密码。
+
 ## 🏗️ 架构设计
 
 ```
 memo-code/
 ├── packages/
-│   ├── core/          # 核心逻辑：Session 状态机、Config 处理
+│   ├── core/          # 核心逻辑：Session 状态机、Config 处理、HTTP Server API
 │   ├── tools/         # Tool 路由、MCP Client管理、内置工具实现（exec_command, read_text_file, apply_patch...）
 │   ├── tui/           # 终端运行时：CLI 入口、交互式 TUI
 │   ├── web-ui/        # Web 前端：React 组件
-│   └── web-server/    # Web 后端：会话管理、API 适配器
 └── docs/              # 技术文档
 ```
 
@@ -107,7 +108,7 @@ memo-code/
 - **架构**：清晰的 Core / Tools / TUI 分层，状态机驱动会话管理
 - **测试**：Core + Tools 覆盖率 > 70%，完整的单元 + 集成测试
 - **协议**：原生支持 MCP (Model Context Protocol)，可接入任意 MCP 工具服务器
-- **Token 估算**：基于 tiktoken 的实时上下文监控，支持可配置的自动压缩策略
+- **Token 估算**：基于 AI SDK usage + 本地估算器的实时上下文监控，支持可配置的自动压缩策略
 - **分发**：npm 包预构建 Web 资源，热加载无感知
 
 ## 🔧 内置工具

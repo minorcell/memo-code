@@ -1,136 +1,120 @@
 ---
-title: 'Unified Communication Architecture for Web and Server: All-in WebSocket Design Practice'
-description: 'Extracting WebSocket communication patterns from memo'"'"'s implementation: JSON-RPC frame design, event subscription model, why we chose full-stack WebSocket and its advantages in real scenarios.'
+title: 'Unified Communication Architecture for Web and Server: HTTP API + SSE Design Practice'
+description: 'After the refactor, memo Web uses HTTP APIs for commands and SSE for server push. This post summarizes the event model, client/server implementation, and migration lessons.'
 date: '2026-02-18'
 order: 5
 ---
 
-# Unified Communication Architecture for Web and Server: All-in WebSocket Design Practice
+# Unified Communication Architecture for Web and Server: HTTP API + SSE Design Practice
 
-After finishing the TUI version, building a Web version was the natural next step. But when I actually started working on it, the first question immediately stumped me:
+After finishing the TUI version, building a Web version was the natural next step. The hardest part was still the same:
 
 **How should the communication layer work?**
 
-## Getting Stuck Right Away
+In the latest refactor, memo settled on a very explicit split:
 
-The TUI version doesn'"'"'t have communication problems—all logic runs in the same process, and you can just call functions directly. But the Web version is different: the browser and server are two separate processes that need to communicate over the network.
+- **HTTP API** for request/response operations
+- **SSE stream** for server-initiated events
 
-At first, I didn'"'"'t think much about it: REST API would work. Since I'"'"'ve been doing frontend work for a while, it should be straightforward.
+This combination replaced the previous single-channel WebSocket narrative and now matches the real implementation.
 
-But after listing out all the requirements, things started to feel off:
+## Communication Matrix: Commands vs Stream
 
-- **Streaming output**: The model outputs token by token, and the UI needs to update in real-time
-- **Approval interception**: When executing dangerous operations, the browser needs to popup a confirmation dialog
-- **Status synchronization**: Whether a session is running or idle, the UI needs to know immediately
-- **Request-response**: Creating sessions, sending messages, querying status...
+The scenarios are straightforward once separated by direction:
 
-All these scenarios share one common characteristic: **the server needs to actively push to the browser**.
+- **Client -> Server (commands / queries)**
+    - create session: `POST /api/chat/sessions`
+    - send message: `POST /api/chat/sessions/{id}/messages`
+    - approval decision: `POST /api/chat/sessions/{id}/approval`
+    - read state / history / admin resources: normal HTTP endpoints
 
-With REST, this becomes cumbersome:
+- **Server -> Client (live events)**
+    - subscribe: `GET /api/chat/sessions/{id}/events`
+    - transport: `text/event-stream`
+    - payload: normalized event envelope (`event`, `data`, `seq`, `ts`)
 
-- Streaming output → requires polling or SSE
-- Approval interception → same, polling or checking status then judging
-- Status synchronization → also polling
+## Event Envelope and Lifecycle Events
 
-Three separate mechanisms to maintain. That'"'"'s a lot of overhead.
-
-## WebSocket Is a Ready-Made Answer
-
-After thinking it through, WebSocket is exactly designed for this scenario:
-
-- **Full-duplex**: Server can push actively, browser can send at any time
-- **Low latency**: Connection established once, then all frame transfers
-- **Stateful**: One connection corresponds to one session, semantics are clear
-
-But having the protocol isn'"'"'t enough—the key is how to use it.
-
-## Frame Design: Simplified JSON-RPC
-
-memo uses a JSON-RPC-like frame format—not complicated, just three types:
+SSE frames are sent as named events, while `data` carries a structured envelope:
 
 ```typescript
-// Client sends request
-{ id: "uuid", type: "rpc.request", method: "session.create", params: {...} }
-
-// Server responds
-{ id: "uuid", type: "rpc.response", ok: true, data: {...} }
-
-// Server pushes proactively
-{ type: "event", topic: "assistant.chunk", data: {...}, seq: 1, ts: "..." }
+event: assistant.chunk
+data: {
+  "event": "assistant.chunk",
+  "data": { "turn": 3, "step": 1, "chunk": "hello" },
+  "seq": 42,
+  "ts": "2026-03-02T12:34:56.000Z"
+}
 ```
 
-**RPC calls** handle "request/response": client sends one, server processes and returns one. For example: creating sessions, sending messages, querying status.
+Main events cover the complete agent turn lifecycle:
 
-**Event pushes** handle "server-initiated": subscribe to a topic, then wait for the server to push data to that topic. For example: model started outputting tokens, tool execution completed, approval needed.
-
-These two patterns combined can cover almost all communication scenarios.
-
-## Event Types: Covering the Complete Agent Lifecycle
-
-memo'"'"'s WebSocket pushes these events:
-
+- `session.snapshot`: initial state right after subscription
 - `turn.start`: User sent a message
 - `assistant.chunk`: Model output a token
 - `turn.final`: This turn of conversation ended
 - `session.status`: Session status changed (idle / running / closed)
+- `context.usage` / `context.compact`: context window updates
 - `approval.request`: A dangerous operation needs user confirmation
 - `tool.action`: A tool started running
 - `tool.observation`: Tool finished, returning results
+- `system.message` / `error`: runtime notices and failures
 
-These events strung together represent the complete lifecycle of an Agent from "receiving requirements" to "finishing work".
+## Client Implementation Notes
 
-## Client Implementation: Reconnection, Timeout, Subscription Management
+The current browser implementation is in `packages/web-ui/src/stores/chat-store.ts`, with three practical safeguards:
 
-The browser'"'"'s ws-client (`packages/web-ui/src/api/ws-client.ts`) has several key designs:
+1. **Token-aware connect**
+    - Refresh/access token is prepared before opening stream.
+    - `401` stops reconnect and asks user to login again.
 
-**Auto-reconnection**: Network instability is common. When disconnected, silently reconnect without requiring user manual refresh.
+2. **Reconnect with backoff**
+    - Broken stream schedules reconnect.
+    - Delay grows gradually and is capped to avoid retry storms.
 
-**Request timeout**: Default 20 seconds. Outgoing requests can'"'"'t wait indefinitely—timeout clears the pending state to prevent freezing.
+3. **Incremental SSE parser**
+    - Reads chunks from `ReadableStream`.
+    - Splits frames with `\n\n`.
+    - Accepts both named SSE events and envelope JSON payloads.
 
-**Subscription management**: A topic can have multiple handlers. Unsubscribing returns a small function, which is very convenient to use:
+## Server Implementation Notes
 
-```typescript
-const unsub = wsClient.subscribe('assistant.chunk', (data) => {
-    appendToChat(data.chunk)
-})
-// When done
-unsub()
-```
+On the server side:
 
-**Authentication**: Pass accessToken via URL query, server validates during WebSocket upgrade stage.
+- Route registration in `packages/core/src/server/http_server.ts`
+    - `GET /api/chat/sessions/:id/events` authenticates first
+    - subscribes through `SseHub`
+    - immediately emits `session.snapshot`
 
-## Why All-in
+- SSE runtime in `packages/core/src/server/sse.ts`
+    - sets SSE headers (`text/event-stream`, `keep-alive`, no buffering)
+    - heartbeat comments every 20s (`: keep-alive`)
+    - per-session sequence id (`seq`) for ordered replay/debugging
 
-Simply put, three reasons:
+## Why This Split Works Better Now
 
-**1. Real-time capability.** Streaming output, approval interception, status synchronization—all require "server active push". HTTP can'"'"'t handle this, either polling or SSE, but maintenance cost is high.
+Three reasons:
 
-**2. Unification.** One connection packages all communication: session management, chat, tool calls, approval. No other HTTP APIs. Unified protocol, unified debugging.
+1. **Clear responsibility boundaries**
+    - Commands stay in typed HTTP handlers.
+    - Streaming stays in a single SSE channel.
 
-**3. Low overhead.** Every HTTP request needs TLS handshake + TCP establishment, high latency. WebSocket establishes once, then all frames. In conversational interaction, the experience difference is obvious.
+2. **Operational simplicity**
+    - Easier to inspect with browser devtools/curl.
+    - Fewer custom RPC semantics to maintain.
 
-## Security and Fault Tolerance
+3. **Frontend robustness**
+    - Reconnect, auth handling, and event parsing are explicit in one store.
+    - No hidden coupling to a custom websocket client abstraction.
 
-WebSocket also needs protection:
-
-```typescript
-// Server rate limiting
-const MAX_REQUESTS_PER_MINUTE = 120
-const MAX_REQUEST_BYTES = 256 * 1024
-```
-
-Disconnection should also give clear error codes:
-
-- 4401: Invalid token
-- 4404: Session does not exist
-- 4409: Session was taken over by another client
+The goal is not "never use WebSocket", but to keep the default path minimal and reliable for memo's chat workflow.
 
 ## Summary
 
-memo'"'"'s Web communication layer chose All-in WebSocket, core reason: **real-time capability + unified protocol + low overhead**.
+memo Web now uses **HTTP API + SSE** as the primary communication contract.
 
-One connection, RPC for request-response, event subscription for server push. Suitable for Agent applications with strong interactivity and high real-time requirements.
+- Request/response: regular HTTP routes
+- Real-time updates: session event stream
+- Shared model: typed event envelopes across server and client
 
-If it'"'"'s pure request-response with low real-time requirements, REST is also a good choice—simplicity is king.
-
-(EOF)
+This architecture aligns with the refactored core server and removes stale dependencies on deleted websocket client code.

@@ -1,63 +1,145 @@
-import { wsRequest } from '@/api/ws-client'
+import { request } from '@/api/request'
 import type {
     ChatFileSuggestionResponse,
     ChatRuntimeListResponse,
     ChatSessionSnapshot,
     ChatProviderRecord,
     LiveSessionState,
+    SessionDetail,
     SessionInputResult,
 } from '@/api/types'
 
+function toChatProvider(item: {
+    name: string
+    model: string
+    isCurrent?: boolean
+}): ChatProviderRecord {
+    return {
+        name: item.name,
+        model: item.model,
+        isCurrent: item.isCurrent === true,
+    }
+}
+
+function toSnapshotTurns(detail: SessionDetail | null | undefined): ChatSessionSnapshot['turns'] {
+    if (!detail?.turns || !Array.isArray(detail.turns)) return []
+    return detail.turns.map((turn) => ({
+        turn: turn.turn,
+        input: turn.input ?? '',
+        assistant: turn.finalText ?? '',
+        status: turn.status ?? 'ok',
+        errorMessage: turn.errorMessage,
+        steps: turn.steps,
+    }))
+}
+
 export function createLiveSession(params?: {
     providerName?: string
-    workspaceId?: string
     cwd?: string
     toolPermissionMode?: 'none' | 'once' | 'full'
     activeMcpServers?: string[]
 }) {
-    return wsRequest<LiveSessionState>('chat.session.create', params ?? {})
+    return request<LiveSessionState>({
+        method: 'POST',
+        url: '/api/chat/sessions',
+        data: params ?? {},
+    })
 }
 
-export function listChatProviders() {
-    return wsRequest<ChatProviderRecord[]>('chat.providers.list', {})
+export async function listChatProviders(): Promise<ChatProviderRecord[]> {
+    const response = await request<{
+        items: Array<{ name: string; model: string; isCurrent?: boolean }>
+    }>({
+        method: 'GET',
+        url: '/api/chat/sessions/providers',
+    })
+
+    return response.items.map(toChatProvider)
 }
 
-export function listChatRuntimes(params?: { workspaceId?: string }) {
-    return wsRequest<ChatRuntimeListResponse>('chat.runtimes.list', params ?? {})
+export function listChatRuntimes(params?: { workspaceCwd?: string }) {
+    return request<ChatRuntimeListResponse>({
+        method: 'GET',
+        url: '/api/chat/runtimes',
+        params: params?.workspaceCwd ? { workspaceCwd: params.workspaceCwd } : undefined,
+    })
 }
 
 export function getLiveSession(sessionId: string) {
-    return wsRequest<LiveSessionState>('chat.session.state', { sessionId })
+    return request<LiveSessionState>({
+        method: 'GET',
+        url: `/api/chat/sessions/${encodeURIComponent(sessionId)}`,
+    })
 }
 
-export function attachLiveSession(sessionId: string) {
-    return wsRequest<ChatSessionSnapshot>('chat.session.attach', { sessionId })
+export async function attachLiveSession(sessionId: string): Promise<ChatSessionSnapshot> {
+    const state = await getLiveSession(sessionId)
+
+    let detail: SessionDetail | null = null
+    try {
+        detail = await request<SessionDetail>({
+            method: 'GET',
+            url: `/api/sessions/${encodeURIComponent(sessionId)}`,
+        })
+    } catch (error) {
+        const message = error instanceof Error ? error.message.toLowerCase() : ''
+        if (!message.includes('session not found')) {
+            throw error
+        }
+    }
+
+    return {
+        state,
+        turns: toSnapshotTurns(detail),
+    }
 }
 
 export function submitSessionInput(sessionId: string, input: string) {
-    return wsRequest<SessionInputResult>(
-        'chat.input.submit',
-        { sessionId, input },
-        { timeoutMs: null },
-    )
+    return request<SessionInputResult>({
+        method: 'POST',
+        url: `/api/chat/sessions/${encodeURIComponent(sessionId)}/input`,
+        data: { input },
+        timeout: 0,
+    })
 }
 
 export function removeQueuedInput(sessionId: string, queueId: string) {
-    return wsRequest<{ removed: boolean }>('chat.queue.remove', { sessionId, queueId })
+    return request<{ removed: boolean; queued: number }>({
+        method: 'DELETE',
+        url: `/api/chat/sessions/${encodeURIComponent(sessionId)}/queue/${encodeURIComponent(queueId)}`,
+    })
 }
 
 export function sendQueuedInputNow(sessionId: string) {
-    return wsRequest<{ triggered: boolean }>('chat.queue.send_now', { sessionId })
+    return request<{ triggered: boolean; queued: number }>({
+        method: 'POST',
+        url: `/api/chat/sessions/${encodeURIComponent(sessionId)}/queue/send_now`,
+        data: {},
+    })
 }
 
 export function cancelSessionTurn(sessionId: string) {
-    return wsRequest<{ cancelled: boolean }>('chat.turn.cancel', { sessionId })
+    return request<{ cancelled: boolean }>({
+        method: 'POST',
+        url: `/api/chat/sessions/${encodeURIComponent(sessionId)}/cancel`,
+        data: {},
+    })
 }
 
-export function compactSession(sessionId: string) {
-    return wsRequest<{ compacted: boolean; keptMessages: number }>('chat.session.compact', {
-        sessionId,
+export async function compactSession(sessionId: string) {
+    const response = await request<{
+        status: string
+        keptMessages: number
+    }>({
+        method: 'POST',
+        url: `/api/chat/sessions/${encodeURIComponent(sessionId)}/compact`,
+        data: {},
     })
+
+    return {
+        compacted: response.status === 'success',
+        keptMessages: response.keptMessages,
+    }
 }
 
 export function approveSessionAction(
@@ -65,18 +147,25 @@ export function approveSessionAction(
     fingerprint: string,
     decision: 'once' | 'session' | 'deny',
 ) {
-    return wsRequest<{ recorded: boolean }>('chat.approval.respond', {
-        sessionId,
-        fingerprint,
-        decision,
+    return request<{ recorded: boolean }>({
+        method: 'POST',
+        url: `/api/chat/sessions/${encodeURIComponent(sessionId)}/approval`,
+        data: {
+            fingerprint,
+            decision,
+        },
     })
 }
 
 export function suggestChatFiles(params: {
     query: string
     sessionId?: string
-    workspaceId?: string
+    workspaceCwd?: string
     limit?: number
 }) {
-    return wsRequest<ChatFileSuggestionResponse>('chat.files.suggest', params)
+    return request<ChatFileSuggestionResponse>({
+        method: 'POST',
+        url: '/api/chat/files/suggest',
+        data: params,
+    })
 }

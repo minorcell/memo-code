@@ -1,6 +1,7 @@
 /** @file Session default dependency assembly: toolset, LLM, history sinks, tokenizer, etc. */
 import { NATIVE_TOOLS } from '@memo/tools'
-import OpenAI from 'openai'
+import { createOpenAI } from '@ai-sdk/openai'
+import { generateText, jsonSchema, tool, type ModelMessage } from 'ai'
 import { createTokenCounter } from '@memo/core/utils/tokenizer'
 import {
     buildSessionPath,
@@ -9,7 +10,6 @@ import {
     selectProvider,
 } from '@memo/core/config/config'
 import { JsonlHistorySink } from '@memo/core/runtime/history'
-import { buildChatCompletionRequest, resolveModelProfile } from '@memo/core/runtime/model_profile'
 import { loadSystemPrompt as defaultLoadPrompt } from '@memo/core/runtime/prompt'
 import { ToolRouter } from '@memo/tools/router'
 import type {
@@ -20,6 +20,7 @@ import type {
     HistorySink,
     TokenCounter,
     ToolRegistry,
+    ToolDefinition,
 } from '@memo/core/types'
 import type { MCPServerConfig } from '@memo/core/config/config'
 
@@ -52,52 +53,112 @@ export function parseToolArguments(
     }
 }
 
-function toOpenAIMessage(message: ChatMessage): OpenAI.Chat.Completions.ChatCompletionMessageParam {
+function toModelMessage(message: ChatMessage): ModelMessage {
     if (message.role === 'assistant') {
-        const assistantMessage: OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam & {
-            reasoning_content?: string
-        } = {
-            role: 'assistant',
-            content: message.content,
-            tool_calls: message.tool_calls?.map((toolCall) => ({
-                id: toolCall.id,
-                type: toolCall.type,
-                function: {
-                    name: toolCall.function.name,
-                    arguments: toolCall.function.arguments,
-                },
-            })),
+        const hasReasoning =
+            typeof message.reasoning_content === 'string' &&
+            message.reasoning_content.trim().length > 0
+        const hasToolCalls = Array.isArray(message.tool_calls) && message.tool_calls.length > 0
+        if (!hasReasoning && !hasToolCalls) {
+            return { role: 'assistant', content: message.content }
         }
-        if (message.reasoning_content) {
-            assistantMessage.reasoning_content = message.reasoning_content
+
+        const content: Array<
+            | { type: 'text'; text: string }
+            | { type: 'reasoning'; text: string }
+            | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+        > = []
+        if (message.content) {
+            content.push({ type: 'text', text: message.content })
         }
-        return assistantMessage as OpenAI.Chat.Completions.ChatCompletionMessageParam
+        if (hasReasoning && message.reasoning_content) {
+            content.push({ type: 'reasoning', text: message.reasoning_content })
+        }
+        if (message.tool_calls) {
+            for (const toolCall of message.tool_calls) {
+                const parsed = parseToolArguments(toolCall.function.arguments)
+                content.push({
+                    type: 'tool-call',
+                    toolCallId: toolCall.id,
+                    toolName: toolCall.function.name,
+                    input: parsed.ok ? parsed.data : { raw: parsed.raw },
+                })
+            }
+        }
+
+        return { role: 'assistant', content }
     }
+
     if (message.role === 'tool') {
         return {
             role: 'tool',
-            content: message.content,
-            tool_call_id: message.tool_call_id,
+            content: [
+                {
+                    type: 'tool-result',
+                    toolCallId: message.tool_call_id,
+                    toolName: message.name?.trim() || 'unknown_tool',
+                    output: {
+                        type: 'text',
+                        value: message.content,
+                    },
+                },
+            ],
         }
     }
-    return {
-        role: message.role,
-        content: message.content,
+
+    return { role: message.role, content: message.content }
+}
+
+function resolveProviderApiKey(envApiKeyName: string): string {
+    const value =
+        process.env[envApiKeyName] ?? process.env.OPENAI_API_KEY ?? process.env.DEEPSEEK_API_KEY
+
+    if (!value) {
+        throw new Error(`Missing env var ${envApiKeyName} (or OPENAI_API_KEY/DEEPSEEK_API_KEY)`)
     }
+    return value
 }
 
-function extractReasoningContent(
-    message: OpenAI.Chat.Completions.ChatCompletionMessage | undefined,
-): string | undefined {
-    const raw = (message as { reasoning_content?: unknown } | undefined)?.reasoning_content
-    if (typeof raw !== 'string') return undefined
-    const trimmed = raw.trim()
-    return trimmed.length > 0 ? trimmed : undefined
+function resolveProviderModelId(model: string): string {
+    return model.trim()
 }
 
-function isChatCompletionResponse(value: unknown): value is OpenAI.Chat.Completions.ChatCompletion {
-    if (!value || typeof value !== 'object') return false
-    return Array.isArray((value as { choices?: unknown }).choices)
+function toGenerateTextTools(toolDefinitions: ToolDefinition[]) {
+    if (toolDefinitions.length === 0) return undefined
+
+    const entries = toolDefinitions.map((definition) => {
+        const inputSchema =
+            definition.input_schema &&
+            typeof definition.input_schema === 'object' &&
+            !Array.isArray(definition.input_schema)
+                ? definition.input_schema
+                : { type: 'object' }
+
+        return [
+            definition.name,
+            tool({
+                description: definition.description,
+                inputSchema: jsonSchema(inputSchema as Record<string, unknown>),
+            }),
+        ] as const
+    })
+    return Object.fromEntries(entries)
+}
+
+function normalizeReasoning(text: string | undefined): string | undefined {
+    const trimmed = text?.trim()
+    return trimmed ? trimmed : undefined
+}
+
+function mapFinishReasonToStopReason(
+    finishReason: 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other',
+    toolCallCount: number,
+): 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' {
+    if (toolCallCount > 0 || finishReason === 'tool-calls') {
+        return 'tool_use'
+    }
+    if (finishReason === 'length') return 'max_tokens'
+    return 'end_turn'
 }
 
 /**
@@ -189,101 +250,54 @@ export async function withDefaultDeps(
             deps.callLLM ??
             (async (messages, _onChunk, callOptions) => {
                 const provider = selectProvider(config, options.providerName)
-                const apiKey =
-                    process.env[provider.env_api_key] ??
-                    process.env.OPENAI_API_KEY ??
-                    process.env.DEEPSEEK_API_KEY
-                if (!apiKey) {
-                    throw new Error(
-                        `Missing env var ${provider.env_api_key} (or OPENAI_API_KEY/DEEPSEEK_API_KEY)`,
-                    )
-                }
-                const client = new OpenAI({
+                const apiKey = resolveProviderApiKey(provider.env_api_key)
+                const baseURL = provider.base_url?.trim() || undefined
+                const openaiProvider = createOpenAI({
                     apiKey,
-                    baseURL: provider.base_url,
+                    ...(baseURL ? { baseURL } : {}),
                 })
-                const openAIMessages = messages.map(toOpenAIMessage)
-                const { profile: modelProfile } = resolveModelProfile(
-                    provider,
-                    config.model_profiles,
-                )
-
+                const modelId = resolveProviderModelId(provider.model)
+                const model = openaiProvider.chat(modelId)
+                const modelMessages = messages.map(toModelMessage)
                 const effectiveToolDefinitions = callOptions?.tools ?? toolDefinitions
-                const request = buildChatCompletionRequest({
-                    model: provider.model,
-                    messages: openAIMessages,
-                    toolDefinitions: effectiveToolDefinitions,
-                    profile: modelProfile,
+                const generated = await generateText({
+                    model,
+                    messages: modelMessages,
+                    tools: toGenerateTextTools(effectiveToolDefinitions),
+                    abortSignal: callOptions?.signal,
                 })
-
-                const data = await client.chat.completions.create(request, {
-                    signal: callOptions?.signal,
-                })
-                if (!isChatCompletionResponse(data)) {
-                    throw new Error('Streaming response is not supported in core callLLM')
+                const content: Array<
+                    | { type: 'text'; text: string }
+                    | { type: 'tool_use'; id: string; name: string; input: unknown }
+                > = []
+                if (generated.text) {
+                    _onChunk?.(generated.text)
+                    content.push({ type: 'text', text: generated.text })
+                }
+                for (const toolCall of generated.toolCalls) {
+                    content.push({
+                        type: 'tool_use',
+                        id: toolCall.toolCallId,
+                        name: toolCall.toolName,
+                        input: toolCall.input,
+                    })
                 }
 
-                const message = data.choices?.[0]?.message
-                const reasoningContent = extractReasoningContent(message)
-
-                // 检查是否有工具调用
-                if (message?.tool_calls && message.tool_calls.length > 0) {
-                    const content: Array<
-                        | { type: 'text'; text: string }
-                        | { type: 'tool_use'; id: string; name: string; input: unknown }
-                    > = []
-
-                    // 添加文本内容（如果有）
-                    if (message.content) {
-                        content.push({ type: 'text', text: message.content })
-                    }
-
-                    // 添加工具调用
-                    for (const toolCall of message.tool_calls) {
-                        if (toolCall.type === 'function') {
-                            const parsedArgs = parseToolArguments(toolCall.function.arguments)
-                            if (parsedArgs.ok) {
-                                content.push({
-                                    type: 'tool_use',
-                                    id: toolCall.id,
-                                    name: toolCall.function.name,
-                                    input: parsedArgs.data,
-                                })
-                            } else {
-                                content.push({
-                                    type: 'text',
-                                    text: `[tool_use parse error] ${parsedArgs.error}; raw: ${parsedArgs.raw}`,
-                                })
-                            }
-                        }
-                    }
-
-                    const hasToolUse = content.some((c) => c.type === 'tool_use')
-                    return {
-                        content,
-                        reasoning_content: reasoningContent,
-                        stop_reason: hasToolUse ? 'tool_use' : 'end_turn',
-                        usage: {
-                            prompt: data.usage?.prompt_tokens ?? undefined,
-                            completion: data.usage?.completion_tokens ?? undefined,
-                            total: data.usage?.total_tokens ?? undefined,
-                        },
-                    }
+                if (content.length === 0) {
+                    throw new Error('AI SDK returned empty content')
                 }
 
-                // 普通文本响应
-                const content = message?.content
-                if (typeof content !== 'string') {
-                    throw new Error('OpenAI-compatible API returned empty content')
-                }
                 return {
-                    content: [{ type: 'text', text: content }],
-                    reasoning_content: reasoningContent,
-                    stop_reason: 'end_turn',
+                    content,
+                    reasoning_content: normalizeReasoning(generated.reasoningText),
+                    stop_reason: mapFinishReasonToStopReason(
+                        generated.finishReason,
+                        generated.toolCalls.length,
+                    ),
                     usage: {
-                        prompt: data.usage?.prompt_tokens ?? undefined,
-                        completion: data.usage?.completion_tokens ?? undefined,
-                        total: data.usage?.total_tokens ?? undefined,
+                        prompt: generated.usage.inputTokens ?? undefined,
+                        completion: generated.usage.outputTokens ?? undefined,
+                        total: generated.usage.totalTokens ?? undefined,
                     },
                 }
             }),

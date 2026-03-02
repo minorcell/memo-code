@@ -1,26 +1,20 @@
 import { request } from '@/api/request'
 import type { AuthTokenPair } from '@/api/types'
 
-export function login(params: { username: string; password: string }) {
+export function login(params: { password: string }) {
     return request<AuthTokenPair>({
         method: 'POST',
         url: '/api/auth/login',
-        data: params,
+        data: {
+            password: params.password,
+        },
     })
 }
 
-export function refreshToken(params: { refreshToken: string }) {
-    return request<AuthTokenPair>({
-        method: 'POST',
-        url: '/api/auth/refresh',
-        data: params,
-    })
+export async function refreshToken(): Promise<AuthTokenPair> {
+    throw new Error('Token refresh is not supported by core HTTP server')
 }
 
-export function logout(params: { refreshToken: string }) {
-    return request<{ loggedOut: boolean }>({
-        method: 'POST',
-        url: '/api/auth/logout',
-        data: params,
-    })
+export async function logout(): Promise<{ loggedOut: boolean }> {
+    return { loggedOut: true }
 }

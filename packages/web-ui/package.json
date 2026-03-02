@@ -16,7 +16,6 @@
         "@streamdown/cjk": "^1.0.2",
         "@streamdown/code": "^1.0.2",
         "@streamdown/math": "^1.0.2",
-        "@streamdown/mermaid": "^1.0.2",
         "@tailwindcss/vite": "^4.1.18",
         "axios": "^1.13.5",
         "class-variance-authority": "^0.7.1",

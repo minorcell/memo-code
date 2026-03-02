@@ -5,7 +5,6 @@ import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { render } from 'ink'
 import {
-    createAgentSession,
     loadMemoConfig,
     resolveContextWindowForProvider,
     writeMemoConfig,
@@ -19,6 +18,7 @@ import {
 import { App } from './App'
 import { findLocalPackageInfoSync } from './version'
 import { runMcpCommand } from './mcp'
+import { createHttpAgentSession } from './http/http_agent_session'
 import { parseHistoryLog, type ParsedHistoryLog } from './controllers/history_parser'
 import { loadSessionHistoryEntries } from './controllers/session_history'
 import { parseArgs, type ParsedArgs } from './cli_args'
@@ -99,8 +99,18 @@ async function loadPreviousSession(
     return parseHistoryLog(raw)
 }
 
-function restoreHistoryMessages(session: { history: ChatMessage[] }, messages: ChatMessage[]) {
+async function restoreHistoryMessages(
+    session: {
+        history: ChatMessage[]
+        restoreHistory?: (messages: ChatMessage[]) => Promise<void>
+    },
+    messages: ChatMessage[],
+) {
     if (!messages.length) return
+    if (typeof session.restoreHistory === 'function') {
+        await session.restoreHistory(messages)
+        return
+    }
     const systemMessage = session.history[0]
     if (!systemMessage) return
     session.history.splice(0, session.history.length, systemMessage, ...messages)
@@ -158,9 +168,14 @@ async function runPlainMode(parsed: ParsedArgs) {
         },
     }
 
-    const session = await createAgentSession(deps, sessionOptions)
+    const session = await createHttpAgentSession(deps, {
+        ...sessionOptions,
+        providerName: provider.name,
+        cwd: process.cwd(),
+        toolPermissionMode: parsed.options.dangerous ? 'full' : 'once',
+    })
     if (previousSession) {
-        restoreHistoryMessages(session, previousSession.messages)
+        await restoreHistoryMessages(session, previousSession.messages)
         console.log('[session] Continued from previous session context.')
     }
 

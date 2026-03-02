@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readdir, readFile, stat, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type {
     SessionDetail,
@@ -249,6 +249,22 @@ export class HistoryIndex {
     async getAllSummaries(): Promise<SessionListItem[]> {
         await this.refresh()
         return Array.from(this.cache.values()).map((entry) => entry.summary)
+    }
+
+    async removeSession(sessionId: string): Promise<{ deleted: boolean }> {
+        await this.refresh()
+        const path = this.sessionIdToPath.get(sessionId)
+        if (!path) return { deleted: false }
+
+        try {
+            await unlink(path)
+        } catch {
+            // Best-effort: still drop stale cache state if file is already gone.
+        }
+
+        this.sessionIdToPath.delete(sessionId)
+        this.cache.delete(path)
+        return { deleted: true }
     }
 
     private async refreshInternal(): Promise<void> {

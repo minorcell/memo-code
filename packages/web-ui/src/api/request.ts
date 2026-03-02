@@ -15,16 +15,10 @@ type RetryConfig = InternalAxiosRequestConfig & {
 }
 
 let tokenState: TokenState | null = null
-let refreshingPromise: Promise<TokenState | null> | null = null
 
 const baseURL = (import.meta.env?.VITE_SERVER_BASE_URL as string | undefined) ?? undefined
 
 const httpClient: AxiosInstance = axios.create({
-    baseURL,
-    timeout: DEFAULT_TIMEOUT,
-})
-
-const refreshClient: AxiosInstance = axios.create({
     baseURL,
     timeout: DEFAULT_TIMEOUT,
 })
@@ -65,47 +59,6 @@ function parseApiError(error: AxiosError): Error {
     return new Error('Request failed')
 }
 
-function normalizeTokens(value: Partial<AuthTokenPair> | Partial<TokenState>): TokenState | null {
-    if (typeof value.accessToken !== 'string' || typeof value.refreshToken !== 'string') {
-        return null
-    }
-
-    const accessToken = value.accessToken.trim()
-    const refreshToken = value.refreshToken.trim()
-
-    if (!accessToken || !refreshToken) return null
-
-    const input = value as Partial<AuthTokenPair> & Partial<TokenState>
-    const now = Date.now()
-
-    const accessTokenExpiresAt =
-        typeof input.accessTokenExpiresAt === 'number' &&
-        Number.isFinite(input.accessTokenExpiresAt)
-            ? input.accessTokenExpiresAt
-            : typeof input.accessTokenExpiresIn === 'number' &&
-                Number.isFinite(input.accessTokenExpiresIn) &&
-                input.accessTokenExpiresIn > 0
-              ? now + Math.floor(input.accessTokenExpiresIn * 1000)
-              : parseJwtExpiresAt(accessToken)
-
-    const refreshTokenExpiresAt =
-        typeof input.refreshTokenExpiresAt === 'number' &&
-        Number.isFinite(input.refreshTokenExpiresAt)
-            ? input.refreshTokenExpiresAt
-            : typeof input.refreshTokenExpiresIn === 'number' &&
-                Number.isFinite(input.refreshTokenExpiresIn) &&
-                input.refreshTokenExpiresIn > 0
-              ? now + Math.floor(input.refreshTokenExpiresIn * 1000)
-              : parseJwtExpiresAt(refreshToken)
-
-    return {
-        accessToken,
-        refreshToken,
-        ...(typeof accessTokenExpiresAt === 'number' ? { accessTokenExpiresAt } : {}),
-        ...(typeof refreshTokenExpiresAt === 'number' ? { refreshTokenExpiresAt } : {}),
-    }
-}
-
 function parseJwtExpiresAt(token: string): number | undefined {
     const parts = token.split('.')
     if (parts.length < 2) return undefined
@@ -128,14 +81,40 @@ function base64UrlDecode(raw: string): string {
     return atob(padded)
 }
 
-function isAccessTokenNearExpiry(
-    tokens: TokenState | null,
-    bufferMs = ACCESS_TOKEN_REFRESH_BUFFER_MS,
-) {
+function normalizeTokens(value: Partial<AuthTokenPair> | Partial<TokenState>): TokenState | null {
+    if (typeof value.accessToken !== 'string') {
+        return null
+    }
+
+    const accessToken = value.accessToken.trim()
+    if (!accessToken) return null
+
+    const expiresIn =
+        typeof (value as Partial<AuthTokenPair>).expiresIn === 'number' &&
+        Number.isFinite((value as Partial<AuthTokenPair>).expiresIn)
+            ? Math.max(0, Math.floor((value as Partial<AuthTokenPair>).expiresIn as number))
+            : undefined
+
+    const accessTokenExpiresAt =
+        'accessTokenExpiresAt' in value &&
+        typeof value.accessTokenExpiresAt === 'number' &&
+        Number.isFinite(value.accessTokenExpiresAt)
+            ? value.accessTokenExpiresAt
+            : typeof expiresIn === 'number'
+              ? Date.now() + expiresIn * 1000
+              : parseJwtExpiresAt(accessToken)
+
+    return {
+        accessToken,
+        ...(typeof accessTokenExpiresAt === 'number' ? { accessTokenExpiresAt } : {}),
+    }
+}
+
+function isAccessTokenNearExpiry(tokens: TokenState | null): boolean {
     if (!tokens?.accessToken) return false
     const expiresAt = tokens.accessTokenExpiresAt ?? parseJwtExpiresAt(tokens.accessToken)
     if (typeof expiresAt !== 'number') return false
-    return Date.now() + bufferMs >= expiresAt
+    return Date.now() + ACCESS_TOKEN_REFRESH_BUFFER_MS >= expiresAt
 }
 
 export function getAuthTokens(): TokenState | null {
@@ -165,41 +144,9 @@ export function clearAuthTokens(): void {
     setAuthTokens(null)
 }
 
-async function refreshTokens(): Promise<TokenState | null> {
-    if (refreshingPromise) return refreshingPromise
-
-    const current = getAuthTokens()
-    if (!current?.refreshToken) return null
-
-    refreshingPromise = (async () => {
-        try {
-            const response = await refreshClient.post<ApiEnvelope<AuthTokenPair>>(
-                '/api/auth/refresh',
-                {
-                    refreshToken: current.refreshToken,
-                },
-            )
-            const payload = unwrapEnvelope<AuthTokenPair>(response.data)
-            const tokens = normalizeTokens(payload)
-            if (!tokens) {
-                clearAuthTokens()
-                return null
-            }
-            setAuthTokens(tokens)
-            return tokens
-        } catch {
-            clearAuthTokens()
-            return null
-        } finally {
-            refreshingPromise = null
-        }
-    })()
-
-    return refreshingPromise
-}
-
 export async function refreshAuthTokens(): Promise<TokenState | null> {
-    return refreshTokens()
+    // Core HTTP server does not provide refresh tokens.
+    return null
 }
 
 export async function ensureValidAccessToken(): Promise<TokenState | null> {
@@ -207,17 +154,19 @@ export async function ensureValidAccessToken(): Promise<TokenState | null> {
     if (!current?.accessToken) return null
 
     if (isAccessTokenNearExpiry(current)) {
-        const refreshed = await refreshTokens()
-        if (refreshed) return refreshed
+        // Without refresh tokens we can only rely on re-login once the token expires.
+        const expiresAt = current.accessTokenExpiresAt ?? parseJwtExpiresAt(current.accessToken)
+        if (typeof expiresAt === 'number' && Date.now() >= expiresAt) {
+            clearAuthTokens()
+            return null
+        }
     }
 
-    return getAuthTokens()
+    return current
 }
 
 httpClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-    const isRefreshRequest =
-        typeof config.url === 'string' && config.url.includes('/api/auth/refresh')
-    const tokens = isRefreshRequest ? getAuthTokens() : await ensureValidAccessToken()
+    const tokens = await ensureValidAccessToken()
     if (tokens?.accessToken) {
         config.headers = config.headers ?? {}
         config.headers.Authorization = `Bearer ${tokens.accessToken}`
@@ -230,16 +179,10 @@ httpClient.interceptors.response.use(
     async (error: AxiosError) => {
         const status = error.response?.status
         const config = error.config as RetryConfig | undefined
-        const isRefreshRequest = config?.url?.includes('/api/auth/refresh')
 
-        if (status === 401 && config && !config.__retried && !isRefreshRequest) {
+        if (status === 401 && config && !config.__retried) {
             config.__retried = true
-            const refreshed = await refreshTokens()
-            if (refreshed?.accessToken) {
-                config.headers = config.headers ?? {}
-                config.headers.Authorization = `Bearer ${refreshed.accessToken}`
-                return httpClient.request(config)
-            }
+            clearAuthTokens()
         }
 
         return Promise.reject(parseApiError(error))

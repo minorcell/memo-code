@@ -24,7 +24,6 @@ export function LoginPage() {
     const login = useAuthStore((state) => state.login)
     const clearError = useAuthStore((state) => state.clearError)
 
-    const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
 
     useEffect(() => {
@@ -42,7 +41,7 @@ export function LoginPage() {
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         clearError()
-        const ok = await login(username, password)
+        const ok = await login(password)
         if (ok) {
             const state = location.state as RedirectState | null
             const target = state?.from?.pathname || '/chat'
@@ -64,22 +63,11 @@ export function LoginPage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Account Login</CardTitle>
-                        <CardDescription>Use your local server credentials.</CardDescription>
+                        <CardTitle>Password Login</CardTitle>
+                        <CardDescription>Use the shared server password.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="login-username">Username</Label>
-                                <Input
-                                    id="login-username"
-                                    type="text"
-                                    autoComplete="username"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    placeholder="Enter your username"
-                                />
-                            </div>
                             <div className="space-y-1.5">
                                 <Label htmlFor="login-password">Password</Label>
                                 <Input
