@@ -5,7 +5,7 @@ import {
     resolveContextWindowForProvider,
     selectProvider,
 } from '@memo/core/config/config'
-import { HistoryIndex } from '@memo/core/runtime/history_index'
+import { HistoryIndex } from '@memo/core/runtime/history/indexer'
 import { createAgentSession } from '@memo/core/runtime/session'
 import {
     defaultWorkspaceName,

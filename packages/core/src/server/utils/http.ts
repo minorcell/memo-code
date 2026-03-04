@@ -2,8 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { extname, join, resolve } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
 import { CoreAuth, CoreAuthError } from '@memo/core/server/handler/auth'
-import { McpAdminError } from '@memo/core/runtime/mcp_admin'
-import { SkillsAdminError } from '@memo/core/runtime/skills_admin'
+import { McpAdminError } from '@memo/core/runtime/mcp/admin'
+import { SkillsAdminError } from '@memo/core/runtime/skills/admin'
 import type { ApiEnvelope, OpenApiError } from '@memo/core/web/types'
 
 const MAX_JSON_BODY_BYTES = 2 * 1024 * 1024

@@ -96,7 +96,7 @@ await session.close()
 - Default output path: `~/.memo/sessions/-<project_abs_path_flattened>/<YYYY-MM-DDTHH-MM-SS>-<id>.jsonl`, with provider/model/tokenizer/token-usage metadata.
 - For concurrent calls, each tool observation is logged individually, and merged observation is also recorded.
 
-## LLM Adapter (`runtime/defaults.ts`)
+## LLM Adapter (`runtime/session/defaults.ts`)
 
 - `withDefaultDeps` provides OpenAI SDK based invocation (selected by provider/model/base_url/env_api_key).
 - **Automatically generates Tool Use API tool definitions**: `toolRouter.generateToolDefinitions()`.
@@ -200,7 +200,7 @@ if (toolUseBlocks.length > 1) {
 }
 ```
 
-## System Prompt (`runtime/prompt.md`)
+## System Prompt (`runtime/prompt/prompt.md`)
 
 Incorporates Claude Code best practices:
 

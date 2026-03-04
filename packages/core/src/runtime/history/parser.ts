@@ -8,8 +8,8 @@ import type {
     SessionTurnStep,
     TokenUsageSummary,
     ToolUsageSummary,
-} from '../web/types.js'
-import { workspaceIdFromCwd } from './workspace.js'
+} from '../../web/types.js'
+import { workspaceIdFromCwd } from '../workspace/index.js'
 
 type MutableTurnDetail = SessionTurnDetail & {
     byStep: Map<number, SessionTurnStep>

@@ -31,7 +31,7 @@ import {
     removeMcpServer,
     setActiveMcpServers,
     updateMcpServer,
-} from './mcp_admin'
+} from './admin'
 
 type LoadedState = {
     configPath: string

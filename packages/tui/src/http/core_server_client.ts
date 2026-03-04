@@ -1,20 +1,24 @@
-import { randomUUID } from 'node:crypto'
-import {
-    startCoreHttpServer,
-    type ChatMessage,
-    type CoreHttpServerHandle,
-    type LiveSessionState,
-    type SseEventEnvelope,
-    type ToolPermissionMode,
-} from '@memo/core'
+import type {
+    ApiEnvelope,
+    ChatMessage,
+    ConfigSnapshot,
+    FileSuggestion,
+    LiveSessionState,
+    McpServerRecord,
+    ProviderConfig,
+    SessionDetail,
+    SessionListResponse,
+    SseEventEnvelope,
+    ToolPermissionMode,
+    UpdateConfigRequest,
+} from './api_types'
+import { ensureCoreServerProcess } from './core_server_process'
 
-type ApiEnvelope<T> =
-    | { success: true; data: T; meta: { requestId: string; timestamp: string } }
-    | {
-          success: false
-          error: { code: string; message: string; details?: unknown }
-          meta: { requestId: string; timestamp: string; path?: string }
-      }
+type CoreHttpServerHandle = {
+    url: string
+    openApiSpecPath: string
+    close: () => Promise<void>
+}
 
 type CreateSessionRequest = {
     sessionId?: string
@@ -42,25 +46,19 @@ type CompactSessionResult = {
     keptMessages: number
 }
 
-type TurnFinalEvent = {
-    turn: number
-    step?: number
-    finalText: string
-    status: string
-    errorMessage?: string
-    turnUsage?: {
-        prompt: number
-        completion: number
-        total: number
-    }
-    tokenUsage?: {
-        prompt: number
-        completion: number
-        total: number
-    }
-}
-
 type ApprovalDecision = 'once' | 'session' | 'deny'
+
+export type ListSessionsQuery = {
+    page?: number
+    pageSize?: number
+    sortBy?: 'updatedAt' | 'startedAt' | 'project' | 'title'
+    order?: 'asc' | 'desc'
+    project?: string
+    workspaceCwd?: string
+    dateFrom?: string
+    dateTo?: string
+    q?: string
+}
 
 function resolveMessage(error: unknown): string {
     if (error instanceof Error && error.message) return error.message
@@ -79,6 +77,22 @@ function assertSuccessEnvelope<T>(payload: unknown): T {
         throw new Error(message)
     }
     return envelope.data
+}
+
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+        return `${fallback} (${response.status})`
+    }
+    try {
+        const payload = (await response.json()) as ApiEnvelope<unknown>
+        if (payload && typeof payload === 'object' && payload.success === false && payload.error) {
+            return payload.error.message || `${fallback} (${response.status})`
+        }
+    } catch {
+        // Ignore invalid JSON response.
+    }
+    return `${fallback} (${response.status})`
 }
 
 function parseSseFrame(frame: string): SseEventEnvelope | null {
@@ -167,14 +181,26 @@ export class CoreServerClient {
             body: JSON.stringify({ password }),
         })
         if (!response.ok) {
-            throw new Error(`Login failed (${response.status})`)
+            throw new Error(await readErrorMessage(response, 'Login failed'))
         }
         const payload = assertSuccessEnvelope<{ accessToken: string }>(await response.json())
         return new CoreServerClient(baseUrl, payload.accessToken)
     }
 
+    async getConfig(): Promise<ConfigSnapshot> {
+        return this.getJson('/api/config')
+    }
+
+    async patchConfig(input: UpdateConfigRequest): Promise<ConfigSnapshot> {
+        return this.patchJson('/api/config', input)
+    }
+
+    async listProviders(): Promise<{ items: ProviderConfig[] }> {
+        return this.getJson('/api/chat/sessions/providers')
+    }
+
     async createSession(input: CreateSessionRequest): Promise<LiveSessionState> {
-        return this.postJson<LiveSessionState>('/api/chat/sessions', input)
+        return this.postJson('/api/chat/sessions', input)
     }
 
     async restoreHistory(
@@ -219,6 +245,65 @@ export class CoreServerClient {
         return this.postJson(`/api/chat/sessions/${encodeURIComponent(sessionId)}/compact`, {})
     }
 
+    async suggestFiles(input: {
+        query: string
+        sessionId?: string
+        workspaceCwd?: string
+        limit?: number
+        maxDepth?: number
+        maxEntries?: number
+        respectGitIgnore?: boolean
+        ignoreGlobs?: string[]
+    }): Promise<{ items: FileSuggestion[] }> {
+        return this.postJson('/api/chat/files/suggest', input)
+    }
+
+    async listSessions(query: ListSessionsQuery = {}): Promise<SessionListResponse> {
+        const searchParams = new URLSearchParams()
+        for (const [key, value] of Object.entries(query)) {
+            if (value === undefined || value === null || value === '') continue
+            searchParams.set(key, String(value))
+        }
+        const suffix = searchParams.size > 0 ? `?${searchParams.toString()}` : ''
+        return this.getJson(`/api/sessions${suffix}`)
+    }
+
+    async getSessionDetail(sessionId: string): Promise<SessionDetail> {
+        return this.getJson(`/api/sessions/${encodeURIComponent(sessionId)}`)
+    }
+
+    async listMcpServers(): Promise<{ items: McpServerRecord[] }> {
+        return this.getJson('/api/mcp/servers')
+    }
+
+    async getMcpServer(name: string): Promise<McpServerRecord> {
+        return this.getJson(`/api/mcp/servers/${encodeURIComponent(name)}`)
+    }
+
+    async createMcpServer(name: string, config: unknown): Promise<{ created: true }> {
+        return this.postJson('/api/mcp/servers', { name, config })
+    }
+
+    async updateMcpServer(name: string, config: unknown): Promise<{ updated: true }> {
+        return this.putJson(`/api/mcp/servers/${encodeURIComponent(name)}`, { config })
+    }
+
+    async removeMcpServer(name: string): Promise<{ deleted: true }> {
+        return this.deleteJson(`/api/mcp/servers/${encodeURIComponent(name)}`)
+    }
+
+    async loginMcpServer(name: string, scopes?: string[]): Promise<{ loggedIn: true }> {
+        return this.postJson(`/api/mcp/servers/${encodeURIComponent(name)}/login`, { scopes })
+    }
+
+    async logoutMcpServer(name: string): Promise<{ loggedOut: true }> {
+        return this.postJson(`/api/mcp/servers/${encodeURIComponent(name)}/logout`, {})
+    }
+
+    async setActiveMcpServers(names: string[]): Promise<{ active: string[] }> {
+        return this.postJson('/api/mcp/active', { names })
+    }
+
     subscribeSessionEvents(
         sessionId: string,
         onEvent: (event: SseEventEnvelope) => Promise<void> | void,
@@ -234,7 +319,7 @@ export class CoreServerClient {
                 },
             )
             if (!response.ok) {
-                throw new Error(`SSE subscribe failed (${response.status})`)
+                throw new Error(await readErrorMessage(response, 'SSE subscribe failed'))
             }
             if (!response.body) {
                 throw new Error('SSE stream body is empty')
@@ -261,9 +346,39 @@ export class CoreServerClient {
             body: JSON.stringify(body),
         })
         if (!response.ok) {
-            throw new Error(`${path} failed (${response.status})`)
+            throw new Error(await readErrorMessage(response, `${path} failed`))
         }
-        return assertSuccessEnvelope<T>(await response.json())
+        return assertSuccessEnvelope(await response.json())
+    }
+
+    private async putJson<T>(path: string, body: unknown): Promise<T> {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+            method: 'PUT',
+            headers: {
+                ...this.authHeaders(),
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        })
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, `${path} failed`))
+        }
+        return assertSuccessEnvelope(await response.json())
+    }
+
+    private async patchJson<T>(path: string, body: unknown): Promise<T> {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+            method: 'PATCH',
+            headers: {
+                ...this.authHeaders(),
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        })
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, `${path} failed`))
+        }
+        return assertSuccessEnvelope(await response.json())
     }
 
     private async getJson<T>(path: string): Promise<T> {
@@ -272,9 +387,9 @@ export class CoreServerClient {
             headers: this.authHeaders(),
         })
         if (!response.ok) {
-            throw new Error(`${path} failed (${response.status})`)
+            throw new Error(await readErrorMessage(response, `${path} failed`))
         }
-        return assertSuccessEnvelope<T>(await response.json())
+        return assertSuccessEnvelope(await response.json())
     }
 
     private async deleteJson<T>(path: string): Promise<T> {
@@ -283,9 +398,9 @@ export class CoreServerClient {
             headers: this.authHeaders(),
         })
         if (!response.ok) {
-            throw new Error(`${path} failed (${response.status})`)
+            throw new Error(await readErrorMessage(response, `${path} failed`))
         }
-        return assertSuccessEnvelope<T>(await response.json())
+        return assertSuccessEnvelope(await response.json())
     }
 
     private authHeaders(): Record<string, string> {
@@ -299,32 +414,41 @@ export async function createEmbeddedCoreServerClient(options?: {
     host?: string
     memoHome?: string
     password?: string
+    preferredPort?: number
+    staticDir?: string
+    requireStaticDir?: boolean
 }): Promise<{
     client: CoreServerClient
     server: CoreHttpServerHandle
     close: () => Promise<void>
 }> {
-    const password = options?.password?.trim() || `memo-${randomUUID()}`
-    const server = await startCoreHttpServer({
-        host: options?.host || '127.0.0.1',
-        port: 0,
-        password,
+    const processInfo = await ensureCoreServerProcess({
+        host: options?.host,
+        preferredPort: options?.preferredPort,
         memoHome: options?.memoHome,
+        staticDir: options?.staticDir,
+        requireStaticDir: options?.requireStaticDir,
     })
 
     try {
-        const client = await CoreServerClient.fromPassword(server.url, password)
+        const client = await CoreServerClient.fromPassword(
+            processInfo.baseUrl,
+            processInfo.password,
+        )
         return {
             client,
-            server,
+            server: {
+                url: processInfo.baseUrl,
+                openApiSpecPath: '/api/openapi.json',
+                close: async () => {
+                    // Shared daemon server is managed by launcher, not per-client lifecycle.
+                },
+            },
             close: async () => {
-                await server.close()
+                // Shared daemon server is managed by launcher, not per-client lifecycle.
             },
         }
     } catch (error) {
-        await server.close()
         throw new Error(`Failed to initialize core server client: ${resolveMessage(error)}`)
     }
 }
-
-export type { TurnFinalEvent }

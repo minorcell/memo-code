@@ -1,7 +1,6 @@
 import type {
     ApiEnvelope as CoreApiEnvelope,
     SseEventEnvelope as CoreSseEventEnvelope,
-    FileSuggestion as CoreFileSuggestion,
     LiveSessionState as CoreLiveSessionState,
     McpServerRecord as CoreMcpServerRecord,
     QueuedInputItem as CoreQueuedInputItem,
@@ -21,7 +20,8 @@ import type {
     WorkspaceDirEntry as CoreWorkspaceDirEntry,
     WorkspaceFsListResult as CoreWorkspaceFsListResult,
     WorkspaceRecord as CoreWorkspaceRecord,
-} from '@memo-code/core'
+    FileSuggestion as CoreFileSuggestion,
+} from '@memo-code/types'
 
 export type ApiMeta = {
     requestId: string

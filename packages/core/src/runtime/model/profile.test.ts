@@ -3,7 +3,7 @@ import {
     buildChatCompletionRequest,
     resolveModelProfile,
     type ModelProfile,
-} from '@memo/core/runtime/model_profile'
+} from '@memo/core/runtime/model/profile'
 import type { ToolDefinition } from '@memo/core/types'
 
 function sampleProfile(overrides: Partial<ModelProfile> = {}): ModelProfile {

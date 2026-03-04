@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, test } from 'vitest'
-import { aggregateToolUsage, HistoryIndex } from './history_index'
+import { aggregateToolUsage, HistoryIndex } from './indexer'
 
 function logFor(sessionId: string, cwd: string, startedAt: string, extras: string[] = []): string {
     const day = startedAt.slice(0, 10)

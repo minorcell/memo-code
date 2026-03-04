@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import { parseToolArguments, filterMcpServersBySelection } from '@memo/core/runtime/defaults'
+import {
+    parseToolArguments,
+    filterMcpServersBySelection,
+} from '@memo/core/runtime/session/defaults'
 
 describe('parseToolArguments', () => {
     test('parses valid JSON string', () => {

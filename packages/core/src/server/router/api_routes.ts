@@ -1,6 +1,17 @@
 import { CoreAuth } from '@memo/core/server/handler/auth'
 import { CoreSessionManager } from '@memo/core/server/handler/session_manager'
 import {
+    loadMemoConfig,
+    resolveContextWindowForProvider,
+    selectProvider,
+    writeMemoConfig,
+    type LoadedConfig,
+    type MCPServerConfig,
+    type MemoConfig,
+    type ModelProfileOverride,
+    type ProviderConfig,
+} from '@memo/core/config/config'
+import {
     createMcpServer,
     getMcpServer,
     listMcpServers,
@@ -9,8 +20,8 @@ import {
     removeMcpServer,
     setActiveMcpServers,
     updateMcpServer,
-} from '@memo/core/runtime/mcp_admin'
-import { getFileSuggestions } from '@memo/core/runtime/file_suggestions'
+} from '@memo/core/runtime/mcp/admin'
+import { getFileSuggestions } from '@memo/core/runtime/workspace/file_suggestions'
 import {
     createSkill,
     getSkill,
@@ -18,7 +29,7 @@ import {
     removeSkill,
     setActiveSkills,
     updateSkill,
-} from '@memo/core/runtime/skills_admin'
+} from '@memo/core/runtime/skills/admin'
 import { buildOpenApiSpec } from '@memo/core/server/router/openapi'
 import {
     HttpRouter,
@@ -26,7 +37,7 @@ import {
     type RouteMethod,
 } from '@memo/core/server/router/http_router'
 import { SseHub } from '@memo/core/server/utils/sse'
-import type { AuthLoginRequest } from '@memo/core/web/types'
+import type { AuthLoginRequest, ConfigSnapshot, UpdateConfigRequest } from '@memo/core/web/types'
 import {
     ensureAuth,
     HttpApiError,
@@ -51,6 +62,201 @@ export type RegisterCoreApiRoutesOptions = {
     sseHub: SseHub
     workspaceState: WorkspaceState
     getServerUrl: () => string
+}
+
+function parseProvider(input: unknown, index: number): ProviderConfig {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        throw new HttpApiError(400, 'BAD_REQUEST', `providers[${index}] must be an object`)
+    }
+    const candidate = input as Record<string, unknown>
+    const name = typeof candidate.name === 'string' ? candidate.name.trim() : ''
+    const envApiKey = typeof candidate.env_api_key === 'string' ? candidate.env_api_key.trim() : ''
+    const model = typeof candidate.model === 'string' ? candidate.model.trim() : ''
+    const baseUrl =
+        typeof candidate.base_url === 'string' && candidate.base_url.trim()
+            ? candidate.base_url.trim()
+            : undefined
+
+    if (!name || !envApiKey || !model) {
+        throw new HttpApiError(
+            400,
+            'BAD_REQUEST',
+            `providers[${index}] requires name, env_api_key, and model`,
+        )
+    }
+
+    return {
+        name,
+        env_api_key: envApiKey,
+        model,
+        base_url: baseUrl,
+    }
+}
+
+function parseProviders(input: unknown): ProviderConfig[] {
+    if (!Array.isArray(input)) {
+        throw new HttpApiError(400, 'BAD_REQUEST', 'providers must be an array')
+    }
+    const providers = input.map((item, index) => parseProvider(item, index))
+    if (providers.length === 0) {
+        throw new HttpApiError(400, 'BAD_REQUEST', 'providers cannot be empty')
+    }
+    return providers
+}
+
+function parseModelProfiles(input: unknown): Record<string, ModelProfileOverride> | undefined {
+    if (input === undefined || input === null) return undefined
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        throw new HttpApiError(400, 'BAD_REQUEST', 'model_profiles must be an object')
+    }
+
+    const normalized: Record<string, ModelProfileOverride> = {}
+    for (const [key, rawValue] of Object.entries(input as Record<string, unknown>)) {
+        if (!rawValue || typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+            continue
+        }
+        const profile = rawValue as Record<string, unknown>
+        const next: ModelProfileOverride = {}
+        if (typeof profile.supports_parallel_tool_calls === 'boolean') {
+            next.supports_parallel_tool_calls = profile.supports_parallel_tool_calls
+        }
+        if (typeof profile.supports_reasoning_content === 'boolean') {
+            next.supports_reasoning_content = profile.supports_reasoning_content
+        }
+        if (
+            typeof profile.context_window === 'number' &&
+            Number.isFinite(profile.context_window) &&
+            profile.context_window > 0
+        ) {
+            next.context_window = Math.floor(profile.context_window)
+        }
+        if (Object.keys(next).length > 0) {
+            normalized[key] = next
+        }
+    }
+
+    return Object.keys(normalized).length > 0 ? normalized : undefined
+}
+
+function parseMcpServerConfig(name: string, input: unknown): MCPServerConfig {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        throw new HttpApiError(400, 'BAD_REQUEST', `mcp_servers.${name} must be an object`)
+    }
+    const config = input as Record<string, unknown>
+
+    if (typeof config.url === 'string' && config.url.trim()) {
+        const headers =
+            config.headers && typeof config.headers === 'object' && !Array.isArray(config.headers)
+                ? (config.headers as Record<string, string>)
+                : undefined
+        const httpHeaders =
+            config.http_headers &&
+            typeof config.http_headers === 'object' &&
+            !Array.isArray(config.http_headers)
+                ? (config.http_headers as Record<string, string>)
+                : undefined
+        return {
+            type: 'streamable_http',
+            url: config.url.trim(),
+            headers,
+            http_headers: httpHeaders,
+            bearer_token_env_var:
+                typeof config.bearer_token_env_var === 'string' &&
+                config.bearer_token_env_var.trim()
+                    ? config.bearer_token_env_var.trim()
+                    : undefined,
+        }
+    }
+
+    if (typeof config.command === 'string' && config.command.trim()) {
+        return {
+            type: 'stdio',
+            command: config.command.trim(),
+            args: Array.isArray(config.args)
+                ? config.args
+                      .filter((item): item is string => typeof item === 'string')
+                      .map((item) => item.trim())
+                      .filter(Boolean)
+                : undefined,
+            env:
+                config.env && typeof config.env === 'object' && !Array.isArray(config.env)
+                    ? (config.env as Record<string, string>)
+                    : undefined,
+            stderr:
+                config.stderr === 'inherit' ||
+                config.stderr === 'pipe' ||
+                config.stderr === 'ignore'
+                    ? config.stderr
+                    : undefined,
+        }
+    }
+
+    throw new HttpApiError(400, 'BAD_REQUEST', `mcp_servers.${name} must contain url or command`)
+}
+
+function parseMcpServers(input: unknown): Record<string, MCPServerConfig> {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        throw new HttpApiError(400, 'BAD_REQUEST', 'mcp_servers must be an object')
+    }
+
+    const normalized: Record<string, MCPServerConfig> = {}
+    for (const [name, value] of Object.entries(input as Record<string, unknown>)) {
+        const trimmedName = name.trim()
+        if (!trimmedName) continue
+        normalized[trimmedName] = parseMcpServerConfig(trimmedName, value)
+    }
+    return normalized
+}
+
+function parseActiveMcpServers(input: unknown): string[] {
+    if (!Array.isArray(input)) {
+        throw new HttpApiError(400, 'BAD_REQUEST', 'active_mcp_servers must be an array')
+    }
+    return Array.from(
+        new Set(
+            input
+                .filter((item): item is string => typeof item === 'string')
+                .map((item) => item.trim())
+                .filter(Boolean),
+        ),
+    )
+}
+
+function parseAutoCompactThresholdPercent(input: unknown): number {
+    if (
+        typeof input !== 'number' ||
+        !Number.isFinite(input) ||
+        !Number.isInteger(input) ||
+        input < 1 ||
+        input > 100
+    ) {
+        throw new HttpApiError(
+            400,
+            'BAD_REQUEST',
+            'auto_compact_threshold_percent must be an integer between 1 and 100',
+        )
+    }
+    return input
+}
+
+function buildConfigSnapshot(loaded: LoadedConfig): ConfigSnapshot {
+    const selected = selectProvider(loaded.config, loaded.config.current_provider)
+    return {
+        configPath: loaded.configPath,
+        memoHome: loaded.home,
+        needsSetup: loaded.needsSetup,
+        currentProvider: selected.name,
+        selectedProvider: {
+            name: selected.name,
+            model: selected.model,
+            contextWindow: resolveContextWindowForProvider(loaded.config, selected),
+        },
+        providers: loaded.config.providers,
+        modelProfiles: loaded.config.model_profiles,
+        mcpServers: loaded.config.mcp_servers ?? {},
+        activeMcpServers: loaded.config.active_mcp_servers ?? [],
+        autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent ?? 80,
+    }
 }
 
 export function registerCoreApiRoutes(options: RegisterCoreApiRoutesOptions): void {
@@ -117,6 +323,80 @@ export function registerCoreApiRoutes(options: RegisterCoreApiRoutesOptions): vo
                 normalized.details,
             )
         }
+    })
+
+    router.register('GET', '/api/config', async (context) => {
+        try {
+            ensureAuth(auth, context.req)
+            const loaded = await loadMemoConfig()
+            writeSuccess(context.res, context.requestId, buildConfigSnapshot(loaded))
+        } catch (error) {
+            const normalized = normalizeError(error)
+            writeError(
+                context.res,
+                context.requestId,
+                context.path,
+                normalized.statusCode,
+                normalized.code,
+                normalized.message,
+                normalized.details,
+            )
+        }
+    })
+
+    registerJsonRoute('PATCH', '/api/config', async (_context, body) => {
+        const loaded = await loadMemoConfig()
+        const patch = body as UpdateConfigRequest
+        const nextConfig: MemoConfig = {
+            ...loaded.config,
+        }
+
+        if (Object.prototype.hasOwnProperty.call(body, 'providers')) {
+            nextConfig.providers = parseProviders(patch.providers)
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'current_provider')) {
+            const currentProvider =
+                typeof patch.current_provider === 'string' ? patch.current_provider.trim() : ''
+            if (!currentProvider) {
+                throw new HttpApiError(400, 'BAD_REQUEST', 'current_provider must be a string')
+            }
+            nextConfig.current_provider = currentProvider
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'model_profiles')) {
+            nextConfig.model_profiles = parseModelProfiles(patch.model_profiles)
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'mcp_servers')) {
+            nextConfig.mcp_servers = parseMcpServers(patch.mcp_servers)
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'active_mcp_servers')) {
+            nextConfig.active_mcp_servers = parseActiveMcpServers(patch.active_mcp_servers)
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'auto_compact_threshold_percent')) {
+            nextConfig.auto_compact_threshold_percent = parseAutoCompactThresholdPercent(
+                patch.auto_compact_threshold_percent,
+            )
+        }
+
+        if (nextConfig.providers.length === 0) {
+            throw new HttpApiError(400, 'BAD_REQUEST', 'providers cannot be empty')
+        }
+
+        const selectedProvider = selectProvider(nextConfig, nextConfig.current_provider)
+        nextConfig.current_provider = selectedProvider.name
+
+        if (nextConfig.active_mcp_servers) {
+            const knownServers = new Set(Object.keys(nextConfig.mcp_servers ?? {}))
+            nextConfig.active_mcp_servers = nextConfig.active_mcp_servers.filter((name) =>
+                knownServers.has(name),
+            )
+        }
+
+        await writeMemoConfig(loaded.configPath, nextConfig)
+        return buildConfigSnapshot({
+            ...loaded,
+            config: nextConfig,
+            needsSetup: nextConfig.providers.length === 0,
+        })
     })
 
     registerJsonRoute('POST', '/api/chat/sessions', async (_context, body) => {
@@ -226,7 +506,10 @@ export function registerCoreApiRoutes(options: RegisterCoreApiRoutesOptions): vo
     })
 
     registerJsonRoute('POST', '/api/chat/files/suggest', async (_context, body) => {
-        const query = requireString(body, 'query')
+        if (typeof body.query !== 'string') {
+            throw new HttpApiError(400, 'BAD_REQUEST', 'query is required')
+        }
+        const query = body.query.trim()
         const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
         const workspaceCwd = typeof body.workspaceCwd === 'string' ? body.workspaceCwd.trim() : ''
         const sessionCwd = sessionId ? sessionManager.resolveSessionCwd(sessionId) : null
@@ -244,11 +527,28 @@ export function registerCoreApiRoutes(options: RegisterCoreApiRoutesOptions): vo
             typeof body.limit === 'number' && Number.isFinite(body.limit)
                 ? Math.max(1, Math.floor(body.limit))
                 : undefined
+        const maxDepth =
+            typeof body.maxDepth === 'number' && Number.isFinite(body.maxDepth)
+                ? Math.max(1, Math.floor(body.maxDepth))
+                : undefined
+        const maxEntries =
+            typeof body.maxEntries === 'number' && Number.isFinite(body.maxEntries)
+                ? Math.max(100, Math.floor(body.maxEntries))
+                : undefined
+        const respectGitIgnore =
+            typeof body.respectGitIgnore === 'boolean' ? body.respectGitIgnore : undefined
+        const ignoreGlobs = Array.isArray(body.ignoreGlobs)
+            ? body.ignoreGlobs.filter((item): item is string => typeof item === 'string')
+            : undefined
 
         const items = await getFileSuggestions({
             cwd,
             query,
             limit,
+            maxDepth,
+            maxEntries,
+            respectGitIgnore,
+            ignoreGlobs,
         })
         return { items }
     })

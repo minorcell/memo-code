@@ -8,7 +8,7 @@ import type {
     ChatMessage,
     AssistantToolCall,
 } from '@memo/core/types'
-import { buildHookRunners, runHook, snapshotHistory } from '@memo/core/runtime/hooks'
+import { buildHookRunners, runHook, snapshotHistory } from '@memo/core/runtime/agent/hooks'
 
 describe('buildHookRunners', () => {
     test('creates empty hook map when no hooks provided', () => {

@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { loadSystemPrompt } from './prompt'
+import { loadSystemPrompt } from './index'
 
 const createdDirs: string[] = []
 

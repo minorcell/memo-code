@@ -5,7 +5,7 @@ import {
     buildCompactionUserPrompt,
     CONTEXT_SUMMARY_PREFIX,
     isContextSummaryMessage,
-} from '@memo/core/runtime/compact_prompt'
+} from '@memo/core/runtime/agent/compact_prompt'
 
 describe('compact_prompt', () => {
     test('buildCompactionUserPrompt formats assistant tool calls and tool messages', () => {

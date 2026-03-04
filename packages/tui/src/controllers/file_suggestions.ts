@@ -1,22 +1,26 @@
-import {
-    getFileSuggestions as getCoreFileSuggestions,
-    invalidateFileSuggestionCache as invalidateCoreFileSuggestionCache,
-    normalizePath as normalizeCorePath,
-    type FileSuggestion as CoreFileSuggestion,
-    type FileSuggestionRequest as CoreFileSuggestionRequest,
-} from '@memo/core/runtime/file_suggestions'
+import { withSharedCoreServerClient } from '../http/shared_core_client'
 import type { FileSuggestion, FileSuggestionRequest } from './types'
 
 export function normalizePath(input: string): string {
-    return normalizeCorePath(input)
+    return input.replace(/\\/g, '/')
 }
 
 export async function getFileSuggestions(req: FileSuggestionRequest): Promise<FileSuggestion[]> {
-    return getCoreFileSuggestions(req as CoreFileSuggestionRequest) as Promise<FileSuggestion[]>
+    const response = await withSharedCoreServerClient((client) =>
+        client.suggestFiles({
+            query: req.query,
+            workspaceCwd: req.cwd,
+            limit: req.limit,
+            maxDepth: req.maxDepth,
+            maxEntries: req.maxEntries,
+            respectGitIgnore: req.respectGitIgnore,
+            ignoreGlobs: req.ignoreGlobs,
+        }),
+    )
+
+    return response.items
 }
 
-export function invalidateFileSuggestionCache(cwd?: string): void {
-    invalidateCoreFileSuggestionCache(cwd)
+export function invalidateFileSuggestionCache(_cwd?: string): void {
+    // Suggestions are served by core HTTP API; cache invalidation is handled server-side.
 }
-
-export type { CoreFileSuggestion, CoreFileSuggestionRequest }

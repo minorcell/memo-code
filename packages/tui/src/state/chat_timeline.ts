@@ -1,4 +1,4 @@
-import type { ContextUsagePhase, TokenUsage, TurnStatus } from '@memo/core'
+import type { ContextUsagePhase, TokenUsage, TurnStatus } from '../http/api_types'
 import type {
     StepView,
     SystemMessage,

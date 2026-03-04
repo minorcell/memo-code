@@ -6,7 +6,7 @@ import {
     normalizeWorkspaceName,
     normalizeWorkspacePath,
     workspaceIdFromCwd,
-} from './workspace'
+} from './index'
 
 describe('workspace runtime helpers', () => {
     test('normalizeWorkspacePath trims and normalizes separators', () => {

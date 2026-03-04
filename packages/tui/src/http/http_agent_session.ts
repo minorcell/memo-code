@@ -11,10 +11,11 @@ import type {
     ToolPermissionMode,
     TurnResult,
     TurnStatus,
-} from '@memo/core'
+    LiveSessionState,
+    SseEventEnvelope,
+} from './api_types'
 import type { ApprovalDecision, ApprovalRequest, RiskLevel } from '@memo/tools/approval'
-import type { LiveSessionState, SseEventEnvelope } from '@memo/core'
-import { createEmbeddedCoreServerClient, type CoreServerClient } from './core_server_client'
+import { getSharedCoreServerClient, type CoreServerClient } from './shared_core_client'
 
 type PendingTurn = {
     input: string
@@ -147,7 +148,6 @@ class HttpBackedAgentSession implements HttpAgentSession {
     constructor(
         private readonly client: CoreServerClient,
         private readonly deps: AgentSessionDeps,
-        private readonly release: () => Promise<void>,
         initialState: LiveSessionState,
     ) {
         this.id = initialState.id
@@ -251,7 +251,6 @@ class HttpBackedAgentSession implements HttpAgentSession {
             }
 
             await this.eventsDone
-            await this.release()
         })()
 
         return this.closePromise
@@ -523,24 +522,17 @@ export async function createHttpAgentSession(
     deps: AgentSessionDeps,
     options: AgentSessionOptions,
 ): Promise<HttpAgentSession> {
-    const embedded = await createEmbeddedCoreServerClient({
-        memoHome: process.env.MEMO_HOME,
+    const client = await getSharedCoreServerClient()
+
+    const state = await client.createSession({
+        sessionId: options.sessionId,
+        providerName: options.providerName,
+        cwd: options.cwd,
+        toolPermissionMode: normalizeToolPermissionMode(options),
+        activeMcpServers: options.activeMcpServers,
     })
 
-    try {
-        const state = await embedded.client.createSession({
-            sessionId: options.sessionId,
-            providerName: options.providerName,
-            cwd: options.cwd,
-            toolPermissionMode: normalizeToolPermissionMode(options),
-            activeMcpServers: options.activeMcpServers,
-        })
-
-        return new HttpBackedAgentSession(embedded.client, deps, embedded.close, state)
-    } catch (error) {
-        await embedded.close()
-        throw new Error(`Failed to create HTTP-backed session: ${resolveErrorMessage(error)}`)
-    }
+    return new HttpBackedAgentSession(client, deps, state)
 }
 
 export type { HttpAgentSession }

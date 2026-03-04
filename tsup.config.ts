@@ -5,6 +5,7 @@ import { join } from 'node:path'
 export default defineConfig({
     entry: {
         index: 'packages/tui/src/cli.tsx',
+        'core-server': 'packages/core/src/server/process_entry.ts',
     },
     outDir: 'dist',
     format: ['esm'],
@@ -24,7 +25,7 @@ export default defineConfig({
     },
     async onSuccess() {
         // Copy prompt.md to dist directory
-        copyFileSync(join('packages/core/src/runtime/prompt.md'), join('dist/prompt.md'))
+        copyFileSync(join('packages/core/src/runtime/prompt/prompt.md'), join('dist/prompt.md'))
         mkdirSync(join('dist/task-prompts'), { recursive: true })
         cpSync(join('packages/tui/src/task-prompts'), join('dist/task-prompts'), {
             recursive: true,

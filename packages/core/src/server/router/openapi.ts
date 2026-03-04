@@ -30,6 +30,14 @@ export function buildOpenApiSpec(options: { serverUrl: string }): Record<string,
                     security: [],
                 },
             },
+            '/api/config': {
+                get: {
+                    summary: 'Get runtime config snapshot',
+                },
+                patch: {
+                    summary: 'Patch runtime config',
+                },
+            },
             '/api/chat/sessions': {
                 post: {
                     summary: 'Create live session',

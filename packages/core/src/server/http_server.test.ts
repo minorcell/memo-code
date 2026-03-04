@@ -199,6 +199,91 @@ describe('startCoreHttpServer', () => {
         }
     })
 
+    test('supports config snapshot and patch APIs', async () => {
+        const memoHome = await mkdtemp(join(tmpdir(), 'memo-http-config-'))
+        const handle = await startCoreHttpServer({
+            host: '127.0.0.1',
+            port: 0,
+            password: 'test-password',
+            memoHome,
+        })
+
+        try {
+            const login = await fetch(`${handle.url}/api/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({ password: 'test-password' }),
+            })
+            expect(login.status).toBe(200)
+            const loginBody = (await readJson(login)) as {
+                success: true
+                data: { accessToken: string }
+            }
+            expect(loginBody.success).toBe(true)
+            const token = loginBody.data.accessToken
+
+            const snapshot = await fetch(`${handle.url}/api/config`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            })
+            expect(snapshot.status).toBe(200)
+            const snapshotBody = (await readJson(snapshot)) as {
+                success: true
+                data: { providers: Array<{ name: string }> }
+            }
+            expect(snapshotBody.success).toBe(true)
+            expect(Array.isArray(snapshotBody.data.providers)).toBe(true)
+            expect(snapshotBody.data.providers.length).toBeGreaterThan(0)
+
+            const patch = await fetch(`${handle.url}/api/config`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({
+                    current_provider: 'openai',
+                    providers: [
+                        {
+                            name: 'openai',
+                            env_api_key: 'OPENAI_API_KEY',
+                            model: 'gpt-5',
+                        },
+                    ],
+                    mcp_servers: {
+                        local: {
+                            command: 'echo',
+                            args: ['hello'],
+                        },
+                    },
+                    active_mcp_servers: ['local'],
+                    auto_compact_threshold_percent: 75,
+                }),
+            })
+            expect(patch.status).toBe(200)
+            const patchBody = (await readJson(patch)) as {
+                success: true
+                data: {
+                    currentProvider: string
+                    providers: Array<{ name: string }>
+                    activeMcpServers: string[]
+                    autoCompactThresholdPercent: number
+                }
+            }
+            expect(patchBody.success).toBe(true)
+            expect(patchBody.data.currentProvider).toBe('openai')
+            expect(patchBody.data.providers[0]?.name).toBe('openai')
+            expect(patchBody.data.activeMcpServers).toEqual(['local'])
+            expect(patchBody.data.autoCompactThresholdPercent).toBe(75)
+        } finally {
+            await handle.close()
+            await rm(memoHome, { recursive: true, force: true })
+        }
+    })
+
     test('allows browsing directories outside current working directory', async () => {
         const outsideDir = await mkdtemp(join(tmpdir(), 'memo-http-browser-'))
         const handle = await startCoreHttpServer({

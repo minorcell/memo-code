@@ -99,7 +99,7 @@ export default defineConfig({
     },
     onSuccess() {
         // copy runtime resource file
-        copyFileSync('packages/core/src/runtime/prompt.md', 'dist/prompt.md')
+        copyFileSync('packages/core/src/runtime/prompt/prompt.md', 'dist/prompt.md')
     },
 })
 ```

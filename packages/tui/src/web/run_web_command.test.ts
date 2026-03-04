@@ -1,66 +1,40 @@
 import { mkdtemp, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-const { startCoreHttpServerMock } = vi.hoisted(() => ({
-    startCoreHttpServerMock: vi.fn(),
+const { createEmbeddedCoreServerClientMock } = vi.hoisted(() => ({
+    createEmbeddedCoreServerClientMock: vi.fn(),
 }))
 
-vi.mock('@memo/core', () => ({
-    startCoreHttpServer: startCoreHttpServerMock,
+vi.mock('../http/core_server_client', () => ({
+    createEmbeddedCoreServerClient: createEmbeddedCoreServerClientMock,
 }))
 
 import { runWebCommand } from './run_web_command'
 
-async function reserveAvailablePort(): Promise<number> {
-    return new Promise((resolvePort, rejectPort) => {
-        const server = createServer()
-        server.once('error', rejectPort)
-        server.listen({ host: '127.0.0.1', port: 0 }, () => {
-            const address = server.address()
-            if (!address || typeof address === 'string') {
-                server.close(() => rejectPort(new Error('failed to reserve port')))
-                return
-            }
-            const port = address.port
-            server.close((error) => {
-                if (error) {
-                    rejectPort(error)
-                    return
-                }
-                resolvePort(port)
-            })
-        })
-    })
-}
-
 describe('runWebCommand', () => {
-    const originalPassword = process.env.MEMO_SERVER_PASSWORD
-
     beforeEach(() => {
-        startCoreHttpServerMock.mockReset()
+        createEmbeddedCoreServerClientMock.mockReset()
     })
 
     afterEach(() => {
-        process.env.MEMO_SERVER_PASSWORD = originalPassword
         vi.restoreAllMocks()
     })
 
-    test('starts core server and closes on SIGTERM', async () => {
+    test('ensures core server and exits on SIGTERM', async () => {
         const staticDir = await mkdtemp(join(tmpdir(), 'memo-web-static-'))
         await writeFile(join(staticDir, 'index.html'), '<!doctype html><html></html>', 'utf8')
-        const preferredPort = await reserveAvailablePort()
 
-        const closeMock = vi.fn(async () => {})
-        startCoreHttpServerMock.mockResolvedValue({
-            url: `http://127.0.0.1:${preferredPort}`,
-            openApiSpecPath: '/api/openapi.json',
-            close: closeMock,
+        createEmbeddedCoreServerClientMock.mockResolvedValue({
+            client: {},
+            server: {
+                url: 'http://127.0.0.1:5494',
+                openApiSpecPath: '/api/openapi.json',
+                close: vi.fn(async () => {}),
+            },
+            close: vi.fn(async () => {}),
         })
-
-        process.env.MEMO_SERVER_PASSWORD = 'test-password'
 
         const signalHandlers = new Map<string, () => void>()
         const onceSpy = vi.spyOn(process, 'once').mockImplementation(((event, listener) => {
@@ -74,14 +48,14 @@ describe('runWebCommand', () => {
             '--host',
             '127.0.0.1',
             '--port',
-            String(preferredPort),
+            '5494',
             '--static-dir',
             staticDir,
             '--no-open',
         ])
 
         await vi.waitFor(() => {
-            expect(startCoreHttpServerMock).toHaveBeenCalledTimes(1)
+            expect(createEmbeddedCoreServerClientMock).toHaveBeenCalledTimes(1)
         })
 
         const terminate = signalHandlers.get('SIGTERM')
@@ -90,13 +64,13 @@ describe('runWebCommand', () => {
 
         await commandPromise
 
-        expect(startCoreHttpServerMock).toHaveBeenCalledWith({
+        expect(createEmbeddedCoreServerClientMock).toHaveBeenCalledWith({
             host: '127.0.0.1',
-            port: preferredPort,
-            password: 'test-password',
+            preferredPort: 5494,
+            memoHome: process.env.MEMO_HOME,
             staticDir,
+            requireStaticDir: true,
         })
-        expect(closeMock).toHaveBeenCalledTimes(1)
         onceSpy.mockRestore()
     })
 })

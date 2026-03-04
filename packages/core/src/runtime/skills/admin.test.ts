@@ -3,7 +3,7 @@ import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { loadMemoConfig, writeMemoConfig, type MemoConfig } from '../config/config'
+import { loadMemoConfig, writeMemoConfig, type MemoConfig } from '../../config/config'
 import {
     SkillsAdminError,
     createSkill,
@@ -12,7 +12,7 @@ import {
     removeSkill,
     setActiveSkills,
     updateSkill,
-} from './skills_admin'
+} from './admin'
 
 const tempRoots: string[] = []
 

@@ -12,7 +12,7 @@ import {
     stableStringify,
     toToolHistoryMessage,
     truncateSessionTitle,
-} from '@memo/core/runtime/session_runtime_helpers'
+} from '@memo/core/runtime/agent/session_runtime_helpers'
 
 describe('accumulateUsage', () => {
     test('uses explicit total when provided', () => {

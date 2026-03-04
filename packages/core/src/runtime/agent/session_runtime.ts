@@ -7,7 +7,7 @@ import {
     CONTEXT_COMPACTION_SYSTEM_PROMPT,
     CONTEXT_SUMMARY_PREFIX,
     isContextSummaryMessage,
-} from '@memo/core/runtime/compact_prompt'
+} from '@memo/core/runtime/agent/compact_prompt'
 import type {
     ChatMessage,
     AgentSession,
@@ -32,7 +32,7 @@ import {
     runHook,
     snapshotHistory,
     type HookRunnerMap,
-} from '@memo/core/runtime/hooks'
+} from '@memo/core/runtime/agent/hooks'
 import {
     createToolOrchestrator,
     type ToolApprovalHooks,
@@ -58,7 +58,7 @@ import {
     resolveToolPermission,
     stableStringify,
     toToolHistoryMessage,
-} from '@memo/core/runtime/session_runtime_helpers'
+} from '@memo/core/runtime/agent/session_runtime_helpers'
 import type { ApprovalRequest, ApprovalDecision } from '@memo/tools/approval'
 
 const DEFAULT_AUTO_COMPACT_THRESHOLD_PERCENT = 80

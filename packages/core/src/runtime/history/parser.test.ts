@@ -1,6 +1,6 @@
 import assert from 'node:assert'
 import { describe, test } from 'vitest'
-import { parseHistoryLogToSessionDetail } from './history_parser'
+import { parseHistoryLogToSessionDetail } from './parser'
 
 function buildSampleLog(): string {
     return [

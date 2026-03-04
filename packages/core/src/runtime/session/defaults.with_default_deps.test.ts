@@ -203,7 +203,7 @@ describe('withDefaultDeps (default path)', () => {
     })
 
     test('builds default deps with injected tool descriptions and default sinks', async () => {
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
 
         const resolved = await withDefaultDeps(
             {},
@@ -222,7 +222,7 @@ describe('withDefaultDeps (default path)', () => {
     })
 
     test('respects provided deps overrides (callLLM/historySinks/tokenCounter/loadPrompt/dispose)', async () => {
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
         const callLLM = vi.fn(async () => ({
             content: [{ type: 'text' as const, text: 'override' }],
             stop_reason: 'end_turn' as const,
@@ -260,7 +260,7 @@ describe('withDefaultDeps (default path)', () => {
     })
 
     test('throws when provider api key is missing', async () => {
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
         const resolved = await withDefaultDeps({}, {} as AgentSessionOptions, 'session-3')
 
         await expect(
@@ -270,7 +270,7 @@ describe('withDefaultDeps (default path)', () => {
 
     test('uses provider env key and provider base_url', async () => {
         process.env.MOCK_API_KEY = 'mock-provider-key'
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
         const resolved = await withDefaultDeps({}, {} as AgentSessionOptions, 'session-3b')
 
         await resolved.callLLM([{ role: 'user', content: 'hello' } as ChatMessage])
@@ -283,7 +283,7 @@ describe('withDefaultDeps (default path)', () => {
 
     test('falls back to OPENAI_API_KEY when provider key is missing', async () => {
         process.env.OPENAI_API_KEY = 'openai-fallback-key'
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
         const resolved = await withDefaultDeps({}, {} as AgentSessionOptions, 'session-3c')
 
         await resolved.callLLM([{ role: 'user', content: 'hello' } as ChatMessage])
@@ -295,7 +295,7 @@ describe('withDefaultDeps (default path)', () => {
 
     test('maps AI SDK tool calls into tool_use blocks', async () => {
         process.env.MOCK_API_KEY = 'test-key'
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
         const callOptionsTools: ToolDefinition[] = [
             {
                 name: 'override',
@@ -385,7 +385,7 @@ describe('withDefaultDeps (default path)', () => {
 
     test('returns plain text end_turn response with usage', async () => {
         process.env.MOCK_API_KEY = 'test-key'
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
 
         state.generateTextResponse = {
             text: 'plain assistant answer',
@@ -409,7 +409,7 @@ describe('withDefaultDeps (default path)', () => {
 
     test('throws when AI SDK returns empty content', async () => {
         process.env.MOCK_API_KEY = 'test-key'
-        const { withDefaultDeps } = await import('@memo/core/runtime/defaults')
+        const { withDefaultDeps } = await import('@memo/core/runtime/session/defaults')
 
         state.generateTextResponse = {
             text: '',

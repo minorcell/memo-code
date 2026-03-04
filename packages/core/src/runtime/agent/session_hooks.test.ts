@@ -7,7 +7,7 @@ import type { Tool } from '@memo/tools/router'
 import {
     CONTEXT_COMPACTION_SYSTEM_PROMPT,
     CONTEXT_SUMMARY_PREFIX,
-} from '@memo/core/runtime/compact_prompt'
+} from '@memo/core/runtime/agent/compact_prompt'
 
 const echoTool: Tool = {
     name: 'echo',

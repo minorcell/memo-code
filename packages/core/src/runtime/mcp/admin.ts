@@ -10,7 +10,7 @@ import {
     logoutMcpServerOAuth,
     type McpAuthStatus,
 } from '@memo/tools/router/mcp/oauth'
-import type { McpServerRecord } from '../web/types.js'
+import type { McpServerRecord } from '../../web/types.js'
 
 export class McpAdminError extends Error {
     constructor(

@@ -105,6 +105,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@memo-code/types':
+        specifier: workspace:*
+        version: link:../types
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
@@ -149,6 +152,9 @@ importers:
       '@memo-code/tools':
         specifier: workspace:*
         version: link:../tools
+      '@memo-code/types':
+        specifier: workspace:*
+        version: link:../types
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
@@ -172,11 +178,13 @@ importers:
         specifier: ^19.2.14
         version: 19.2.14
 
+  packages/types: {}
+
   packages/web-ui:
     dependencies:
-      '@memo-code/core':
+      '@memo-code/types':
         specifier: workspace:*
-        version: link:../core
+        version: link:../types
       '@streamdown/cjk':
         specifier: ^1.0.2
         version: 1.0.2(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(react@19.2.4)(unified@11.0.5)
