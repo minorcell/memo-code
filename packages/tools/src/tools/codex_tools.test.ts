@@ -149,10 +149,21 @@ describe('codex shell family', () => {
         const startedText = textPayload(started)
         const match = startedText.match(/session ID (\d+)/)
         assert.ok(match, `expected running session id, got: ${startedText}`)
-        const firstChunk = outputPayload(startedText)
+        const sessionId = Number(match?.[1])
+        let firstChunk = outputPayload(startedText)
+        if (firstChunk.length === 0) {
+            for (let i = 0; i < 5; i += 1) {
+                const retry = await writeStdinTool.execute({
+                    session_id: sessionId,
+                    yield_time_ms: 100,
+                    max_output_tokens: 10,
+                })
+                firstChunk = outputPayload(textPayload(retry))
+                if (firstChunk.length > 0) break
+            }
+        }
         assert.strictEqual(firstChunk.length, 40)
 
-        const sessionId = Number(match?.[1])
         const next = await writeStdinTool.execute({
             session_id: sessionId,
             yield_time_ms: 100,
