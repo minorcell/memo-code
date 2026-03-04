@@ -1,6 +1,5 @@
 import { cjk } from '@streamdown/cjk'
 import { code } from '@streamdown/code'
-import { mermaid } from '@streamdown/mermaid'
 import { Streamdown } from 'streamdown'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +11,6 @@ type MarkdownMessageProps = {
 
 const streamdownPlugins = {
     code,
-    mermaid,
     cjk,
 }
 

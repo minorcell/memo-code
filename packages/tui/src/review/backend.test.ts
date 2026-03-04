@@ -1,6 +1,6 @@
 import assert from 'node:assert'
 import { describe, test } from 'vitest'
-import type { MCPServerConfig } from '@memo/core'
+import type { MCPServerConfig } from '../http/api_types'
 import {
     detectGitHubMcpToolPrefixes,
     findActiveGitHubMcpServer,

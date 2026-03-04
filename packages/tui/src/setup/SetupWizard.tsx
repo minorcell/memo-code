@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink'
 import { Spinner, StatusMessage, TextInput } from '@inkjs/ui'
 import { memo, useCallback, useMemo, useState } from 'react'
-import { writeMemoConfig, type MemoConfig } from '@memo/core'
+import { withSharedCoreServerClient } from '../http/shared_core_client'
 
 type SetupWizardProps = {
     configPath: string
@@ -65,18 +65,19 @@ export const SetupWizard = memo(function SetupWizard({
             setBusy(true)
             setError(null)
             try {
-                const config: MemoConfig = {
-                    current_provider: nextValues.name,
-                    providers: [
-                        {
-                            name: nextValues.name,
-                            env_api_key: nextValues.envKey,
-                            model: nextValues.model,
-                            base_url: nextValues.baseUrl || undefined,
-                        },
-                    ],
-                }
-                await writeMemoConfig(configPath, config)
+                await withSharedCoreServerClient((client) =>
+                    client.patchConfig({
+                        current_provider: nextValues.name,
+                        providers: [
+                            {
+                                name: nextValues.name,
+                                env_api_key: nextValues.envKey,
+                                model: nextValues.model,
+                                base_url: nextValues.baseUrl || undefined,
+                            },
+                        ],
+                    }),
+                )
                 onComplete()
             } catch (err) {
                 setError((err as Error).message)

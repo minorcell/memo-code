@@ -1,9 +1,9 @@
-import {
-    parseHistoryLogToSessionDetail,
-    type ChatMessage,
-    type SessionTurnDetail,
-    type SessionTurnStep,
-} from '@memo/core'
+import type {
+    ChatMessage,
+    SessionDetail,
+    SessionTurnDetail,
+    SessionTurnStep,
+} from '../http/api_types'
 import { TOOL_STATUS, type StepView, type TurnView } from '../types'
 
 export type ParsedHistoryLog = {
@@ -52,8 +52,7 @@ function toTurnView(turn: SessionTurnDetail, sequence: number, turnIndex: number
     }
 }
 
-export function parseHistoryLog(raw: string): ParsedHistoryLog {
-    const detail = parseHistoryLogToSessionDetail(raw, 'history.log')
+export function parseSessionDetail(detail: SessionDetail): ParsedHistoryLog {
     const orderedTurns = [...detail.turns].sort((left, right) => left.turn - right.turn)
 
     const messages: ChatMessage[] = []

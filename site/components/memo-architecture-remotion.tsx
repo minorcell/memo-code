@@ -333,7 +333,7 @@ export function MemoArchitectureDiagram() {
                             gap: 20,
                         }}
                     >
-                        <MiniCard title="Web Server API Gateway" sub="REST + WebSocket RPC" />
+                        <MiniCard title="Web Server API Gateway" sub="HTTP API + SSE Stream" />
                         <MiniCard
                             title="Session Stream / Router"
                             sub="web requests -> core runtime"

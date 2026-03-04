@@ -1,22 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { Box, Text, useApp } from 'ink'
-import {
-    createAgentSession,
-    loadMemoConfig,
-    resolveContextWindowForProvider,
-    selectProvider,
-    writeMemoConfig,
-    type AgentSession,
-    type AgentSessionDeps,
-    type AgentSessionOptions,
-    type ChatMessage,
-    type MCPServerConfig,
-    type ModelProfileOverride,
-    type ProviderConfig,
-} from '@memo/core'
 import type { ApprovalDecision, ApprovalRequest } from '@memo/tools/approval'
+import type {
+    AgentSession,
+    AgentSessionDeps,
+    AgentSessionOptions,
+    ChatMessage,
+    MCPServerConfig,
+    ModelProfileOverride,
+    ProviderConfig,
+} from './http/api_types'
 import { ChatWidget } from './chatwidget/ChatWidget'
 import { Composer } from './bottom_pane/Composer'
 import { Footer } from './bottom_pane/Footer'
@@ -24,7 +18,9 @@ import { ApprovalOverlay } from './overlays/ApprovalOverlay'
 import { McpActivationOverlay } from './overlays/McpActivationOverlay'
 import { notifyApprovalRequested } from './notifications/approval_notification'
 import { SetupWizard } from './setup/SetupWizard'
-import { parseHistoryLog } from './controllers/history_parser'
+import { parseSessionDetail } from './controllers/history_parser'
+import { createHttpAgentSession } from './http/http_agent_session'
+import { withSharedCoreServerClient } from './http/shared_core_client'
 import {
     chatTimelineReducer,
     createInitialTimelineState,
@@ -51,7 +47,6 @@ export type AppProps = {
     configPath: string
     mcpServers: Record<string, MCPServerConfig>
     cwd: string
-    sessionsDir: string
     providers: ProviderConfig[]
     modelProfiles?: Record<string, ModelProfileOverride>
     dangerous?: boolean
@@ -93,6 +88,32 @@ function clearTerminalScreen() {
     }
 }
 
+function resolveContextWindowForProviderLocal(
+    modelProfiles: Record<string, ModelProfileOverride> | undefined,
+    provider: Pick<ProviderConfig, 'name' | 'model'>,
+): number {
+    const DEFAULT_CONTEXT_WINDOW = 120000
+    if (!modelProfiles) return DEFAULT_CONTEXT_WINDOW
+
+    const normalize = (value: string) => value.trim().toLowerCase()
+    const modelKey = normalize(provider.model)
+    const providerKey = `${normalize(provider.name)}:${modelKey}`
+
+    const read = (key: string): number | undefined => {
+        const profile = modelProfiles[key]
+        if (
+            typeof profile?.context_window === 'number' &&
+            Number.isFinite(profile.context_window) &&
+            profile.context_window > 0
+        ) {
+            return Math.floor(profile.context_window)
+        }
+        return undefined
+    }
+
+    return read(providerKey) ?? read(modelKey) ?? DEFAULT_CONTEXT_WINDOW
+}
+
 export function App({
     sessionOptions,
     providerName,
@@ -100,7 +121,6 @@ export function App({
     configPath,
     mcpServers,
     cwd,
-    sessionsDir,
     providers,
     modelProfiles,
     dangerous = false,
@@ -135,7 +155,7 @@ export function App({
 
     const resolveContextLimit = useCallback(
         (providerConfig: Pick<ProviderConfig, 'name' | 'model'>) =>
-            resolveContextWindowForProvider({ model_profiles: modelProfilesState }, providerConfig),
+            resolveContextWindowForProviderLocal(modelProfilesState, providerConfig),
         [modelProfilesState],
     )
 
@@ -149,7 +169,6 @@ export function App({
 
     const [busy, setBusy] = useState(false)
     const [inputHistory, setInputHistory] = useState<string[]>([])
-    const [sessionLogPath, setSessionLogPath] = useState<string | null>(null)
     const [pendingHistoryMessages, setPendingHistoryMessages] = useState<ChatMessage[] | null>(null)
 
     const [contextLimit, setContextLimit] = useState<number>(
@@ -346,7 +365,7 @@ export function App({
                     await previous.close()
                 }
 
-                const created = await createAgentSession(deps, sessionOptionsState)
+                const created = await createHttpAgentSession(deps, sessionOptionsState)
                 if (cancelled) {
                     await created.close()
                     return
@@ -354,12 +373,10 @@ export function App({
 
                 sessionRef.current = created
                 setSession(created)
-                setSessionLogPath(created.historyFilePath ?? null)
             } catch (err) {
                 if (cancelled) return
                 sessionRef.current = null
                 setSession(null)
-                setSessionLogPath(null)
                 setBusy(false)
                 appendSystemMessage(
                     'Session',
@@ -464,11 +481,9 @@ export function App({
     const persistCurrentProvider = useCallback(
         async (name: string) => {
             try {
-                const loaded = await loadMemoConfig()
-                await writeMemoConfig(loaded.configPath, {
-                    ...loaded.config,
-                    current_provider: name,
-                })
+                await withSharedCoreServerClient((client) =>
+                    client.patchConfig({ current_provider: name }),
+                )
             } catch (err) {
                 appendSystemMessage(
                     'Config',
@@ -574,11 +589,7 @@ export function App({
     const persistActiveMcpServers = useCallback(
         async (names: string[]) => {
             try {
-                const loaded = await loadMemoConfig()
-                await writeMemoConfig(loaded.configPath, {
-                    ...loaded.config,
-                    active_mcp_servers: names,
-                })
+                await withSharedCoreServerClient((client) => client.setActiveMcpServers(names))
             } catch (err) {
                 appendSystemMessage(
                     'MCP',
@@ -627,8 +638,10 @@ export function App({
                 return
             }
             try {
-                const raw = await readFile(entry.sessionFile, 'utf8')
-                const parsed = parseHistoryLog(raw)
+                const detail = await withSharedCoreServerClient((client) =>
+                    client.getSessionDetail(entry.id),
+                )
+                const parsed = parseSessionDetail(detail)
                 dispatch({ type: 'clear_current_timeline' })
                 dispatch({
                     type: 'replace_history',
@@ -638,7 +651,6 @@ export function App({
                 setPendingHistoryMessages(parsed.messages)
                 setBusy(false)
                 setSession(null)
-                setSessionLogPath(null)
                 setCurrentContextTokens(0)
                 currentTurnRef.current = null
                 setSessionOptionsState((prev) => ({ ...prev, sessionId: randomUUID() }))
@@ -646,7 +658,7 @@ export function App({
             } catch (err) {
                 appendSystemMessage(
                     'History',
-                    `Failed to load ${entry.sessionFile}: ${(err as Error).message}`,
+                    `Failed to load session history: ${(err as Error).message}`,
                     'error',
                 )
             }
@@ -801,23 +813,22 @@ export function App({
 
     const handleSetupComplete = useCallback(async () => {
         try {
-            const loaded = await loadMemoConfig()
-            const provider = selectProvider(loaded.config)
-            const nextContextLimit = resolveContextWindowForProvider(loaded.config, provider)
-            setProvidersState(loaded.config.providers)
-            setModelProfilesState(loaded.config.model_profiles)
+            const snapshot = await withSharedCoreServerClient((client) => client.getConfig())
+            const provider = snapshot.selectedProvider
+            setProvidersState(snapshot.providers)
+            setModelProfilesState(snapshot.modelProfiles)
             setCurrentProvider(provider.name)
             setCurrentModel(provider.model)
-            setContextLimit(nextContextLimit)
+            setContextLimit(provider.contextWindow)
             setSessionOptionsState((prev) => ({
                 ...prev,
                 sessionId: randomUUID(),
                 providerName: provider.name,
-                contextWindow: nextContextLimit,
-                autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
+                contextWindow: provider.contextWindow,
+                autoCompactThresholdPercent: snapshot.autoCompactThresholdPercent,
             }))
             setSetupPending(false)
-            appendSystemMessage('Setup', `Config saved to ${loaded.configPath}`)
+            appendSystemMessage('Setup', `Config saved to ${snapshot.configPath}`)
         } catch (err) {
             appendSystemMessage(
                 'Setup',
@@ -829,11 +840,41 @@ export function App({
 
     useEffect(() => {
         if (!session || !pendingHistoryMessages?.length) return
-        const systemMessage = session.history[0]
-        if (!systemMessage) return
-        session.history.splice(0, session.history.length, systemMessage, ...pendingHistoryMessages)
-        setPendingHistoryMessages(null)
-    }, [pendingHistoryMessages, session])
+
+        let cancelled = false
+        ;(async () => {
+            try {
+                if ('restoreHistory' in session && typeof session.restoreHistory === 'function') {
+                    await session.restoreHistory(pendingHistoryMessages)
+                } else {
+                    const systemMessage = session.history[0]
+                    if (!systemMessage) return
+                    session.history.splice(
+                        0,
+                        session.history.length,
+                        systemMessage,
+                        ...pendingHistoryMessages,
+                    )
+                }
+                if (!cancelled) {
+                    setPendingHistoryMessages(null)
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    appendSystemMessage(
+                        'History',
+                        `Failed to restore history: ${(err as Error).message}`,
+                        'error',
+                    )
+                    setPendingHistoryMessages(null)
+                }
+            }
+        })()
+
+        return () => {
+            cancelled = true
+        }
+    }, [appendSystemMessage, pendingHistoryMessages, session])
 
     const handleApprovalDecision = useCallback((decision: ApprovalDecision) => {
         const resolver = approvalResolverRef.current
@@ -909,8 +950,7 @@ export function App({
                 busy={busy}
                 history={inputHistory}
                 cwd={cwd}
-                sessionsDir={sessionsDir}
-                currentSessionFile={sessionLogPath ?? undefined}
+                currentSessionId={session?.id ?? sessionOptionsState.sessionId}
                 providers={providersState}
                 configPath={configPath}
                 providerName={currentProvider}

@@ -20,7 +20,7 @@ Core should stay UI-agnostic: do not add Ink/UI rendering details into `packages
     - `session.ts`: Session/Turn state machine; runs ReAct loop, writes events, tracks tokens, fires hooks; **supports concurrent tool calls**.
 - `toolRouter/`: tool routing and management
     - `index.ts`: manages built-in + MCP tools, generates Tool Use API tool definitions.
-- `utils/`: parsing and tokenizer wrappers (assistant output parsing, message wrappers, tiktoken wrapper).
+- `utils/`: parsing and tokenizer wrappers (assistant output parsing, message wrappers, lightweight token estimator).
 - `types.ts`: shared types (**extended for Tool Use API support**).
 - `index.ts`: package entry exporting the modules above.
 
@@ -74,7 +74,7 @@ if (toolUseBlocks.length > 1) {
 ## Entry API: Session/Turn (`createAgentSession`)
 
 - `createAgentSession(deps, options)` returns a Session; `runTurn` runs one ReAct turn. UI controls turn count.
-- Default deps can be omitted: `tools` (built-in set), `callLLM` (provider-based OpenAI client, **auto-sends tool definitions**), `loadPrompt`, `historySinks` (writes to `~/.memo/sessions/...`), `tokenCounter`.
+- Default deps can be omitted: `tools` (built-in set), `callLLM` (AI SDK Gateway-based client, **auto-sends tool definitions**), `loadPrompt`, `historySinks` (writes to `~/.memo/sessions/...`), `tokenCounter`.
 - Config source: `~/.memo/config.toml` (overridable via `MEMO_HOME`), keys include `current_provider` and `providers` list. Missing config triggers interactive UI setup.
 - Callbacks:
     - `onAssistantStep` (stream-like output)
@@ -96,7 +96,7 @@ await session.close()
 - Default output path: `~/.memo/sessions/-<project_abs_path_flattened>/<YYYY-MM-DDTHH-MM-SS>-<id>.jsonl`, with provider/model/tokenizer/token-usage metadata.
 - For concurrent calls, each tool observation is logged individually, and merged observation is also recorded.
 
-## LLM Adapter (`runtime/defaults.ts`)
+## LLM Adapter (`runtime/session/defaults.ts`)
 
 - `withDefaultDeps` provides OpenAI SDK based invocation (selected by provider/model/base_url/env_api_key).
 - **Automatically generates Tool Use API tool definitions**: `toolRouter.generateToolDefinitions()`.
@@ -200,7 +200,7 @@ if (toolUseBlocks.length > 1) {
 }
 ```
 
-## System Prompt (`runtime/prompt.md`)
+## System Prompt (`runtime/prompt/prompt.md`)
 
 Incorporates Claude Code best practices:
 

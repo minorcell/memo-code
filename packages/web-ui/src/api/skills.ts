@@ -1,26 +1,37 @@
-import { wsRequest } from '@/api/ws-client'
+import { request } from '@/api/request'
 import type { SkillDetail, SkillRecord } from '@/api/types'
 
 export function getSkills(params?: {
     scope?: 'project' | 'global'
     q?: string
-    workspaceId?: string
+    workspaceCwd?: string
 }) {
-    return wsRequest<{ items: SkillRecord[] }>('skills.list', params ?? {})
+    return request<{ items: SkillRecord[] }>({
+        method: 'GET',
+        url: '/api/skills',
+        params: params,
+    })
 }
 
 export function getSkill(id: string) {
-    return wsRequest<SkillDetail>('skills.get', { id })
+    return request<SkillDetail>({
+        method: 'GET',
+        url: `/api/skills/${encodeURIComponent(id)}`,
+    })
 }
 
 export function createSkill(params: {
     scope: 'project' | 'global'
-    workspaceId?: string
+    workspaceCwd?: string
     name: string
     description?: string
     content?: string
 }) {
-    return wsRequest<{ created: true; item: SkillRecord }>('skills.create', params)
+    return request<{ created: true; item: SkillRecord }>({
+        method: 'POST',
+        url: '/api/skills',
+        data: params,
+    })
 }
 
 export function updateSkill(
@@ -30,16 +41,24 @@ export function updateSkill(
         content?: string
     },
 ) {
-    return wsRequest<{ updated: true }>('skills.update', {
-        id,
-        ...params,
+    return request<{ updated: true }>({
+        method: 'PATCH',
+        url: `/api/skills/${encodeURIComponent(id)}`,
+        data: params,
     })
 }
 
 export function removeSkill(id: string) {
-    return wsRequest<{ deleted: true }>('skills.remove', { id })
+    return request<{ deleted: true }>({
+        method: 'DELETE',
+        url: `/api/skills/${encodeURIComponent(id)}`,
+    })
 }
 
 export function setActiveSkillIds(ids: string[]) {
-    return wsRequest<{ active: string[] }>('skills.active.set', { ids })
+    return request<{ active: string[] }>({
+        method: 'POST',
+        url: '/api/skills/active',
+        data: { ids },
+    })
 }

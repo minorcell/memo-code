@@ -14,13 +14,13 @@ Core provides the central capabilities of **Memo Code CLI**: the ReAct loop, ses
 - `types.ts`: Shared types (`AgentDeps`, `Session/Turn`, `TokenUsage`, `HistoryEvent`, etc.).
 - `utils/`
     - Utility functions (assistant output parsing, message wrappers).
-    - `tokenizer.ts`: tiktoken-based tokenizer helpers.
+    - `tokenizer.ts`: lightweight token estimation helpers (fallback with AI SDK usage).
 - `index.ts`: Package entry, exports core modules and types.
 
 ## Key Flows
 
 - `createAgentSession(deps, options)`: Creates a Session, fills default dependencies, loads prompt, and returns an object with `runTurn`.
-- `withDefaultDeps`: Injects default toolset, LLM client, prompt, history sink (writes to `~/.memo/sessions/YY/MM/DD/<uuid>.jsonl`), and tokenizer based on config and overrides.
+- `withDefaultDeps`: Injects default toolset, AI SDK Gateway client, prompt, history sink (writes to `~/.memo/sessions/YY/MM/DD/<uuid>.jsonl`), and tokenizer based on config and overrides.
 - Session history: JSONL events (`session_start/turn_start/assistant/action/observation/final/turn_end/session_end`) with metadata like provider, model, tokenizer, and token usage.
 - Config: `~/.memo/config.toml` (overridable via `MEMO_HOME`). If missing, UI setup flow is triggered.
 

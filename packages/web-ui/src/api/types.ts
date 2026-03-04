@@ -1,6 +1,6 @@
 import type {
     ApiEnvelope as CoreApiEnvelope,
-    FileSuggestion as CoreFileSuggestion,
+    SseEventEnvelope as CoreSseEventEnvelope,
     LiveSessionState as CoreLiveSessionState,
     McpServerRecord as CoreMcpServerRecord,
     QueuedInputItem as CoreQueuedInputItem,
@@ -20,8 +20,8 @@ import type {
     WorkspaceDirEntry as CoreWorkspaceDirEntry,
     WorkspaceFsListResult as CoreWorkspaceFsListResult,
     WorkspaceRecord as CoreWorkspaceRecord,
-    WsServerEvent as CoreWsServerEvent,
-} from '@memo-code/core'
+    FileSuggestion as CoreFileSuggestion,
+} from '@memo-code/types'
 
 export type ApiMeta = {
     requestId: string
@@ -37,19 +37,16 @@ export type ApiError = {
 export type ApiEnvelope<T> = CoreApiEnvelope<T>
 
 export type AuthTokenPair = {
-    tokenType: 'Bearer'
     accessToken: string
-    refreshToken: string
-    accessTokenExpiresIn: number
-    refreshTokenExpiresIn: number
+    expiresIn: number
 }
 
 export type TokenState = {
     accessToken: string
-    refreshToken: string
     accessTokenExpiresAt?: number
-    refreshTokenExpiresAt?: number
 }
+
+export type SseEventEnvelope = CoreSseEventEnvelope
 
 export type TokenUsageSummary = CoreTokenUsageSummary
 export type ToolUsageSummary = CoreToolUsageSummary
@@ -79,7 +76,7 @@ export type ListSessionsQuery = {
     sortBy?: 'updatedAt' | 'startedAt' | 'project' | 'title'
     order?: 'asc' | 'desc'
     project?: string
-    workspaceId?: string
+    workspaceCwd?: string
     dateFrom?: string
     dateTo?: string
     q?: string
@@ -115,47 +112,9 @@ export type ChatFileSuggestionResponse = {
 
 export type SessionInputResult = {
     accepted: boolean
-    kind: 'turn' | 'command'
-    status: 'ok' | 'error' | 'cancelled'
-    message?: string
+    queueId: string
+    queued: number
 }
-
-export type WsRpcResponse<T = unknown> =
-    | {
-          id: string
-          type: 'rpc.response'
-          ok: true
-          data: T
-      }
-    | {
-          id: string
-          type: 'rpc.response'
-          ok: false
-          error: {
-              code: string
-              message: string
-              details?: unknown
-          }
-      }
-
-export type WsEventFrame<T = unknown> = {
-    type: 'event'
-    topic: string
-    data: T
-    seq: number
-    ts: string
-}
-
-export type WsServerEvent =
-    | CoreWsServerEvent
-    | {
-          type: 'runtime.status'
-          payload: SessionRuntimeBadge
-      }
-    | {
-          type: 'workspace.changed'
-          payload: unknown
-      }
 
 export type McpServerConfig = Record<string, unknown>
 

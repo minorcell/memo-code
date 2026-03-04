@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useInput, useStdout } from 'ink'
-import type { MCPServerConfig, ProviderConfig } from '@memo/core'
+import type { MCPServerConfig, ProviderConfig } from '../http/api_types'
 import { resolveSlashCommand, SLASH_SPECS } from '../slash/registry'
 import type { SlashContext } from '../slash/types'
 import { getFileSuggestions } from '../controllers/file_suggestions'
@@ -45,8 +45,7 @@ type ComposerProps = {
     busy: boolean
     history: string[]
     cwd: string
-    sessionsDir: string
-    currentSessionFile?: string
+    currentSessionId?: string
     providers: ProviderConfig[]
     configPath: string
     providerName: string
@@ -180,8 +179,7 @@ function formatTimestamp(ts: number): string {
 type SuggestionBuildInput = {
     trigger: Trigger
     cwd: string
-    sessionsDir: string
-    currentSessionFile?: string
+    currentSessionId?: string
     providers: ProviderConfig[]
     toolPermissionMode: ToolPermissionMode
 }
@@ -247,8 +245,7 @@ function buildSlashSuggestions(keyword: string): SuggestionBuildResult {
 async function buildSuggestionsForTrigger({
     trigger,
     cwd,
-    sessionsDir,
-    currentSessionFile,
+    currentSessionId,
     providers,
     toolPermissionMode,
 }: SuggestionBuildInput): Promise<SuggestionBuildResult> {
@@ -272,10 +269,9 @@ async function buildSuggestionsForTrigger({
 
         case 'history': {
             const entries = await loadSessionHistoryEntries({
-                sessionsDir,
                 cwd,
                 keyword: trigger.keyword,
-                activeSessionFile: currentSessionFile,
+                activeSessionId: currentSessionId,
             })
             const items: SuggestionRecord[] = entries.map((entry) => ({
                 id: entry.id,
@@ -304,8 +300,7 @@ export const Composer = memo(function Composer({
     busy,
     history,
     cwd,
-    sessionsDir,
-    currentSessionFile,
+    currentSessionId,
     providers,
     configPath,
     providerName,
@@ -459,8 +454,7 @@ export const Composer = memo(function Composer({
                 const { mode: nextMode, items: nextItems } = await buildSuggestionsForTrigger({
                     trigger,
                     cwd,
-                    sessionsDir,
-                    currentSessionFile,
+                    currentSessionId,
                     providers,
                     toolPermissionMode,
                 })
@@ -480,15 +474,7 @@ export const Composer = memo(function Composer({
         return () => {
             cancelled = true
         }
-    }, [
-        trigger,
-        cwd,
-        sessionsDir,
-        currentSessionFile,
-        providers,
-        toolPermissionMode,
-        closeSuggestions,
-    ])
+    }, [trigger, cwd, currentSessionId, providers, toolPermissionMode, closeSuggestions])
 
     const applySuggestion = useCallback(
         (record?: SuggestionRecord) => {

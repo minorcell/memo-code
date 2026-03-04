@@ -26,7 +26,8 @@
 
         "baseUrl": ".",
         "paths": {
-            "@/*": ["./src/*"]
+            "@/*": ["./src/*"],
+            "@memo-code/types": ["../types/src/index.ts"]
         }
     },
     "include": ["src"]

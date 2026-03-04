@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { authApi, clearAuthTokens, disconnectWs, getAuthTokens, setAuthTokens } from '@/api'
+import { authApi, clearAuthTokens, getAuthTokens, setAuthTokens } from '@/api'
 import { getErrorMessage } from '@/utils/error'
 
 type AuthStore = {
@@ -7,7 +7,7 @@ type AuthStore = {
     username: string
     pending: boolean
     error: string | null
-    login: (username: string, password: string) => Promise<boolean>
+    login: (password: string) => Promise<boolean>
     logout: () => Promise<void>
     clearError: () => void
 }
@@ -17,17 +17,15 @@ export const useAuthStore = create<AuthStore>((set) => ({
     username: 'memo',
     pending: false,
     error: null,
-    async login(username, password) {
+    async login(password) {
         set({ pending: true, error: null })
         try {
-            const pair = await authApi.login({ username, password })
+            const pair = await authApi.login({ password })
             setAuthTokens({
                 accessToken: pair.accessToken,
-                refreshToken: pair.refreshToken,
-                accessTokenExpiresAt: Date.now() + pair.accessTokenExpiresIn * 1000,
-                refreshTokenExpiresAt: Date.now() + pair.refreshTokenExpiresIn * 1000,
+                accessTokenExpiresAt: Date.now() + pair.expiresIn * 1000,
             })
-            set({ isAuthenticated: true, username, pending: false })
+            set({ isAuthenticated: true, username: 'memo', pending: false })
             return true
         } catch (error) {
             set({ pending: false, error: getErrorMessage(error, 'Login failed') })
@@ -35,16 +33,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
         }
     },
     async logout() {
-        const current = getAuthTokens()
         set({ pending: true, error: null })
         try {
-            if (current?.refreshToken) {
-                await authApi.logout({ refreshToken: current.refreshToken })
-            }
+            await authApi.logout()
         } catch {
             // Ignore logout API failure and clear local state anyway.
         } finally {
-            disconnectWs()
             clearAuthTokens()
             set({ isAuthenticated: false, pending: false })
         }

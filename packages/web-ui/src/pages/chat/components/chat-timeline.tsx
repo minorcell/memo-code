@@ -25,7 +25,7 @@ export function ChatTimeline({
     sessionCwd,
     messagesEndRef,
 }: ChatTimelineProps) {
-    if (!hasActiveSession) {
+    if (!hasActiveSession && turns.length === 0) {
         return (
             <div className="flex-1 overflow-auto">
                 <div className="px-3 py-4 sm:px-4 sm:py-6">

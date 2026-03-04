@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import type { MCPServerConfig } from '@memo/core'
+import type { MCPServerConfig } from '../http/api_types'
 
 const GH_COMMAND_TIMEOUT_MS = 12_000
 const GH_REVIEW_PERMISSIONS = new Set(['WRITE', 'MAINTAIN', 'ADMIN'])

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { cjk } from '@streamdown/cjk'
 import { code } from '@streamdown/code'
-import { mermaid } from '@streamdown/mermaid'
 import { Streamdown } from 'streamdown'
 import { FileText, Folder, Globe, Loader2, Trash2, X, Zap } from 'lucide-react'
 import type { SkillDetail, SkillRecord } from '@/api/types'
@@ -17,7 +16,6 @@ import { useSkillsStore } from '@/stores'
 
 const streamdownPlugins = {
     code,
-    mermaid,
     cjk,
 }
 
