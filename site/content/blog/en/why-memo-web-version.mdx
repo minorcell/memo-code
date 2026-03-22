@@ -55,7 +55,7 @@ This was a difficult problem for the original implementation. So I made many cha
 
 - **Workspace abstraction**: The core package defines workspace data structure, including fields like id, name, cwd (current working directory), creation time, last used time. Using `workspaceIdFromCwd` with SHA256 hashing on the path generates a stable workspace ID.
 
-- **Multi-workspace support**: web-server'"'"'s `SessionRuntimeRegistry` maintains session and workspace mappings. Each session can be associated with a workspace, with status (idle/running/closed) tracked independently.
+- **Multi-workspace support**: core server'"'"'s `SessionManager` and runtime badge APIs maintain session and workspace mappings. Each session can be associated with a workspace, with status (idle/running/closed) tracked independently.
 
 - **Unified into core**: Consolidating TUI implementation into core, so we don'"'"'t need to maintain separate code for different endpoints.
 
@@ -67,14 +67,13 @@ The premise of "Add project" is: during remote access, the file explorer reads t
 
 This is completely different from local desktop applications—the browser runs on the client, but file operations happen on the server.
 
-web-server'"'"'s `WorkspacesService` implements this:
+The core HTTP server implements this through workspace routes and filesystem listing:
 
 ```typescript
-async listDirectories(pathInput: string | undefined): Promise<WorkspaceFsListResult> {
-  // Read the directory of the machine running memo
-  const entries = await readdir(targetPath, { withFileTypes: true });
-  // Return to browser for display
-  return { path, parentPath, items };
+async function listWorkspaceDirectories(workspaces, pathInput) {
+    // Read directories from the machine running memo
+    // and keep results inside allowed workspace roots.
+    return { path, parentPath, items }
 }
 ```
 

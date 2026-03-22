@@ -1,0 +1,8 @@
+{
+    "name": "@memo-code/types",
+    "type": "module",
+    "module": "src/index.ts",
+    "types": "src/index.ts",
+    "version": "0.1.0",
+    "private": true
+}

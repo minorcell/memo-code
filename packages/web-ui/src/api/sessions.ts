@@ -1,4 +1,4 @@
-import { wsRequest } from '@/api/ws-client'
+import { request } from '@/api/request'
 import type {
     ListSessionsQuery,
     SessionDetail,
@@ -7,17 +7,46 @@ import type {
 } from '@/api/types'
 
 export function getSessions(params: ListSessionsQuery) {
-    return wsRequest<SessionListResponse>('sessions.list', params)
+    const { page, pageSize, sortBy, order, project, workspaceCwd, dateFrom, dateTo, q } = params
+
+    return request<SessionListResponse>({
+        method: 'GET',
+        url: '/api/sessions',
+        params: {
+            page,
+            pageSize,
+            sortBy,
+            order,
+            project,
+            workspaceCwd,
+            dateFrom,
+            dateTo,
+            q,
+        },
+    })
 }
 
 export function getSessionDetail(sessionId: string) {
-    return wsRequest<SessionDetail>('sessions.detail', { sessionId })
+    return request<SessionDetail>({
+        method: 'GET',
+        url: `/api/sessions/${encodeURIComponent(sessionId)}`,
+    })
 }
 
 export function getSessionEvents(params: { sessionId: string; cursor?: string; limit?: number }) {
-    return wsRequest<SessionEventsResponse>('sessions.events', params)
+    return request<SessionEventsResponse>({
+        method: 'GET',
+        url: `/api/sessions/${encodeURIComponent(params.sessionId)}/events`,
+        params: {
+            cursor: params.cursor,
+            limit: params.limit,
+        },
+    })
 }
 
 export function removeSession(sessionId: string) {
-    return wsRequest<{ deleted: boolean }>('sessions.remove', { sessionId })
+    return request<{ deleted: boolean }>({
+        method: 'DELETE',
+        url: `/api/sessions/${encodeURIComponent(sessionId)}`,
+    })
 }

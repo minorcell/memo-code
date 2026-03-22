@@ -55,7 +55,7 @@ cd ~/Desktop/projects/project_a/ && memo
 
 - **workspace 抽象**：核心包定义了 workspace 的数据结构，包括 id、name、cwd（当前工作目录）、创建时间、最后使用时间等字段。通过 `workspaceIdFromCwd` 用 SHA256 对路径做哈希，生成稳定的 workspace ID。
 
-- **多 workspace 支持**：web-server 的 `SessionRuntimeRegistry` 维护了 session 和 workspace 的映射关系。每个 session 可以关联一个 workspace，状态（idle/running/closed）也独立追踪。
+- **多 workspace 支持**：core server 的 `SessionManager` 与 runtime badge API 维护了 session 和 workspace 的映射关系。每个 session 可以关联一个 workspace，状态（idle/running/closed）也独立追踪。
 
 - **统一到 core**：把 TUI 的实现收拢到 core 中，这样就不必为不同端各维护一套代码。
 
@@ -67,14 +67,13 @@ cd ~/Desktop/projects/project_a/ && memo
 
 这和本地桌面应用完全不一样——浏览器跑在客户端，但文件操作发生在服务端。
 
-web-server 的 `WorkspacesService` 实现了这个功能：
+core HTTP server 通过 workspace 路由与文件系统列表接口实现了这个能力：
 
 ```typescript
-async listDirectories(pathInput: string | undefined): Promise<WorkspaceFsListResult> {
-  // 读取运行 memo 的那台机器的目录
-  const entries = await readdir(targetPath, { withFileTypes: true });
-  // 返回给浏览器展示
-  return { path, parentPath, items };
+async function listWorkspaceDirectories(workspaces, pathInput) {
+    // 读取运行 memo 的那台机器目录
+    // 并确保结果始终限制在允许的 workspace 根路径内
+    return { path, parentPath, items }
 }
 ```
 

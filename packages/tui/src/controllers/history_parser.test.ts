@@ -1,48 +1,64 @@
 import assert from 'node:assert'
 import { describe, test } from 'vitest'
+import type { SessionDetail } from '../http/api_types'
 import { TOOL_STATUS } from '../types'
-import { parseHistoryLog } from './history_parser'
+import { parseSessionDetail } from './history_parser'
 
-function line(event: Record<string, unknown>): string {
-    return JSON.stringify({
-        ts: new Date().toISOString(),
-        sessionId: 'session-1',
-        ...event,
-    })
-}
-
-describe('parseHistoryLog', () => {
-    test('maps core history detail to tui timeline model', () => {
-        const raw = [
-            line({ type: 'session_start', meta: { cwd: '/tmp/demo' } }),
-            line({ type: 'turn_start', turn: 1, content: 'plan this task' }),
-            line({ type: 'assistant', turn: 1, step: 0, content: 'thinking...' }),
-            line({
-                type: 'action',
-                turn: 1,
-                step: 0,
-                meta: {
-                    tool: 'read_file',
-                    input: { path: 'README.md' },
-                    thinking: 'need context',
+describe('parseSessionDetail', () => {
+    test('maps session detail to tui timeline model', () => {
+        const detail: SessionDetail = {
+            id: 'history-1',
+            sessionId: 'session-1',
+            filePath: '/tmp/history-1.jsonl',
+            title: 'plan this task',
+            project: 'demo',
+            workspaceId: 'ws-1',
+            cwd: '/tmp/demo',
+            date: {
+                day: '2026-03-03',
+                startedAt: '2026-03-03T00:00:00.000Z',
+                updatedAt: '2026-03-03T00:01:00.000Z',
+            },
+            status: 'idle',
+            turnCount: 1,
+            tokenUsage: {
+                prompt: 10,
+                completion: 12,
+                total: 22,
+            },
+            toolUsage: {
+                total: 1,
+                success: 1,
+                failed: 0,
+                denied: 0,
+                cancelled: 0,
+            },
+            summary: 'Session summary',
+            turns: [
+                {
+                    turn: 1,
+                    input: 'plan this task',
+                    finalText: 'done',
+                    status: 'ok',
+                    steps: [
+                        {
+                            step: 0,
+                            assistantText: 'thinking...',
+                            thinking: 'need context',
+                            action: {
+                                tool: 'read_file',
+                                input: { path: 'README.md' },
+                            },
+                            observation: 'loaded',
+                            resultStatus: 'success',
+                        },
+                    ],
                 },
-            }),
-            line({
-                type: 'observation',
-                turn: 1,
-                step: 0,
-                content: 'loaded',
-                meta: { status: 'success' },
-            }),
-            line({
-                type: 'final',
-                turn: 1,
-                content: 'done',
-                meta: { status: 'ok' },
-            }),
-        ].join('\n')
+            ],
+            events: [],
+        }
 
-        const parsed = parseHistoryLog(raw)
+        const parsed = parseSessionDetail(detail)
         assert.strictEqual(parsed.messages.length, 2)
         assert.strictEqual(parsed.messages[0]?.role, 'user')
         assert.strictEqual(parsed.messages[0]?.content, 'plan this task')

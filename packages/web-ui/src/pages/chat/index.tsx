@@ -198,7 +198,7 @@ export function ChatPage() {
                 onCancelTurn={cancelCurrentTurn}
                 onApprovalDecision={handleApprovalDecision}
                 sessionId={liveSession?.id ?? selectedSessionId}
-                workspaceId={liveSession?.workspaceId ?? layout.selectedWorkspaceId}
+                workspaceCwd={liveSession?.cwd ?? layout.selectedWorkspace?.cwd ?? null}
                 contextPercent={contextPercent}
                 queuedInputs={liveSession?.queuedInputs ?? []}
                 onEditQueuedInput={handleEditQueuedInput}

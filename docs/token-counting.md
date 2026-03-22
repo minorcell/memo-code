@@ -4,28 +4,29 @@ This document describes how Memo Code CLI estimates and records tokens for promp
 
 ## Counting Implementation
 
-- **Underlying encoder**: uses `@dqbd/tiktoken`, default encoding `cl100k_base`; override via `tokenizerModel`.
-- **Plain text count**: `countText(text)` encodes a string directly and returns token length.
+- **Primary source**: prefers model-returned usage (`inputTokens/outputTokens/totalTokens`) from AI SDK calls.
+- **Fallback counter**: local lightweight estimator (default model label `cl100k_base`); override via `tokenizerModel`.
+- **Plain text count**: `countText(text)` estimates by character mix (ASCII/CJK/symbol/newline weighting).
 - **Message array count (ChatML approximation)**: `countMessages(messages)` uses a common OpenAI ChatML estimate:
     - fixed overhead of 4 tokens per message (role/name wrappers, etc.)
-    - `content` counted via tiktoken encoding
+    - `content` counted with local estimator
     - if `name` is supported later, adds 1 token
     - adds 2 tokens at the end for assistant priming
 
-This is closer to actual ChatML overhead than naive text concatenation, but still an approximation.
+This remains an approximation for context budgeting, while runtime accounting prefers provider usage when available.
 
 ## Usage Scenarios
 
 - **Prompt budgeting**: before each step, `runTurn` estimates prompt tokens with `countMessages` and applies:
     - `warnPromptTokens`: prints warning
     - `maxPromptTokens`: returns early when exceeded, preventing over-limit LLM requests
-- **Usage reconciliation**: each step combines local count and model-returned `usage` (if available), records into token usage and JSONL history events.
+- **Usage reconciliation**: each step combines local estimate and AI SDK usage (if available), records into token usage and JSONL history events.
 
 ## Precision and Limitations
 
 - Fixed ChatML overhead varies slightly by model. Current "4 per message + 2 ending" estimate may differ by dozens of tokens on specific models.
-- Extra structural overhead for tool/function calling is not explicitly modeled yet. For exact reconciliation, model-specific constants can be added later.
-- If using custom `callLLM`, pass matching model encoding or custom `tokenCounter` implementation to align with real usage.
+- Extra structural overhead for tool/function calling is not explicitly modeled yet. For exact reconciliation, prefer provider usage data.
+- If using custom `callLLM`, inject custom `tokenCounter` when you need model-specific estimation rules.
 
 ## How to Override
 

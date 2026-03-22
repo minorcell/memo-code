@@ -1,4 +1,4 @@
-import type { TokenUsage, TurnStatus } from '@memo/core'
+import type { TokenUsage, TurnStatus } from './http/api_types'
 
 export const TOOL_STATUS = {
     PENDING: 'pending',

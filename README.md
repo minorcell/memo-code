@@ -97,6 +97,8 @@ First run will guide you through Provider/Model setup and save config to `~/.mem
 | Resume Session | `memo --prev`                                  | Load latest session for current directory |
 | Web Console    | `memo web --host 127.0.0.1 --port 5494 --open` | Browser-based operation                   |
 
+`memo web` requires a shared password via `MEMO_SERVER_PASSWORD`.
+
 ---
 
 ## 🏗️ Architecture
@@ -104,11 +106,10 @@ First run will guide you through Provider/Model setup and save config to `~/.mem
 ```
 memo-code/
 ├── packages/
-│   ├── core/          # Core logic: Session state machine, Config handling
+│   ├── core/          # Core logic: Session state machine, Config handling, HTTP server API
 │   ├── tools/         # Tool routing, MCP Client management, built-in tools (exec_command, read_text_file, apply_patch...)
 │   ├── tui/           # Terminal runtime: CLI entry, interactive TUI
 │   ├── web-ui/        # Web frontend: React components
-│   └── web-server/    # Web backend: session management, API adapter
 └── docs/              # Technical documentation
 ```
 
@@ -117,7 +118,7 @@ memo-code/
 - **Architecture**: Clean Core / Tools / TUI separation, state-machine driven session management
 - **Testing**: Core + Tools coverage > 70%, complete unit + integration tests
 - **Protocol**: Native MCP (Model Context Protocol) support, can integrate any MCP tool server
-- **Token Estimation**: Real-time context monitoring based on tiktoken, configurable auto-compaction strategy
+- **Token Estimation**: Real-time context monitoring based on AI SDK usage + local fallback estimator, configurable auto-compaction strategy
 - **Distribution**: npm package with pre-built Web assets, hot-reloading without perception
 
 ---

@@ -1,136 +1,120 @@
 ---
-title: 'Web 与 Server 的统一通信架构：All-in WebSocket 设计实践'
-description: '从 memo 的实践中提炼出 WebSocket 通信方案：JSON-RPC 帧设计、事件订阅模型、为什么选择全栈 WebSocket 以及在实际场景中的优势。'
+title: 'Web 与 Server 的统一通信架构：HTTP API + SSE 设计实践'
+description: '在本轮重构后，memo Web 采用 HTTP API 处理请求响应，采用 SSE 处理服务端推送。本文总结事件模型、前后端实现和迁移经验。'
 date: '2026-02-18'
 order: 5
 ---
 
-# Web 与 Server 的统一通信架构：All-in WebSocket 设计实践
+# Web 与 Server 的统一通信架构：HTTP API + SSE 设计实践
 
-把 TUI 做完后，做 Web 版是顺理成章的事。但真正动手的时候，第一个问题就把的我卡住了：
+把 TUI 做完后，做 Web 版是顺理成章的事。通信层仍然是第一个关键问题：
 
 **通信层怎么搞？**
 
-## 上来就被问住了
+在最新重构里，memo 最终落地为一个非常明确的拆分：
 
-TUI 版本不存在通信问题——所有逻辑都在同一个进程里，函数直接调用就行。但 Web 版不一样，浏览器和服务器是两个独立的进程，得通过网络说话。
+- **HTTP API** 负责请求/响应
+- **SSE 事件流** 负责服务端主动推送
 
-一开始我想都没想：那就 REST API 呗。正好我搞前端也熟，做起来应该顺手。
+这套口径已经替代了早期单通道 WebSocket 叙事，并与当前代码实现一致。
 
-但等真的把需求列完，我开始觉得不对劲了：
+## 通信拆分：命令通道 vs 事件通道
 
-- 流式输出：模型是一个字一个字吐的，界面得跟着刷新
-- 审批拦截：执行危险操作时，浏览器得弹窗让用户确认
-- 状态同步：会话 running 还是 idle，界面得实时知道
-- 请求响应：创建会话、发送消息、查询状态……
+把方向拆开后，场景就很清晰：
 
-这些场景都有一个共同点：**服务端需要主动推送到浏览器**。
+- **Client -> Server（命令/查询）**
+    - 创建会话：`POST /api/chat/sessions`
+    - 发送消息：`POST /api/chat/sessions/{id}/messages`
+    - 审批决策：`POST /api/chat/sessions/{id}/approval`
+    - 查询状态/历史/管理接口：常规 HTTP
 
-如果是 REST，就很麻烦：
+- **Server -> Client（实时事件）**
+    - 订阅入口：`GET /api/chat/sessions/{id}/events`
+    - 传输协议：`text/event-stream`
+    - 数据结构：统一事件 envelope（`event`、`data`、`seq`、`ts`）
 
-- 流式输出 → 得用轮询，或者 SSE
-- 审批拦截 → 同样得轮询，或者轮询状态再判断
-- 状态同步 → 也是轮询
+## 事件 Envelope 与生命周期事件
 
-三套机制，光维护就够喝一壶。
-
-## WebSocket 是个现成答案
-
-想了一圈，WebSocket 正好就是为这种场景设计的：
-
-- 全双工：服务端可以主动推，浏览器也可以随时发
-- 低延迟：一次连接建立，之后全是帧传输
-- 有状态：一个连接对应一个会话，语义清晰
-
-但光有协议还不够，关键是怎么用。
-
-## 帧设计：JSON-RPC 的简化版
-
-memo 用了一套类似 JSON-RPC 的帧格式，不复杂，三种就够了：
+SSE 帧通过事件名分发，`data` 内承载结构化 envelope：
 
 ```typescript
-// 客户端发请求
-{ id: "uuid", type: "rpc.request", method: "session.create", params: {...} }
-
-// 服务端返回
-{ id: "uuid", type: "rpc.response", ok: true, data: {...} }
-
-// 服务端主动推
-{ type: "event", topic: "assistant.chunk", data: {...}, seq: 1, ts: "..." }
+event: assistant.chunk
+data: {
+  "event": "assistant.chunk",
+  "data": { "turn": 3, "step": 1, "chunk": "hello" },
+  "seq": 42,
+  "ts": "2026-03-02T12:34:56.000Z"
+}
 ```
 
-**RPC 调用**用来做"请求/响应"：客户端发一个，服务端处理完返回一个。比如创建会话、发送消息、查询状态。
+核心事件覆盖了 Agent 一轮执行的完整生命周期：
 
-**事件推送**用来做"服务端主动"：订阅一个 topic，然后等服务端往这个 topic 推数据。比如模型开始吐字了、工具执行完了、该审批了。
-
-这两种模式加起来，几乎能覆盖所有通信场景。
-
-## 事件类型：覆盖 Agent 完整生命周期
-
-memo 的 WebSocket 会推这些事件：
-
+- `session.snapshot`：订阅后先下发一次当前快照
 - `turn.start`：用户发来一条消息
 - `assistant.chunk`：模型吐了一个字/词
 - `turn.final`：这轮对话结束
 - `session.status`：会话状态变了（idle / running / closed）
+- `context.usage` / `context.compact`：上下文窗口变化
 - `approval.request`：有个危险操作需要用户确认
 - `tool.action`：某个工具开始跑了
 - `tool.observation`：工具跑完了，返回结果
+- `system.message` / `error`：系统提示和错误
 
-这些事件串起来，就是一个 Agent 从"接需求"到"干完活"的完整生命周期。
+## 客户端实现要点
 
-## 客户端实现：重连、超时、订阅管理
+浏览器端当前实现位于 `packages/web-ui/src/stores/chat-store.ts`，关键点有三类：
 
-浏览器端的 ws-client（`packages/web-ui/src/api/ws-client.ts`）做了几个关键设计：
+1. **带鉴权的连接建立**
+    - 打开流前先准备 access token
+    - 返回 `401` 时停止重连并提示重新登录
 
-**自动重连**：网络不稳定是常态，断掉就默默重连，不用用户手动刷新。
+2. **指数退避重连**
+    - 流中断后自动安排重连
+    - 延迟逐步增加并设上限，避免重试风暴
 
-**请求超时**：默认 20 秒。发出去的请求不能无限等，超时就把 pending 状态清掉，防止卡死。
+3. **增量 SSE 解析**
+    - 从 `ReadableStream` 持续读 chunk
+    - 用 `\n\n` 切帧
+    - 同时兼容 named event 与 envelope JSON
 
-**订阅管理**：一个 topic 可以有多个 handler，取消订阅返回一个小函数，用起来很顺：
+## 服务端实现要点
 
-```typescript
-const unsub = wsClient.subscribe('assistant.chunk', (data) => {
-    appendToChat(data.chunk)
-})
-// 不用了
-unsub()
-```
+服务端对应实现：
 
-**认证**：通过 URL query 传 accessToken，服务端在 WebSocket 升级阶段验证。
+- 路由定义在 `packages/core/src/server/http_server.ts`
+    - `GET /api/chat/sessions/:id/events` 先鉴权
+    - 通过 `SseHub` 注册连接
+    - 订阅成功后立即推送 `session.snapshot`
 
-## 为什么 All-in
+- SSE 基础设施在 `packages/core/src/server/sse.ts`
+    - 设置标准 SSE 头（`text/event-stream`、`keep-alive`、禁缓冲）
+    - 每 20 秒发送心跳注释（`: keep-alive`）
+    - 按 session 维护递增序号 `seq` 方便排障
 
-说白了，就三个原因：
+## 为什么现在这套更合适
 
-**一是实时性。** 流式输出、审批拦截、状态同步，个个都需要"服务端主动推"。HTTP 搞不定这个，非得轮询或者 SSE，但维护成本高。
+核心是三个点：
 
-**二是统一。** 一次连接把所有通信都包了：会话管理、聊天、工具调用、审批。没有其他 HTTP API。协议统一，调试也统一。
+1. **职责边界清晰**
+    - 命令接口走类型化 HTTP handler
+    - 实时更新集中在单一 SSE 流
 
-**三是低开销。** HTTP 每次请求都要 TLS 握手 + TCP 建立，延迟高。WebSocket 建一次，之后全是帧。对话式交互里体验差别很明显。
+2. **运维与调试更简单**
+    - 浏览器网络面板和 `curl` 就能直接观察
+    - 不再维护额外的自定义 RPC 协议层
 
-## 安全与容错
+3. **前端韧性更高**
+    - 重连、鉴权、事件解析都在同一 store 显式处理
+    - 不依赖已删除的 websocket client 抽象
 
-WebSocket 也需要保护：
-
-```typescript
-// 服务端限流
-const MAX_REQUESTS_PER_MINUTE = 120
-const MAX_REQUEST_BYTES = 256 * 1024
-```
-
-断连也要给清晰的提示：
-
-- 4401：token 无效
-- 4404：会话不存在
-- 4409：会话被其他客户端抢走了
+目标不是“永远不用 WebSocket”，而是让默认链路在当前聊天场景下足够简单、稳定、可维护。
 
 ## 总结
 
-memo 的 Web 通信层选 All-in WebSocket，核心就一个原因：**实时性 + 统一协议 + 低开销**。
+memo Web 当前主通信口径是 **HTTP API + SSE**：
 
-一套连接，RPC 做请求响应，事件订阅做服务端推送。适合交互性强、实时性要求高的 Agent 应用。
+- 请求响应：常规 HTTP 路由
+- 实时事件：会话级 SSE 流
+- 数据模型：前后端共享的事件 envelope
 
-如果是纯请求响应、实时性要求不高的场景，REST 也是好选择——简单就是硬道理。
-
-（完）
+这套架构已经和重构后的 core server 实现对齐，也清除了对已删除 websocket client 的历史引用。

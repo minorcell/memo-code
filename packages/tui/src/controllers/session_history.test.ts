@@ -1,68 +1,102 @@
-import assert from 'node:assert'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { describe, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+
+const { withSharedCoreServerClientMock } = vi.hoisted(() => ({
+    withSharedCoreServerClientMock: vi.fn(),
+}))
+
+vi.mock('../http/shared_core_client', () => ({
+    withSharedCoreServerClient: withSharedCoreServerClientMock,
+}))
+
 import { loadSessionHistoryEntries } from './session_history'
 
-function buildHistoryLine(event: Record<string, unknown>): string {
-    return JSON.stringify({
-        ts: new Date().toISOString(),
-        sessionId: 'session-1',
-        ...event,
-    })
-}
-
-async function writeSessionFile(
-    sessionsDir: string,
-    fileName: string,
-    lines: string[],
-): Promise<string> {
-    await mkdir(sessionsDir, { recursive: true })
-    const filePath = join(sessionsDir, fileName)
-    await writeFile(filePath, `${lines.join('\n')}\n`, 'utf8')
-    return filePath
-}
-
 describe('loadSessionHistoryEntries', () => {
-    test('prefers session_title over first prompt for history display', async () => {
-        const sessionsDir = join(tmpdir(), `memo-session-history-${Date.now()}-title`)
-        const cwd = join(tmpdir(), `memo-session-cwd-${Date.now()}`)
-        await mkdir(cwd, { recursive: true })
+    test('prefers title and maps API response', async () => {
+        withSharedCoreServerClientMock.mockImplementation(async (runner) =>
+            runner({
+                listSessions: vi.fn().mockResolvedValue({
+                    items: [
+                        {
+                            id: 'history-1',
+                            sessionId: 'session-1',
+                            filePath: '/tmp/session-1.jsonl',
+                            title: 'Express.js REST API',
+                            project: 'demo',
+                            workspaceId: 'ws-1',
+                            cwd: '/tmp/demo',
+                            date: {
+                                day: '2026-03-03',
+                                startedAt: '2026-03-03T00:00:00.000Z',
+                                updatedAt: '2026-03-03T00:01:00.000Z',
+                            },
+                            status: 'idle',
+                            turnCount: 1,
+                            tokenUsage: { prompt: 1, completion: 1, total: 2 },
+                            toolUsage: {
+                                total: 0,
+                                success: 0,
+                                failed: 0,
+                                denied: 0,
+                                cancelled: 0,
+                            },
+                        },
+                    ],
+                    page: 1,
+                    pageSize: 20,
+                    total: 1,
+                    totalPages: 1,
+                }),
+            }),
+        )
 
-        try {
-            await writeSessionFile(sessionsDir, 'rollout-title.jsonl', [
-                buildHistoryLine({ type: 'session_start', meta: { cwd } }),
-                buildHistoryLine({ type: 'turn_start', content: 'Help me create an API' }),
-                buildHistoryLine({ type: 'session_title', content: 'Express.js REST API' }),
-            ])
-
-            const entries = await loadSessionHistoryEntries({ sessionsDir, cwd })
-            assert.strictEqual(entries.length, 1)
-            assert.strictEqual(entries[0]?.input, 'Express.js REST API')
-        } finally {
-            await rm(sessionsDir, { recursive: true, force: true })
-            await rm(cwd, { recursive: true, force: true })
-        }
+        const entries = await loadSessionHistoryEntries({ cwd: '/tmp/demo', limit: 10 })
+        expect(entries).toHaveLength(1)
+        expect(entries[0]?.input).toBe('Express.js REST API')
     })
 
-    test('falls back to first prompt when session_title is missing', async () => {
-        const sessionsDir = join(tmpdir(), `memo-session-history-${Date.now()}-prompt`)
-        const cwd = join(tmpdir(), `memo-session-cwd-${Date.now()}`)
-        await mkdir(cwd, { recursive: true })
+    test('filters out active session id', async () => {
+        withSharedCoreServerClientMock.mockImplementation(async (runner) =>
+            runner({
+                listSessions: vi.fn().mockResolvedValue({
+                    items: [
+                        {
+                            id: 'history-1',
+                            sessionId: 'active-session',
+                            filePath: '/tmp/session-1.jsonl',
+                            title: 'Current session',
+                            project: 'demo',
+                            workspaceId: 'ws-1',
+                            cwd: '/tmp/demo',
+                            date: {
+                                day: '2026-03-03',
+                                startedAt: '2026-03-03T00:00:00.000Z',
+                                updatedAt: '2026-03-03T00:01:00.000Z',
+                            },
+                            status: 'idle',
+                            turnCount: 1,
+                            tokenUsage: { prompt: 1, completion: 1, total: 2 },
+                            toolUsage: {
+                                total: 0,
+                                success: 0,
+                                failed: 0,
+                                denied: 0,
+                                cancelled: 0,
+                            },
+                        },
+                    ],
+                    page: 1,
+                    pageSize: 20,
+                    total: 1,
+                    totalPages: 1,
+                }),
+            }),
+        )
 
-        try {
-            await writeSessionFile(sessionsDir, 'rollout-prompt.jsonl', [
-                buildHistoryLine({ type: 'session_start', meta: { cwd } }),
-                buildHistoryLine({ type: 'turn_start', content: 'Design a postgres schema' }),
-            ])
-
-            const entries = await loadSessionHistoryEntries({ sessionsDir, cwd })
-            assert.strictEqual(entries.length, 1)
-            assert.strictEqual(entries[0]?.input, 'Design a postgres schema')
-        } finally {
-            await rm(sessionsDir, { recursive: true, force: true })
-            await rm(cwd, { recursive: true, force: true })
-        }
+        const entries = await loadSessionHistoryEntries({
+            cwd: '/tmp/demo',
+            activeSessionId: 'active-session',
+            limit: 10,
+        })
+        expect(entries).toHaveLength(0)
     })
 })

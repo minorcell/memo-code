@@ -59,10 +59,9 @@ export function SettingsAccount() {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <Shield className="size-3.5 text-muted-foreground" />
-                                <span className="text-muted-foreground">Refresh:</span>
-                                <code className="break-all rounded bg-muted px-2 py-1">
-                                    {maskedToken(tokens.refreshToken)}
-                                </code>
+                                <span className="text-muted-foreground">
+                                    Refresh tokens are not enabled.
+                                </span>
                             </div>
                         </div>
                     ) : (

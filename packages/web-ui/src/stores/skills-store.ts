@@ -11,11 +11,11 @@ type SkillsStore = {
     load: (query?: {
         scope?: 'project' | 'global'
         q?: string
-        workspaceId?: string
+        workspaceCwd?: string
     }) => Promise<void>
     create: (payload: {
         scope: 'project' | 'global'
-        workspaceId?: string
+        workspaceCwd?: string
         name: string
         description?: string
         content?: string
@@ -34,9 +34,12 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
         set({ loading: true, error: null })
         try {
             const selectedWorkspaceId = useWorkspaceStore.getState().selectedWorkspaceId
+            const selectedWorkspaceCwd =
+                useWorkspaceStore.getState().items.find((item) => item.id === selectedWorkspaceId)
+                    ?.cwd ?? undefined
             const response = await skillsApi.getSkills({
                 ...query,
-                workspaceId: query?.workspaceId ?? selectedWorkspaceId ?? undefined,
+                workspaceCwd: query?.workspaceCwd ?? selectedWorkspaceCwd,
             })
             set({ items: response.items, loading: false })
         } catch (error) {
@@ -55,9 +58,13 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
         try {
             await skillsApi.createSkill({
                 ...payload,
-                workspaceId:
-                    payload.workspaceId ??
-                    useWorkspaceStore.getState().selectedWorkspaceId ??
+                workspaceCwd:
+                    payload.workspaceCwd ??
+                    useWorkspaceStore
+                        .getState()
+                        .items.find(
+                            (item) => item.id === useWorkspaceStore.getState().selectedWorkspaceId,
+                        )?.cwd ??
                     undefined,
                 name,
             })

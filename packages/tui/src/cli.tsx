@@ -1,34 +1,25 @@
 // CLI entry: interactive/one-off modes with session management and logs.
 import { randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { render } from 'ink'
-import {
-    createAgentSession,
-    loadMemoConfig,
-    resolveContextWindowForProvider,
-    writeMemoConfig,
-    selectProvider,
-    getSessionsDir,
-    type AgentSessionDeps,
-    type AgentSessionOptions,
-    type ChatMessage,
-    type MemoConfig,
-} from '@memo/core'
 import { App } from './App'
 import { findLocalPackageInfoSync } from './version'
 import { runMcpCommand } from './mcp'
-import { parseHistoryLog, type ParsedHistoryLog } from './controllers/history_parser'
+import { createHttpAgentSession } from './http/http_agent_session'
+import { parseSessionDetail, type ParsedHistoryLog } from './controllers/history_parser'
 import { loadSessionHistoryEntries } from './controllers/session_history'
 import { parseArgs, type ParsedArgs } from './cli_args'
 import { routeCli } from './cli_router'
+import { closeSharedCoreServerClient, withSharedCoreServerClient } from './http/shared_core_client'
+import { runWebCommand } from './web/run_web_command'
+import type { AgentSessionDeps, AgentSessionOptions, ChatMessage } from './http/api_types'
 
 async function ensureProviderConfig(mode: 'plain' | 'tui') {
-    const loaded = await loadMemoConfig()
-    if (!loaded.needsSetup) return loaded
+    const snapshot = await withSharedCoreServerClient((client) => client.getConfig())
+    if (!snapshot.needsSetup) return snapshot
 
-    const defaultProvider = loaded.config.providers[0]
+    const defaultProvider = snapshot.providers[0]
     const envCandidates = [
         defaultProvider?.env_api_key,
         'OPENAI_API_KEY',
@@ -38,15 +29,21 @@ async function ensureProviderConfig(mode: 'plain' | 'tui') {
     const hasEnvKey = envCandidates.some((key) => Boolean(process.env[key]))
 
     if (defaultProvider && hasEnvKey) {
-        await writeMemoConfig(loaded.configPath, loaded.config)
-        console.log(
-            `Detected API key in env. Wrote default provider (${defaultProvider.name}) to ${loaded.configPath}`,
+        await withSharedCoreServerClient((client) =>
+            client.patchConfig({
+                current_provider: defaultProvider.name,
+                providers: [defaultProvider],
+            }),
         )
-        return { ...loaded, needsSetup: false }
+        const next = await withSharedCoreServerClient((client) => client.getConfig())
+        console.log(
+            `Detected API key in env. Wrote default provider (${defaultProvider.name}) to ${next.configPath}`,
+        )
+        return next
     }
 
     if (mode === 'tui') {
-        return loaded
+        return snapshot
     }
 
     const rl = createInterface({ input, output })
@@ -65,84 +62,85 @@ async function ensureProviderConfig(mode: 'plain' | 'tui') {
             'https://api.deepseek.com',
         )
 
-        const config: MemoConfig = {
-            current_provider: name,
-            providers: [
-                {
-                    name,
-                    env_api_key: envKey,
-                    model,
-                    base_url: baseUrl || undefined,
-                },
-            ],
-        }
-        await writeMemoConfig(loaded.configPath, config)
-        console.log(`Config written to ${loaded.configPath}\n`)
-        return { ...loaded, config, needsSetup: false }
+        await withSharedCoreServerClient((client) =>
+            client.patchConfig({
+                current_provider: name,
+                providers: [
+                    {
+                        name,
+                        env_api_key: envKey,
+                        model,
+                        base_url: baseUrl || undefined,
+                    },
+                ],
+            }),
+        )
+        const next = await withSharedCoreServerClient((client) => client.getConfig())
+        console.log(`Config written to ${next.configPath}\n`)
+        return next
     } finally {
         rl.close()
     }
 }
 
-async function loadPreviousSession(
-    sessionsDir: string,
-    cwd: string,
-): Promise<ParsedHistoryLog | null> {
+async function loadPreviousSession(cwd: string): Promise<ParsedHistoryLog | null> {
     const entries = await loadSessionHistoryEntries({
-        sessionsDir,
         cwd,
         limit: 1,
     })
     const latest = entries[0]
     if (!latest) return null
-    const raw = await readFile(latest.sessionFile, 'utf8')
-    return parseHistoryLog(raw)
+
+    const detail = await withSharedCoreServerClient((client) => client.getSessionDetail(latest.id))
+    return parseSessionDetail(detail)
 }
 
-function restoreHistoryMessages(session: { history: ChatMessage[] }, messages: ChatMessage[]) {
+async function restoreHistoryMessages(
+    session: {
+        history: ChatMessage[]
+        restoreHistory?: (messages: ChatMessage[]) => Promise<void>
+    },
+    messages: ChatMessage[],
+) {
     if (!messages.length) return
+    if (typeof session.restoreHistory === 'function') {
+        await session.restoreHistory(messages)
+        return
+    }
     const systemMessage = session.history[0]
     if (!systemMessage) return
     session.history.splice(0, session.history.length, systemMessage, ...messages)
 }
 
 async function runPlainMode(parsed: ParsedArgs) {
-    const loaded = await ensureProviderConfig('plain')
-    const provider = selectProvider(loaded.config)
-    const contextWindow = resolveContextWindowForProvider(loaded.config, provider)
+    const snapshot = await ensureProviderConfig('plain')
+    const provider = snapshot.selectedProvider
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        contextWindow,
-        autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
-        activeMcpServers: loaded.config.active_mcp_servers,
+        contextWindow: provider.contextWindow,
+        autoCompactThresholdPercent: snapshot.autoCompactThresholdPercent,
+        activeMcpServers: snapshot.activeMcpServers,
         dangerous: parsed.options.dangerous,
     }
-    const sessionsDir = getSessionsDir(loaded, sessionOptions)
-    const previousSession = parsed.options.prev
-        ? await loadPreviousSession(sessionsDir, process.cwd())
-        : null
+    const previousSession = parsed.options.prev ? await loadPreviousSession(process.cwd()) : null
     if (parsed.options.prev && !previousSession) {
         console.error('No previous session found for current directory.')
         process.exitCode = 1
         return
     }
 
-    // Show warning in dangerous mode
     if (parsed.options.dangerous) {
         console.log('⚠️  DANGEROUS MODE: All tool approvals are bypassed!')
     }
 
     const deps: AgentSessionDeps = {
-        // In non-dangerous mode, plain mode does not support interactive approval, so don't set requestApproval
-        // Returns error when tool needs approval
         requestApproval: parsed.options.dangerous
             ? undefined
             : (request) => {
-                  // Plain mode cannot interact, deny directly
                   console.log(`\n[approval required] ${request.toolName}: ${request.reason}`)
-                  console.log(`[approval] Run with --dangerous to bypass approval`)
+                  console.log('[approval] Run with --dangerous to bypass approval')
                   return Promise.resolve('deny')
               },
         hooks: {
@@ -153,14 +151,19 @@ async function runPlainMode(parsed: ParsedArgs) {
                 }
             },
             onObservation: () => {
-                // Don't show results, only show tool call parameters
+                // Don't show results, only show tool call parameters.
             },
         },
     }
 
-    const session = await createAgentSession(deps, sessionOptions)
+    const session = await createHttpAgentSession(deps, {
+        ...sessionOptions,
+        providerName: provider.name,
+        cwd: process.cwd(),
+        toolPermissionMode: parsed.options.dangerous ? 'full' : 'once',
+    })
     if (previousSession) {
-        restoreHistoryMessages(session, previousSession.messages)
+        await restoreHistoryMessages(session, previousSession.messages)
         console.log('[session] Continued from previous session context.')
     }
 
@@ -190,29 +193,24 @@ async function runPlainMode(parsed: ParsedArgs) {
 }
 
 async function runInteractiveTui(parsed: ParsedArgs) {
-    const loaded = await ensureProviderConfig('tui')
-    const provider = selectProvider(loaded.config)
-    const contextWindow = resolveContextWindowForProvider(loaded.config, provider)
+    const snapshot = await ensureProviderConfig('tui')
+    const provider = snapshot.selectedProvider
     const sessionId = randomUUID()
     const sessionOptions: AgentSessionOptions = {
         sessionId,
         mode: 'interactive',
-        contextWindow,
-        autoCompactThresholdPercent: loaded.config.auto_compact_threshold_percent,
-        activeMcpServers: loaded.config.active_mcp_servers,
+        contextWindow: provider.contextWindow,
+        autoCompactThresholdPercent: snapshot.autoCompactThresholdPercent,
+        activeMcpServers: snapshot.activeMcpServers,
         dangerous: parsed.options.dangerous,
     }
-    const sessionsDir = getSessionsDir(loaded, sessionOptions)
-    const previousSession = parsed.options.prev
-        ? await loadPreviousSession(sessionsDir, process.cwd())
-        : null
+    const previousSession = parsed.options.prev ? await loadPreviousSession(process.cwd()) : null
     if (parsed.options.prev && !previousSession) {
         console.error('No previous session found for current directory.')
         process.exitCode = 1
         return
     }
 
-    // 危险模式下显示警告
     if (parsed.options.dangerous) {
         console.log('⚠️  DANGEROUS MODE: All tool approvals are bypassed!')
         console.log('   Use with caution.\n')
@@ -223,14 +221,13 @@ async function runInteractiveTui(parsed: ParsedArgs) {
             sessionOptions={sessionOptions}
             providerName={provider.name}
             model={provider.model}
-            configPath={loaded.configPath}
-            mcpServers={loaded.config.mcp_servers ?? {}}
+            configPath={snapshot.configPath}
+            mcpServers={snapshot.mcpServers}
             cwd={process.cwd()}
-            sessionsDir={sessionsDir}
-            providers={loaded.config.providers}
-            modelProfiles={loaded.config.model_profiles}
+            providers={snapshot.providers}
+            modelProfiles={snapshot.modelProfiles}
             dangerous={parsed.options.dangerous}
-            needsSetup={loaded.needsSetup}
+            needsSetup={snapshot.needsSetup}
             initialHistory={previousSession ?? undefined}
         />,
         {
@@ -242,32 +239,37 @@ async function runInteractiveTui(parsed: ParsedArgs) {
 }
 
 async function main() {
-    const argv = process.argv.slice(2)
-    const route = routeCli(argv)
-    if (route.kind === 'subcommand') {
-        if (route.name === 'mcp') {
-            await runMcpCommand(route.args)
+    try {
+        const argv = process.argv.slice(2)
+        const route = routeCli(argv)
+        if (route.kind === 'subcommand') {
+            if (route.name === 'mcp') {
+                await runMcpCommand(route.args)
+                return
+            }
+            if (route.name === 'web') {
+                await runWebCommand(route.args)
+                return
+            }
+        }
+
+        const parsed = parseArgs(route.args)
+        if (parsed.options.showVersion) {
+            const info = findLocalPackageInfoSync()
+            const version = info?.version ?? 'unknown'
+            console.log(version)
             return
         }
-        if (route.name === 'web') {
-            const { runWebCommand } = await import('./web/run_web_command')
-            await runWebCommand(route.args)
+
+        const isInteractive = process.stdin.isTTY && process.stdout.isTTY
+        if (parsed.options.once || !isInteractive) {
+            await runPlainMode(parsed)
             return
         }
+        await runInteractiveTui(parsed)
+    } finally {
+        await closeSharedCoreServerClient()
     }
-    const parsed = parseArgs(route.args)
-    if (parsed.options.showVersion) {
-        const info = findLocalPackageInfoSync()
-        const version = info?.version ?? 'unknown'
-        console.log(version)
-        return
-    }
-    const isInteractive = process.stdin.isTTY && process.stdout.isTTY
-    if (parsed.options.once || !isInteractive) {
-        await runPlainMode(parsed)
-        return
-    }
-    await runInteractiveTui(parsed)
 }
 
 void main()

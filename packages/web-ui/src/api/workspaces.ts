@@ -1,22 +1,40 @@
-import { wsRequest } from '@/api/ws-client'
+import { request } from '@/api/request'
 import type { WorkspaceFsListResult, WorkspaceRecord } from '@/api/types'
 
 export function listWorkspaces() {
-    return wsRequest<{ items: WorkspaceRecord[] }>('workspace.list', {})
+    return request<{ items: WorkspaceRecord[] }>({
+        method: 'GET',
+        url: '/api/workspaces',
+    })
 }
 
 export function addWorkspace(params: { cwd: string; name?: string }) {
-    return wsRequest<{ created: boolean; item: WorkspaceRecord }>('workspace.add', params)
+    return request<{ created: boolean; item: WorkspaceRecord }>({
+        method: 'POST',
+        url: '/api/workspaces',
+        data: params,
+    })
 }
 
 export function updateWorkspace(params: { workspaceId: string; name: string }) {
-    return wsRequest<{ updated: boolean; item: WorkspaceRecord }>('workspace.update', params)
+    return request<{ updated: boolean; item: WorkspaceRecord }>({
+        method: 'PATCH',
+        url: `/api/workspaces/${encodeURIComponent(params.workspaceId)}`,
+        data: { name: params.name },
+    })
 }
 
 export function removeWorkspace(params: { workspaceId: string }) {
-    return wsRequest<{ deleted: boolean; deletedSessions?: number }>('workspace.remove', params)
+    return request<{ deleted: boolean; deletedSessions?: number }>({
+        method: 'DELETE',
+        url: `/api/workspaces/${encodeURIComponent(params.workspaceId)}`,
+    })
 }
 
 export function listWorkspaceDirectories(path?: string) {
-    return wsRequest<WorkspaceFsListResult>('workspace.fs.list', path ? { path } : {})
+    return request<WorkspaceFsListResult>({
+        method: 'GET',
+        url: '/api/workspaces/fs/list',
+        params: path ? { path } : undefined,
+    })
 }

@@ -88,7 +88,7 @@ type ChatInputPanelProps = {
     onCancelTurn: () => Promise<void> | void
     onApprovalDecision: (decision: ApprovalDecision) => Promise<void> | void
     sessionId?: string | null
-    workspaceId?: string | null
+    workspaceCwd?: string | null
     contextPercent: number
     queuedInputs: QueuedInputItem[]
     onEditQueuedInput: (item: QueuedInputItem) => Promise<void> | void
@@ -111,7 +111,7 @@ export function ChatInputPanel({
     onCancelTurn,
     onApprovalDecision,
     sessionId,
-    workspaceId,
+    workspaceCwd,
     contextPercent,
     queuedInputs,
     onEditQueuedInput,
@@ -148,7 +148,7 @@ export function ChatInputPanel({
         }
         const generation = ++requestIdRef.current
 
-        if (!activeTrigger || !hasActiveSession || (!sessionId && !workspaceId)) {
+        if (!activeTrigger || !hasActiveSession || (!sessionId && !workspaceCwd)) {
             setFileSuggestions([])
             setActiveSuggestionIndex(0)
             setLoadingFileSuggestions(false)
@@ -162,7 +162,7 @@ export function ChatInputPanel({
                 .suggestChatFiles({
                     query: activeTrigger.query,
                     sessionId: sessionId?.trim() || undefined,
-                    workspaceId: sessionId?.trim() ? undefined : workspaceId?.trim() || undefined,
+                    workspaceCwd: sessionId?.trim() ? undefined : workspaceCwd?.trim() || undefined,
                     limit: 8,
                 })
                 .then((result) => {
@@ -189,7 +189,7 @@ export function ChatInputPanel({
                 requestTimerRef.current = null
             }
         }
-    }, [activeTrigger, hasActiveSession, sessionId, workspaceId])
+    }, [activeTrigger, hasActiveSession, sessionId, workspaceCwd])
 
     function applyFileSuggestion(item: FileSuggestion) {
         const trigger = activeTrigger

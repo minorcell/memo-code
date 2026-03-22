@@ -1,17 +1,5 @@
-import { describe, expect, test, vi } from 'vitest'
-import { loadMemoConfig, writeMemoConfig } from '@memo/core'
+import { describe, expect, test } from 'vitest'
 import * as mcpModule from './mcp'
-
-vi.mock('@memo/core', () => ({
-    loadMemoConfig: vi.fn(),
-    writeMemoConfig: vi.fn(),
-}))
-
-vi.mock('@memo/tools/router/mcp/oauth', () => ({
-    getMcpAuthStatus: vi.fn(),
-    loginMcpServerOAuth: vi.fn(),
-    logoutMcpServerOAuth: vi.fn(),
-}))
 
 describe('mcp CLI helpers', () => {
     test('parseEnvAssignment parses valid assignment', () => {

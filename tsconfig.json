@@ -31,6 +31,8 @@
         "paths": {
             "@memo/core": ["packages/core/src/index.ts"],
             "@memo/core/*": ["packages/core/src/*"],
+            "@memo-code/types": ["packages/types/src/index.ts"],
+            "@memo-code/types/*": ["packages/types/src/*"],
             "@memo/tools": ["packages/tools/src/index.ts"],
             "@memo/tools/*": ["packages/tools/src/*"],
             "@memo-code/tui": ["packages/tui/src/index.ts"],

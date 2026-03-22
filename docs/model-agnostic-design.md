@@ -51,7 +51,7 @@ base_url = "http://localhost:11434/v1"
 
 ### 2. 统一 HTTP 客户端层
 
-位置：`packages/core/src/runtime/defaults.ts:147-174`
+位置：`packages/core/src/runtime/session/defaults.ts:147-174`
 
 使用 OpenAI SDK 作为统一接口：
 
@@ -70,7 +70,7 @@ const client = new OpenAI({
 
 ### 3. 消息格式转换层
 
-位置：`packages/core/src/runtime/defaults.ts:34-60`
+位置：`packages/core/src/runtime/session/defaults.ts:34-60`
 
 将内部 `ChatMessage` 格式转换为 OpenAI API 格式：
 
@@ -113,7 +113,7 @@ function toOpenAIMessage(message: ChatMessage): OpenAI.ChatCompletionMessagePara
 
 ### 4. 响应格式归一化层
 
-位置：`packages/core/src/runtime/defaults.ts:176-236`
+位置：`packages/core/src/runtime/session/defaults.ts:176-236`
 
 将模型响应转换为内部统一的 `LLMResponse` 格式：
 
@@ -206,6 +206,6 @@ base_url = "https://your-api-endpoint.com/v1"
 ## 相关文件
 
 - `packages/core/src/config/config.ts` - Provider 配置管理
-- `packages/core/src/runtime/defaults.ts` - HTTP 客户端和消息转换
+- `packages/core/src/runtime/session/defaults.ts` - HTTP 客户端和消息转换
 - `packages/core/src/types.ts` - 统一类型定义
 - `packages/tui/src/slash/registry.ts` - CLI 命令处理

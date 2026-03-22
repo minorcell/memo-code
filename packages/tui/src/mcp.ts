@@ -1,12 +1,8 @@
-import { loadMemoConfig, writeMemoConfig, type MCPServerConfig } from '@memo/core'
-import {
-    getMcpAuthStatus,
-    loginMcpServerOAuth,
-    logoutMcpServerOAuth,
-    type McpAuthStatus,
-} from '@memo/tools/router/mcp/oauth'
+import type { MCPServerConfig } from './http/api_types'
+import { withSharedCoreServerClient } from './http/shared_core_client'
 
 type McpCommand = 'list' | 'get' | 'add' | 'remove' | 'login' | 'logout' | 'help'
+type McpAuthStatus = 'unsupported' | 'not_logged_in' | 'bearer_token' | 'oauth'
 
 type AddOptions = {
     name: string
@@ -235,14 +231,6 @@ function parseLoginArgs(rest: string[]): {
     return { name, scopes }
 }
 
-function oauthSettingsFromLoaded(loaded: Awaited<ReturnType<typeof loadMemoConfig>>) {
-    return {
-        memoHome: loaded.home,
-        storeMode: loaded.config.mcp_oauth_credentials_store_mode,
-        callbackPort: loaded.config.mcp_oauth_callback_port,
-    }
-}
-
 export async function runMcpCommand(args: string[]): Promise<void> {
     const { command, rest } = parseCommand(args)
 
@@ -253,49 +241,44 @@ export async function runMcpCommand(args: string[]): Promise<void> {
 
     if (command === 'list') {
         const json = rest.includes('--json')
-        const loaded = await loadMemoConfig()
-        const servers = loaded.config.mcp_servers ?? {}
-        const names = Object.keys(servers)
-        const settings = oauthSettingsFromLoaded(loaded)
-        const authStatuses = new Map<string, McpAuthStatus>()
-        await Promise.all(
-            names.map(async (name) => {
-                const config = servers[name]
-                if (!config) return
-                try {
-                    const status = await getMcpAuthStatus(config, settings)
-                    authStatuses.set(name, status)
-                } catch {
-                    authStatuses.set(name, 'unsupported')
-                }
-            }),
-        )
+        try {
+            const response = await withSharedCoreServerClient((client) => client.listMcpServers())
+            const items = [...response.items].sort((left, right) =>
+                left.name.localeCompare(right.name),
+            )
 
-        if (json) {
-            const withAuthStatus: Record<string, MCPServerConfig & { auth_status: McpAuthStatus }> =
-                {}
-            for (const name of names) {
-                const server = servers[name]
-                if (!server) continue
-                withAuthStatus[name] = {
-                    ...(server as MCPServerConfig),
-                    auth_status: authStatuses.get(name) ?? 'unsupported',
+            if (json) {
+                const withAuthStatus: Record<
+                    string,
+                    MCPServerConfig & { auth_status: McpAuthStatus }
+                > = {}
+                for (const item of items) {
+                    withAuthStatus[item.name] = {
+                        ...(item.config as MCPServerConfig),
+                        auth_status: item.authStatus,
+                    }
                 }
+                console.log(JSON.stringify(withAuthStatus, null, 2))
+                return
             }
-            console.log(JSON.stringify(withAuthStatus, null, 2))
+
+            if (items.length === 0) {
+                console.log('No MCP servers configured. Add one with "memo mcp add".')
+                return
+            }
+
+            console.log(`MCP servers (${items.length}):`)
+            for (const item of items) {
+                console.log(
+                    formatServer(item.name, item.config as MCPServerConfig, item.authStatus),
+                )
+            }
+            return
+        } catch (error) {
+            console.error(getErrorMessage(error))
+            process.exitCode = 1
             return
         }
-        if (names.length === 0) {
-            console.log(`No MCP servers configured. Add one with "memo mcp add".`)
-            return
-        }
-        console.log(`MCP servers (${names.length}):`)
-        for (const name of names) {
-            const config = servers[name]
-            if (!config) continue
-            console.log(formatServer(name, config, authStatuses.get(name) ?? 'unsupported'))
-        }
-        return
     }
 
     if (command === 'get') {
@@ -306,19 +289,20 @@ export async function runMcpCommand(args: string[]): Promise<void> {
             process.exitCode = 1
             return
         }
-        const loaded = await loadMemoConfig()
-        const server = loaded.config.mcp_servers?.[name]
-        if (!server) {
-            console.error(`Unknown MCP server "${name}".`)
+
+        try {
+            const item = await withSharedCoreServerClient((client) => client.getMcpServer(name))
+            if (json) {
+                console.log(JSON.stringify(item.config, null, 2))
+                return
+            }
+            console.log(formatServer(item.name, item.config as MCPServerConfig, item.authStatus))
+            return
+        } catch (error) {
+            console.error(getErrorMessage(error))
             process.exitCode = 1
             return
         }
-        if (json) {
-            console.log(JSON.stringify(server, null, 2))
-            return
-        }
-        console.log(formatServer(name, server))
-        return
     }
 
     if (command === 'add') {
@@ -333,6 +317,7 @@ export async function runMcpCommand(args: string[]): Promise<void> {
         }
         const options = parsed.options
         if (!options) return
+
         if (options.url) {
             try {
                 new URL(options.url)
@@ -343,17 +328,9 @@ export async function runMcpCommand(args: string[]): Promise<void> {
             }
         }
 
-        const loaded = await loadMemoConfig()
-        const servers = { ...(loaded.config.mcp_servers ?? {}) }
-        if (servers[options.name]) {
-            console.error(`MCP server "${options.name}" already exists.`)
-            process.exitCode = 1
-            return
-        }
-
-        let entry: MCPServerConfig
+        let config: MCPServerConfig
         if (options.url) {
-            entry = {
+            config = {
                 type: 'streamable_http',
                 url: options.url,
                 ...(options.bearerTokenEnvVar
@@ -361,20 +338,24 @@ export async function runMcpCommand(args: string[]): Promise<void> {
                     : {}),
             }
         } else {
-            entry = {
+            config = {
                 command: options.command!,
                 args: options.args && options.args.length > 0 ? options.args : undefined,
                 env: options.env,
             }
         }
 
-        servers[options.name] = entry
-        await writeMemoConfig(loaded.configPath, {
-            ...loaded.config,
-            mcp_servers: servers,
-        })
-        console.log(`Added MCP server "${options.name}".`)
-        return
+        try {
+            await withSharedCoreServerClient((client) =>
+                client.createMcpServer(options.name, config),
+            )
+            console.log(`Added MCP server "${options.name}".`)
+            return
+        } catch (error) {
+            console.error(getErrorMessage(error))
+            process.exitCode = 1
+            return
+        }
     }
 
     if (command === 'remove') {
@@ -384,20 +365,16 @@ export async function runMcpCommand(args: string[]): Promise<void> {
             process.exitCode = 1
             return
         }
-        const loaded = await loadMemoConfig()
-        const servers = { ...(loaded.config.mcp_servers ?? {}) }
-        if (!servers[name]) {
-            console.error(`Unknown MCP server "${name}".`)
+
+        try {
+            await withSharedCoreServerClient((client) => client.removeMcpServer(name))
+            console.log(`Removed MCP server "${name}".`)
+            return
+        } catch (error) {
+            console.error(getErrorMessage(error))
             process.exitCode = 1
             return
         }
-        delete servers[name]
-        await writeMemoConfig(loaded.configPath, {
-            ...loaded.config,
-            mcp_servers: servers,
-        })
-        console.log(`Removed MCP server "${name}".`)
-        return
     }
 
     if (command === 'login') {
@@ -417,41 +394,16 @@ export async function runMcpCommand(args: string[]): Promise<void> {
             process.exitCode = 1
             return
         }
-        const loaded = await loadMemoConfig()
-        const server = loaded.config.mcp_servers?.[name]
-        if (!server) {
-            console.error(`Unknown MCP server "${name}".`)
-            process.exitCode = 1
-            return
-        }
-        if (!('url' in server)) {
-            console.error('OAuth login only applies to streamable HTTP servers.')
-            process.exitCode = 1
-            return
-        }
 
-        console.log(`Starting OAuth login for "${name}"...`)
         try {
-            const result = await loginMcpServerOAuth({
-                serverName: name,
-                config: server,
-                scopes: parsed.scopes,
-                settings: oauthSettingsFromLoaded(loaded),
-                onAuthorizationUrl: (url) => {
-                    console.log(`Open this URL to authorize:\n${url}`)
-                },
-                onBrowserOpenFailure: () => {
-                    console.log('Browser launch failed. Open the URL above manually.')
-                },
-            })
-            console.log(
-                `OAuth login completed for "${name}" (credentials stored in ${result.backend}).`,
-            )
+            await withSharedCoreServerClient((client) => client.loginMcpServer(name, parsed.scopes))
+            console.log(`OAuth login completed for "${name}".`)
+            return
         } catch (error) {
             console.error(getErrorMessage(error))
             process.exitCode = 1
+            return
         }
-        return
     }
 
     if (command === 'logout') {
@@ -461,34 +413,16 @@ export async function runMcpCommand(args: string[]): Promise<void> {
             process.exitCode = 1
             return
         }
-        const loaded = await loadMemoConfig()
-        const server = loaded.config.mcp_servers?.[name]
-        if (!server) {
-            console.error(`Unknown MCP server "${name}".`)
-            process.exitCode = 1
-            return
-        }
-        if (!('url' in server)) {
-            console.error('OAuth logout only applies to streamable HTTP servers.')
-            process.exitCode = 1
-            return
-        }
 
         try {
-            const result = await logoutMcpServerOAuth({
-                config: server,
-                settings: oauthSettingsFromLoaded(loaded),
-            })
-            if (result.removed) {
-                console.log(`Removed OAuth credentials for "${name}".`)
-            } else {
-                console.log(`No OAuth credentials stored for "${name}".`)
-            }
+            await withSharedCoreServerClient((client) => client.logoutMcpServer(name))
+            console.log(`Removed OAuth credentials for "${name}".`)
+            return
         } catch (error) {
             console.error(getErrorMessage(error))
             process.exitCode = 1
+            return
         }
-        return
     }
 
     console.error(`Unknown subcommand: ${command}`)
