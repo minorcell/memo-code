@@ -4,7 +4,7 @@ export default defineConfig({
     entry: ['src/index.ts'],
     outDir: 'dist',
     format: ['esm', 'cjs'],
-    target: 'node20',
+    target: 'node22',
     dts: true,
     clean: true,
     sourcemap: false,

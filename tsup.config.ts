@@ -3,6 +3,15 @@ import { build as esbuildBuild } from 'esbuild'
 import { copyFileSync, cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+const WEBFETCH_EXTERNALS = [
+    '@mozilla/readability',
+    'ipaddr.js',
+    'jsdom',
+    'robots-parser',
+    'turndown',
+    'undici',
+]
+
 async function bundleWebServerForDist(webServerDist: string, outputDir: string): Promise<void> {
     const entryFile = join(webServerDist, 'main.js')
     if (!existsSync(entryFile)) {
@@ -19,7 +28,7 @@ async function bundleWebServerForDist(webServerDist: string, outputDir: string):
         sourcemap: false,
         platform: 'node',
         format: 'cjs',
-        target: 'node20',
+        target: 'node22',
         legalComments: 'none',
         external: [
             '@dqbd/tiktoken',
@@ -29,6 +38,7 @@ async function bundleWebServerForDist(webServerDist: string, outputDir: string):
             '@nestjs/websockets/socket-module',
             '@nestjs/microservices',
             '@nestjs/microservices/microservices-module',
+            ...WEBFETCH_EXTERNALS,
         ],
     })
     writeFileSync(
@@ -44,14 +54,14 @@ export default defineConfig({
     },
     outDir: 'dist',
     format: ['esm'],
-    target: 'node20',
+    target: 'node22',
     dts: false,
     clean: true,
     minify: true,
     sourcemap: false,
     splitting: false,
     bundle: true,
-    external: ['@mozilla/readability', 'ipaddr.js', 'jsdom', 'robots-parser', 'turndown', 'undici'],
+    external: WEBFETCH_EXTERNALS,
     esbuildOptions(options) {
         options.jsx = 'automatic'
     },
