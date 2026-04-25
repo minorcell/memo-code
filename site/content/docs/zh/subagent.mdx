@@ -139,7 +139,7 @@ Memo 的消息结构里，工具往返遵循标准配对：
 ### 3) 模拟一次 subagent 调用（伪代码）
 
 ```ts
-// 简化流程示例：省略实际实现细节（如 hooks、事件记录、审批中间层）
+// 简化流程示例： 省略实际实现细节（如 hooks、事件记录、审批中间层）
 // 用户问题进入主 agent
 messages.push({ role: 'user', content: task })
 
@@ -148,7 +148,7 @@ assistant = llm(messages)
 // -> tool_calls: [{ id: "call_spawn_1", function: { name: "spawn_agent", arguments: ... } }]
 messages.push(assistant)
 
-spawnResult = callTool('spawn_agent', { message: '...' })
+spawnResult = callTool('spawn_agent', { message: `分析任务：${task}` })
 messages.push({
     role: 'tool',
     tool_call_id: 'call_spawn_1',
