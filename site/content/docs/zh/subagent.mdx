@@ -140,6 +140,9 @@ Memo 的消息结构里，工具往返遵循标准配对：
 
 ```ts
 // 简化流程示例： 省略实际实现细节（如 hooks、事件记录、审批中间层）
+// 假设输入：task = 用户当前问题
+const task = '并行分析两个目录的 TODO'
+// llm(messages) 表示一次模型调用，返回 assistant 消息（可能包含 tool_calls）
 // 用户问题进入主 agent
 messages.push({ role: 'user', content: task })
 
