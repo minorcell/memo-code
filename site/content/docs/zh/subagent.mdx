@@ -86,6 +86,7 @@ Memo 的消息结构里，工具往返遵循标准配对：
 
 - assistant 消息里放 `tool_calls[]`
 - tool 消息里放 `tool_call_id`（必须对应前面的 `tool_calls[i].id`）
+- `tool_calls[*].function.arguments` 在协议中是 **JSON 字符串**（不是已解析对象）
 
 简化示例（只展示关键字段）：
 
@@ -138,6 +139,7 @@ Memo 的消息结构里，工具往返遵循标准配对：
 ### 3) 模拟一次 subagent 调用（伪代码）
 
 ```ts
+// 简化流程示例：省略实际实现细节（如 hooks、事件记录、审批中间层）
 // 用户问题进入主 agent
 messages.push({ role: 'user', content: task })
 
