@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import zod from 'zod'
 import { option, argument } from 'pastel'
 import { loadMemoConfig, writeMemoConfig, type MCPServerConfig } from '@memo/core'
-import { parseEnvAssignment } from '../../mcp_helpers'
+import { parseEnvAssignment } from '../../features/mcp/mcpHelpers'
 
 export const options = zod.object({
     url: zod

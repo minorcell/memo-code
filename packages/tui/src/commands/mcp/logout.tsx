@@ -3,7 +3,7 @@ import zod from 'zod'
 import { argument } from 'pastel'
 import { loadMemoConfig } from '@memo/core'
 import { logoutMcpServerOAuth } from '@memo/tools/router/mcp/oauth'
-import { getErrorMessage, oauthSettingsFromLoaded } from '../../mcp_helpers'
+import { getErrorMessage, oauthSettingsFromLoaded } from '../../features/mcp/mcpHelpers'
 
 export const args = zod
     .array(zod.string())

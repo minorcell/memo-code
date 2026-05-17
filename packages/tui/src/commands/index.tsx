@@ -16,9 +16,9 @@ import {
     type AgentSessionOptions,
     type MemoConfig,
 } from '@memo/core'
-import { App } from '../App'
-import { parseHistoryLog } from '../controllers/history_parser'
-import { loadSessionHistoryEntries } from '../controllers/session_history'
+import { App } from '../app/App'
+import { parseHistoryLog } from '../features/session/historyParser'
+import { loadSessionHistoryEntries } from '../features/session/sessionHistory'
 
 export const options = zod.object({
     once: zod
@@ -40,6 +40,7 @@ export const options = zod.object({
 
 export const args = zod
     .array(zod.string())
+    .default([])
     .describe(argument({ name: 'question', description: 'Your question' }))
 
 async function ensureProviderConfig(mode: 'plain' | 'tui') {
