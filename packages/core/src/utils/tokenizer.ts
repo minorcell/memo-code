@@ -1,4 +1,4 @@
-/** @file tiktoken wrapper: for prompt/response token counting and encoding management. */
+/** @file tiktoken wrapper for token estimation. Used for compaction triggering, context overflow checks, and tool result sizing — not for usage reporting. */
 import { encoding_for_model, get_encoding, type Tiktoken } from '@dqbd/tiktoken'
 import type { ChatMessage, TokenCounter } from '@memo/core/types'
 
@@ -36,7 +36,7 @@ function messagePayloadForCounting(message: ChatMessage): string {
     return message.content
 }
 
-/** Create a reusable tokenizer counter for prompt estimation and usage reconciliation. */
+/** Create a reusable token counter for prompt size estimation (compaction trigger, context overflow check). */
 export function createTokenCounter(model?: string): TokenCounter {
     const { model: resolvedModel, factory } = safeEncodingFactory(model)
     const encoding = factory()

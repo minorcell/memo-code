@@ -694,16 +694,14 @@ export class AgentSessionImpl implements AgentSession {
                         parsed = {}
                     }
 
-                    // 将本地 tokenizer 与 LLM usage（若有）结合，记录 step 级 token 数据。
-                    const completionTokens = this.tokenCounter.countText(assistantText)
-                    const promptUsed = usageFromLLM?.prompt ?? estimatedPrompt
-                    const completionUsed = usageFromLLM?.completion ?? completionTokens
-                    const totalUsed = usageFromLLM?.total ?? promptUsed + completionUsed
-                    const stepUsage: TokenUsage = {
-                        prompt: promptUsed,
-                        completion: completionUsed,
-                        total: totalUsed,
-                    }
+                    // 使用 LLM 返回的 usage 作为用量记录。本地 tokenizer 仅用于预估（压缩触发、上下文超限检查），不作为用量上报的 fallback。
+                    const stepUsage: TokenUsage = usageFromLLM
+                        ? {
+                              prompt: usageFromLLM.prompt ?? 0,
+                              completion: usageFromLLM.completion ?? 0,
+                              total: usageFromLLM.total ?? 0,
+                          }
+                        : { prompt: 0, completion: 0, total: 0 }
                     accumulateUsage(turnUsage, stepUsage)
                     accumulateUsage(this.sessionUsage, stepUsage)
 
