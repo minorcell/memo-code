@@ -35,9 +35,6 @@ export default defineConfig({
     esbuildOptions(options) {
         options.jsx = 'automatic'
     },
-    banner: {
-        js: '#!/usr/bin/env node',
-    },
     async onSuccess() {
         copyFileSync(join('packages/core/src/runtime/prompt.md'), join('dist/prompt.md'))
         mkdirSync(join('dist/task-prompts'), { recursive: true })
