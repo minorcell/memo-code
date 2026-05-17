@@ -14,6 +14,13 @@ const WEBFETCH_EXTERNALS = [
 export default defineConfig({
     entry: {
         index: 'packages/tui/src/cli.tsx',
+        'commands/index': 'packages/tui/src/commands/index.tsx',
+        'commands/mcp/list': 'packages/tui/src/commands/mcp/list.tsx',
+        'commands/mcp/get': 'packages/tui/src/commands/mcp/get.tsx',
+        'commands/mcp/add': 'packages/tui/src/commands/mcp/add.tsx',
+        'commands/mcp/remove': 'packages/tui/src/commands/mcp/remove.tsx',
+        'commands/mcp/login': 'packages/tui/src/commands/mcp/login.tsx',
+        'commands/mcp/logout': 'packages/tui/src/commands/mcp/logout.tsx',
     },
     outDir: 'dist',
     format: ['esm'],
