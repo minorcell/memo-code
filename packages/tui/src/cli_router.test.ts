@@ -21,15 +21,6 @@ describe('routeCli', () => {
         })
     })
 
-    test('routes direct web subcommand', () => {
-        const routed = routeCli(['web', '--host', '127.0.0.1'])
-        assert.deepStrictEqual(routed, {
-            kind: 'subcommand',
-            name: 'web',
-            args: ['--host', '127.0.0.1'],
-        })
-    })
-
     test('keeps normal flags in default route', () => {
         const routed = routeCli(['--once', 'hello'])
         assert.deepStrictEqual(routed, {

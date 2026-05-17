@@ -5,8 +5,6 @@
 - `packages/tui/`：终端运行时包（入口文件 `src/cli.tsx`，包含交互式应用、聊天时间线、斜杠命令注册、批准/设置覆盖层）。
 - `packages/core/`：会话状态机、提供商/配置处理、共享类型。
 - `packages/tools/`：内置的类似 MCP 的工具；测试文件与实现文件放在一起，并使用 `*.test.ts` 命名。
-- `packages/web-ui/`：Web 版本的前端实现；包含 WebSocket 客户端、React 组件和样式。
-- `packages/web-server/`：Web 版本的后端实现；包含 WebSocket 服务器、会话管理和 API 适配器。
 - `docs/`：开发文档和设计方向；`public/`：TUI 静态资源。
 - 根脚本由 `package.json` 管理；需要 Node.js >=20 和 pnpm。安装 `rg` 以加快搜索速度。类型/路径别名在 `tsconfig.json` 中。
 - 运行时配置和日志默认存储在 `~/.memo/` 中，可以通过 `MEMO_HOME` 环境变量重定向。
@@ -16,7 +14,7 @@
 
 - 安装依赖：`pnpm install`。
 - 本地运行：`pnpm start`（交互式 TUI）。非 TTY 标准输入会自动使用纯文本模式。
-- 构建可分发的包：`pnpm run build`（输出 `dist/index.js` 和 `dist/prompt.md` 用于 npm 发布）。
+- 构建可分发的包：`pnpm run build`（输出 `dist/index.js`、`dist/prompt.md` 和 `dist/task-prompts/` 用于 npm 发布）。
 - 格式化：`pnpm run format`（写入文件）/ `pnpm run format:check`（仅 CI 检查）。
 - 测试：`pnpm test` 运行所有测试；按包测试：`pnpm run test:core`，`pnpm run test:tools`，`pnpm run test:tui`。CI 运行 `pnpm run ci` 进行格式检查、核心/工具测试和构建。
 - 常见本地问题：缺少 `OPENAI_API_KEY`/`DEEPSEEK_API_KEY` 会触发交互式提示；非 TTY 环境自动使用纯文本模式。

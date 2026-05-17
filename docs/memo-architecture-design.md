@@ -2,7 +2,7 @@
 
 ## 概述
 
-Memo 是一个轻量级的编程代理系统，采用模块化的 monorepo 架构，支持终端用户界面（TUI）和 Web 界面两种交互模式。系统基于 Node.js 22+ 构建，使用 TypeScript 开发，遵循严格的类型安全和模块化设计原则。
+Memo 是一个轻量级的编程代理系统，采用模块化的 monorepo 架构，支持终端用户界面（TUI）交互。系统基于 Node.js 22+ 构建，使用 TypeScript 开发，遵循严格的类型安全和模块化设计原则。
 
 ## 整体架构
 
@@ -22,8 +22,6 @@ memo-code/
 │   ├── core/           # 核心运行时和会话管理
 │   ├── tools/          # 工具系统和 MCP 集成
 │   ├── tui/            # 终端用户界面
-│   ├── web-server/     # Web 服务器端
-│   └── web-ui/         # Web 客户端
 ├── site/               # 文档站点
 └── dist/               # 构建输出
 ```
@@ -173,76 +171,6 @@ interface McpTool {
 - 简化的错误处理
 - CI/CD 集成
 
-### 4. Web Server 包 (`@memo-code/web-server`)
-
-**职责**：HTTP API、WebSocket 通信、会话管理
-
-#### 技术栈
-- **NestJS**：企业级 Node.js 框架
-- **WebSocket**：实时双向通信
-- **JWT**：身份认证和授权
-- **TypeScript**：类型安全
-
-#### API 设计
-
-**REST API**
-```
-POST /api/sessions          # 创建会话
-GET  /api/sessions/:id      # 获取会话信息
-POST /api/sessions/:id/chat # 发送消息
-GET  /api/config            # 获取配置
-PUT  /api/config            # 更新配置
-```
-
-**WebSocket 事件**
-```typescript
-interface WebSocketEvents {
-    'session:join': { sessionId: string }
-    'session:message': { message: ChatMessage }
-    'session:tool_call': { toolCall: AssistantToolCall }
-    'session:tool_result': { result: CallToolResult }
-    'session:error': { error: Error }
-}
-```
-
-#### 会话管理
-
-**会话注册表**
-- 多会话并发支持
-- 会话生命周期管理
-- 资源清理和回收
-- 状态同步
-
-**认证系统**
-- JWT 令牌认证
-- 会话级权限控制
-- API 密钥支持
-- 安全策略执行
-
-### 5. Web UI 包 (`@memo-code/web-ui`)
-
-**职责**：Web 客户端界面、实时通信、用户体验
-
-#### 技术栈
-- **React 19**：现代前端框架
-- **TypeScript**：类型安全
-- **WebSocket Client**：实时通信
-- **CSS Modules**：样式隔离
-
-#### 核心功能
-
-**聊天界面**
-- 消息流渲染
-- 工具调用可视化
-- 状态指示器
-- 响应式设计
-
-**工作区管理**
-- 项目文件浏览
-- 配置编辑器
-- 会话历史查看
-- MCP 服务器管理
-
 ## 数据流和交互
 
 ### 典型会话流程
@@ -250,23 +178,20 @@ interface WebSocketEvents {
 ```mermaid
 sequenceDiagram
     participant U as 用户
-    participant C as 客户端 (TUI/Web)
-    participant G as 网关 (Web Server)
+    participant C as 客户端 (TUI)
     participant S as 会话核心
     participant T as 工具系统
     participant L as LLM 提供商
 
     U->>C: 输入消息
-    C->>G: HTTP/WebSocket 请求
-    G->>S: 创建/获取会话
+    C->>S: 创建/获取会话
     S->>S: 构建提示词
     S->>L: LLM API 调用
     L-->>S: 响应 (包含工具调用)
     S->>T: 执行工具调用
     T-->>S: 工具执行结果
     S->>S: 处理结果并更新历史
-    S-->>G: 会话响应
-    G-->>C: HTTP/WebSocket 响应
+    S-->>C: 会话响应
     C-->>U: 显示结果
 ```
 
@@ -333,16 +258,6 @@ memo
 
 # 纯文本模式
 echo "help me debug" | memo
-```
-
-**Web 模式**
-```bash
-# 开发模式
-pnpm run web:dev
-
-# 生产构建
-pnpm run web:build
-pnpm run start
 ```
 
 ## 扩展机制
@@ -469,7 +384,6 @@ interface LogEvent {
 **集成测试**
 - 端到端会话测试
 - MCP 服务器集成
-- Web API 测试
 - 并发场景测试
 
 ## 未来规划

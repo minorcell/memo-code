@@ -249,11 +249,6 @@ async function main() {
             await runMcpCommand(route.args)
             return
         }
-        if (route.name === 'web') {
-            const { runWebCommand } = await import('./web/run_web_command')
-            await runWebCommand(route.args)
-            return
-        }
     }
     const parsed = parseArgs(route.args)
     if (parsed.options.showVersion) {

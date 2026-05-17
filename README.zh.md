@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/logo.svg" width="96" height="96" alt="Memo Code logo">
   <h1>Memo Code</h1>
-  <p><strong>面向终端与 Web 工作流的轻量级编码代理。</strong></p>
+  <p><strong>面向终端工作流的轻量级编码代理。</strong></p>
   <p>
     <a href="https://memo.mcell.top/">官方网站</a>
     ·
@@ -37,7 +37,7 @@ Memo 诞生于一个简单的想法：**我想验证一个最简单的 Agent 是
 - 多模型切换与兼容性
 - 上下文管理（尤其是长会话的压缩策略）
 - TUI 难以处理的交互
-- Web 版本的多工作区支持
+- 多工作区支持
 - npm 包的分发与热更新
 - ...
 
@@ -49,7 +49,7 @@ Memo 诞生于一个简单的想法：**我想验证一个最简单的 Agent 是
 
 | 特性                | 说明                                                                    |
 | ------------------- | ----------------------------------------------------------------------- |
-| **终端 + Web 双端** | 终端 TUI 交互流畅，Web Console 支持多工作区、并发实时会话（最高 20 个） |
+| **终端模式**         | 终端 TUI 交互流畅                                                  |
 | **智能上下文管理**  | 自动压缩长会话上下文，支持配置压缩阈值，毫秒级 token 估算               |
 | **Skills 技能系统** | Skills 技能集成，自动发现 `SKILL.md`，支持按场景激活                    |
 | **MCP 深度集成**    | 支持本地/远程 MCP 服务器，OAuth 登录，运行时动态切换                    |
@@ -87,7 +87,6 @@ memo
 | 交互模式   | `memo`                                         | 默认，完整 TUI 体验    |
 | 单次模式   | `memo --once "prompt"`                         | 执行一次后退出         |
 | 继续会话   | `memo --prev`                                  | 加载当前目录的最新会话 |
-| Web 控制台 | `memo web --host 127.0.0.1 --port 5494 --open` | 浏览器操作             |
 
 ## 🏗️ 架构设计
 
@@ -97,8 +96,6 @@ memo-code/
 │   ├── core/          # 核心逻辑：Session 状态机、Config 处理
 │   ├── tools/         # Tool 路由、MCP Client管理、内置工具实现（exec_command, read_text_file, apply_patch...）
 │   ├── tui/           # 终端运行时：CLI 入口、交互式 TUI
-│   ├── web-ui/        # Web 前端：React 组件
-│   └── web-server/    # Web 后端：会话管理、API 适配器
 └── docs/              # 技术文档
 ```
 
@@ -108,7 +105,7 @@ memo-code/
 - **测试**：Core + Tools 覆盖率 > 70%，完整的单元 + 集成测试
 - **协议**：原生支持 MCP (Model Context Protocol)，可接入任意 MCP 工具服务器
 - **Token 估算**：基于 tiktoken 的实时上下文监控，支持可配置的自动压缩策略
-- **分发**：npm 包预构建 Web 资源，热加载无感知
+- **分发**：npm 包热加载无感知
 
 ## 🔧 内置工具
 

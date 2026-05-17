@@ -8,7 +8,7 @@ import type {
     SessionTurnStep,
     TokenUsageSummary,
     ToolUsageSummary,
-} from '../web/types.js'
+} from '../api_types.js'
 import { workspaceIdFromCwd } from './workspace.js'
 
 type MutableTurnDetail = SessionTurnDetail & {

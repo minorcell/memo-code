@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/logo.svg" width="96" height="96" alt="Memo Code logo">
   <h1>Memo Code</h1>
-  <p><strong>A lightweight coding agent for terminal and web workflows.</strong></p>
+  <p><strong>A lightweight coding agent for terminal workflows.</strong></p>
   <p>
     <a href="https://memo.mcell.top/">Website</a>
     ·
@@ -39,7 +39,7 @@ In the second half of 2024, while writing my tech blog post [Agent = LLM + TOOL]
 - Multi-model switching and compatibility
 - Context management (especially long-session compaction strategies)
 - Tricky TUI interactions
-- Multi-workspace support for Web version
+- Multi-workspace support
 - npm package distribution and hot-reloading
 - ...
 
@@ -53,7 +53,7 @@ This project grew from a small demo into an indispensable "productivity assistan
 
 | Feature                       | Description                                                                                           |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Terminal + Web Dual Mode**  | Smooth TUI in terminal, Web Console with multi-workspace and concurrent real-time sessions (up to 20) |
+| **Terminal Mode**            | Smooth TUI in terminal                                                               |
 | **Smart Context Management**  | Auto-compact long session context, configurable threshold, millisecond-level token estimation         |
 | **Skills System**             | Skills integration, auto-discover `SKILL.md`, activate by scenario                                    |
 | **Deep MCP Integration**      | Local/remote MCP servers, OAuth login, runtime dynamic switching                                      |
@@ -95,7 +95,6 @@ First run will guide you through Provider/Model setup and save config to `~/.mem
 | Interactive    | `memo`                                         | Default, full TUI experience              |
 | One-shot       | `memo --once "prompt"`                         | Run once and exit                         |
 | Resume Session | `memo --prev`                                  | Load latest session for current directory |
-| Web Console    | `memo web --host 127.0.0.1 --port 5494 --open` | Browser-based operation                   |
 
 ---
 
@@ -107,8 +106,6 @@ memo-code/
 │   ├── core/          # Core logic: Session state machine, Config handling
 │   ├── tools/         # Tool routing, MCP Client management, built-in tools (exec_command, read_text_file, apply_patch...)
 │   ├── tui/           # Terminal runtime: CLI entry, interactive TUI
-│   ├── web-ui/        # Web frontend: React components
-│   └── web-server/    # Web backend: session management, API adapter
 └── docs/              # Technical documentation
 ```
 
@@ -118,7 +115,7 @@ memo-code/
 - **Testing**: Core + Tools coverage > 70%, complete unit + integration tests
 - **Protocol**: Native MCP (Model Context Protocol) support, can integrate any MCP tool server
 - **Token Estimation**: Real-time context monitoring based on tiktoken, configurable auto-compaction strategy
-- **Distribution**: npm package with pre-built Web assets, hot-reloading without perception
+- **Distribution**: npm package with hot-reloading without perception
 
 ---
 

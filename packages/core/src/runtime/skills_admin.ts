@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { loadMemoConfig, writeMemoConfig, type MemoConfig } from '../config/config.js'
 import { normalizeWorkspacePath } from './workspace.js'
-import type { SkillRecord } from '../web/types.js'
+import type { SkillRecord } from '../api_types.js'
 
 type SkillScope = 'project' | 'global'
 

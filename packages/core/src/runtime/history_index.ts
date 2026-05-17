@@ -7,7 +7,7 @@ import type {
     SessionListItem,
     SessionListResponse,
     ToolUsageSummary,
-} from '../web/types.js'
+} from '../api_types.js'
 import { parseHistoryLogToSessionDetail } from './history_parser.js'
 import { cwdBelongsToWorkspace } from './workspace.js'
 
