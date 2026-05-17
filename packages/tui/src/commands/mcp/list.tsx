@@ -3,7 +3,7 @@ import zod from 'zod'
 import { option } from 'pastel'
 import { loadMemoConfig } from '@memo/core'
 import { getMcpAuthStatus } from '@memo/tools/router/mcp/oauth'
-import { formatServer, oauthSettingsFromLoaded } from '../../mcp_helpers'
+import { formatServer, oauthSettingsFromLoaded } from '../../features/mcp/mcpHelpers'
 import type { McpAuthStatus } from '@memo/tools/router/mcp/oauth'
 
 export const options = zod.object({

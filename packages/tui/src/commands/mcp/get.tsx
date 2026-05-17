@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import zod from 'zod'
 import { option, argument } from 'pastel'
 import { loadMemoConfig } from '@memo/core'
-import { formatServer } from '../../mcp_helpers'
+import { formatServer } from '../../features/mcp/mcpHelpers'
 
 export const options = zod.object({
     json: zod

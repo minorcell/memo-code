@@ -1,2 +1,2 @@
-export { App, type AppProps } from './App'
-export { findLocalPackageInfoSync } from './version'
+export { App, type AppProps } from './app/App'
+export { findLocalPackageInfoSync } from './shared/lib/version'
