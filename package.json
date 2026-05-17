@@ -1,6 +1,6 @@
 {
     "name": "@memo-code/memo",
-    "version": "0.8.61",
+    "version": "0.8.62",
     "private": false,
     "type": "module",
     "description": "A lightweight coding agent that runs in your terminal",
@@ -10,6 +10,7 @@
     "files": [
         "dist/index.js",
         "dist/prompt.md",
+        "dist/commands/**",
         "dist/task-prompts/*.md",
         "README.md",
         "LICENSE"
