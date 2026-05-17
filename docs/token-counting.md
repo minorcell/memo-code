@@ -1,6 +1,6 @@
-# Token Counting Strategy in Memo Code CLI
+# Token Counting Strategy in Memo Code
 
-This document describes how Memo Code CLI estimates and records tokens for prompt budgeting, context-limit protection, and usage reconciliation.
+This document describes how Memo Code estimates and records tokens for prompt budgeting, context-limit protection, and usage reconciliation.
 
 ## Counting Implementation
 

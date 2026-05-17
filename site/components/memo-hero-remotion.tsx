@@ -199,7 +199,7 @@ const MemoHeroComposition = () => {
                             }}
                         >
                             <div style={{ color: '#f3f4f6', fontWeight: 700 }}>
-                                Welcome to Memo Code CLI!
+                                Welcome to Memo Code!
                             </div>
                             <div style={{ color: '#a1a1aa' }}>
                                 Send <span style={{ color: '#facc15' }}>/help</span> for help

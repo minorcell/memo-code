@@ -1,6 +1,6 @@
 # @memo/core Overview
 
-Core provides the central capabilities of **Memo Code CLI**: the ReAct loop, session state management, default dependency wiring (LLM/tools/prompt/history), config loading, and shared types/utilities. The design goal is "thick Core, thin UI": UI handles interaction and callbacks, while Core owns behavior.
+Core provides the central capabilities of **Memo Code**: the ReAct loop, session state management, default dependency wiring (LLM/tools/prompt/history), config loading, and shared types/utilities. The design goal is "thick Core, thin UI": UI handles interaction and callbacks, while Core owns behavior.
 
 ## Directory Layout
 

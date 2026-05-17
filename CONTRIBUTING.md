@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in **Memo Code CLI**. Please read these guidelines before opening a PR.
+Thanks for your interest in **Memo Code**. Please read these guidelines before opening a PR.
 
 ## Getting Started
 
