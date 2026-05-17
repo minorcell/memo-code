@@ -103,9 +103,7 @@ export const ChatWidget = memo(function ChatWidget({
                                 </Text>
                                 <Text color="gray">cwd: {item.data.cwd}</Text>
                                 {item.data.mcpNames.length > 0 ? (
-                                    <Text color="gray">
-                                        mcp: {item.data.mcpNames.join(', ')}
-                                    </Text>
+                                    <Text color="gray">mcp: {item.data.mcpNames.join(', ')}</Text>
                                 ) : null}
                             </Box>
                         )
